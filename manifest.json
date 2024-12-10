@@ -1,0 +1,11 @@
+{
+    "display_name": "st_commands",
+    "loading_order": 100,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "",
+    "author": "qvink",
+    "version": "0.0.1",
+    "homePage": "https://github.com/qvink/st_commands.git"
+}
