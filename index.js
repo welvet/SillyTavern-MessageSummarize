@@ -1,5 +1,5 @@
-import { getStringHash, debounce, waitUntilCondition, extractAllWords, isTrueBoolean } from '../../utils.js';
-import { getContext, getApiUrl, extension_settings, doExtrasFetch, modules, renderExtensionTemplateAsync } from '../../extensions.js';
+import { getStringHash, debounce, waitUntilCondition, extractAllWords, isTrueBoolean } from '../../../utils.js';
+import { getContext, getApiUrl, extension_settings, doExtrasFetch, modules, renderExtensionTemplateAsync } from '../../../extensions.js';
 import {
     activateSendButtons,
     deactivateSendButtons,
@@ -16,18 +16,18 @@ import {
     getMaxContextSize,
     setExtensionPrompt,
     streamingProcessor,
-} from '../../../script.js';
-import { is_group_generating, selected_group } from '../../group-chats.js';
-import { loadMovingUIState } from '../../power-user.js';
-import { dragElement } from '../../RossAscends-mods.js';
-import { getTextTokens, getTokenCountAsync, tokenizers } from '../../tokenizers.js';
-import { debounce_timeout } from '../../constants.js';
-import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
-import { SlashCommand } from '../../slash-commands/SlashCommand.js';
-import { ARGUMENT_TYPE, SlashCommandArgument, SlashCommandNamedArgument } from '../../slash-commands/SlashCommandArgument.js';
-import { MacrosParser } from '../../macros.js';
-import { countWebLlmTokens, generateWebLlmChatPrompt, getWebLlmContextSize, isWebLlmSupported } from '../shared.js';
-import { commonEnumProviders } from '../../slash-commands/SlashCommandCommonEnumsProvider.js';
+} from '../../../../script.js';
+import { is_group_generating, selected_group } from '../../../group-chats.js';
+import { loadMovingUIState } from '../../../power-user.js';
+import { dragElement } from '../../../RossAscends-mods.js';
+import { getTextTokens, getTokenCountAsync, tokenizers } from '../../../tokenizers.js';
+import { debounce_timeout } from '../../../constants.js';
+import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
+import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
+import { ARGUMENT_TYPE, SlashCommandArgument, SlashCommandNamedArgument } from '../../../slash-commands/SlashCommandArgument.js';
+import { MacrosParser } from '../../../macros.js';
+import { countWebLlmTokens, generateWebLlmChatPrompt, getWebLlmContextSize, isWebLlmSupported } from '../../shared.js';
+import { commonEnumProviders } from '../../../slash-commands/SlashCommandCommonEnumsProvider.js';
 export { MODULE_NAME };
 
 const MODULE_NAME = 'qvink_memory';
@@ -38,6 +38,10 @@ let lastChatId = null;
 let lastMessageHash = null;
 let lastMessageId = null;
 let inApiCall = false;
+
+function log(message) {
+    console.log(`[Qvink Memory] ${message}`);
+}
 
 /**
  * Count the number of tokens in the provided text.
@@ -141,7 +145,7 @@ const defaultSettings = {
 
 // UI handling
 function loadSettings() {
-    console.log("Loading Qvink Memory Settings...")
+    log("Loading Settings...")
     // Load default settings if not present
     if (Object.keys(extension_settings.qvink_memory).length === 0) {
         Object.assign(extension_settings.qvink_memory, defaultSettings);
@@ -192,7 +196,7 @@ function switchSourceControls(value) {
 // Event handling
 async function onChatEvent() {
     // When the chat is updated, check if the summarization should be triggered
-    console.debug("Chat updated, checking if summarization should be triggered...")
+    log("Chat updated, checking if summarization should be triggered...")
     
     // Module not enabled
     if (extension_settings.qvink_memory.source === summary_sources.extras && !modules.includes(MODULE_NAME)) {
@@ -219,7 +223,7 @@ async function onChatEvent() {
 
     // Chat/character/group changed
     if ((context.groupId && lastGroupId !== context.groupId) || (context.characterId !== lastCharacterId) || (context.chatId !== lastChatId)) {
-        console.debug('Chat or character changed');
+        log('Chat or character changed');
         return;
     }
 
@@ -230,7 +234,7 @@ async function onChatEvent() {
 
     // No new messages - do nothing
     if (chat.length === 0 || (lastMessageId === chat.length && getStringHash(chat[chat.length - 1].mes) === lastMessageHash)) {
-        console.debug("No new messages, skipping summarization")
+        log("No new messages, skipping summarization")
         return;
     }
 
@@ -239,10 +243,10 @@ async function onChatEvent() {
         && chat[chat.length - 1].extra?.memory
         && lastMessageId === chat.length
         && getStringHash(chat[chat.length - 1].mes) !== lastMessageHash) {
-        console.debug("Last message has been edite");
+        log("Last message has been edite");
     }
 
-    console.log("Chat update - summarize new memory here")
+    log("Chat update - summarize new memory here")
 }
 
 
@@ -269,7 +273,7 @@ async function onPromptForceWordsAutoClick() {
     const targetMessagesInPrompt = maxMessagesPerSummary > 0 ? maxMessagesPerSummary : Math.max(0, averageMessagesPerPrompt);
     const targetSummaryWords = (targetMessagesInPrompt * averageMessageWordCount) + (promptAllowanceWords / 4);
 
-    console.table({
+    log({
         maxPromptLength,
         maxPromptLengthWords,
         promptAllowanceWords,
@@ -304,7 +308,7 @@ async function onPromptIntervalAutoClick() {
     const targetMessagesInPrompt = maxMessagesPerSummary > 0 ? maxMessagesPerSummary : Math.max(0, averageMessagesPerPrompt);
     const adjustedAverageMessagesPerPrompt = targetMessagesInPrompt + (averageMessagesPerPrompt - targetMessagesInPrompt) / 4;
 
-    console.table({
+    log({
         maxPromptLength,
         promptAllowance,
         targetSummaryTokens,
@@ -419,7 +423,7 @@ function onMaxMessagesPerRequestInput() {
 
 function onMemoryRestoreClick() {
     // See what the current memory looks like
-    console.debug("Viewing current memory contents")
+    log("Viewing current memory contents")
     let long_memory = get_long_memory()
     let short_memory = get_short_memory()
     let value = "Long-term memory:\n\n" + long_memory + '\n\n' + "Short-term memory:\n\n" + short_memory + '\n\n'
@@ -428,12 +432,12 @@ function onMemoryRestoreClick() {
 
 function onMemoryContentInput() {
     const value = $(this).val();
-    console.debug("user inputting into memory (doing nothing): " + value)
+    log("user inputting into memory (doing nothing): " + value)
 }
 
 function onMemoryPromptBuilderInput(e) {
     let value = Number(e.target.value);
-    console.debug("Prompt builder changed to: " + value)
+    log("Prompt builder changed to: " + value)
     extension_settings.qvink_memory.prompt_builder = value;
     saveSettingsDebounced();
 }
@@ -495,7 +499,7 @@ async function callExtrasSummarizeAPI(text) {
  */
 function summarize_text(text, method='main') {
 
-    console.debug(`Summarizing text using method: ${method}\n ${text}`)
+    log(`Summarizing text using method: ${method}\n ${text}`)
 
     switch (method) {
         case 'main':
@@ -524,7 +528,7 @@ function summarize_message(index=null, replace=false) {
 
     // Check if the message already has a summary
     if (!replace && context.chat[index].extra?.qvink_memory) {
-        console.debug(`Message ${index} already has a summary, skipping summarization.`);
+        log(`Message ${index} already has a summary, skipping summarization.`);
         return;
     }
 
@@ -539,7 +543,7 @@ function summarize_message(index=null, replace=false) {
     message.extra.qvink_memory = summary;
     saveChatDebounced();
 
-    console.debug(`Summarized message ${index}: ${summary}`);
+    log(`Summarized message ${index}: ${summary}`);
 }
 
 
@@ -562,7 +566,7 @@ function concatenate_summaries(start, end=null, long_term=false, short_term=fals
 
     // assert start is less than end
     if (start > end) {
-        console.warn('Cannot concatenate summaries: start index is greater than end index');
+        log('Cannot concatenate summaries: start index is greater than end index');
         return '';
     }
 
@@ -617,7 +621,7 @@ async function text_within_short_limit(text) {
  * Iterate through all chat messages and update whether each message should be included in short-term memory
  */
 function update_short_term_memory() {
-    console.log("Updating short-term memory flags...")
+    log("Updating short-term memory flags...")
     let context = getContext();
     let chat = context.chat;
 
@@ -663,7 +667,7 @@ function set_message_long_term(index=null) {
     message.extra.qvink_long_term = true;
     saveChatDebounced();
 
-    console.debug(`Set message ${index} as long term memory`);
+    log(`Set message ${index} as long term memory`);
 }
 
 function get_long_memory() {
@@ -681,7 +685,7 @@ function get_short_memory() {
  * @param replace {boolean} Whether to replace existing summaries (default false)
  */
 function summarize_chat(replace=false) {
-    console.log('Summarizing chat...')
+    log('Summarizing chat...')
     let context = getContext();
 
     // optionally block user from sending chat messages while summarization is in progress
@@ -702,11 +706,11 @@ function summarize_chat(replace=false) {
 
 
 function doPopout(e) {
-    console.debug('QM popout button clicked')
+    log('QM popout button clicked')
     const target = e.target;
     //repurposes the zoomed avatar template to server as a floating div
     if ($('#qmExtensionPopout').length === 0) {
-        console.debug('did not see popout yet, creating');
+        log('did not see popout yet, creating');
         const originalHTMLClone = $(target).parent().parent().parent().find('.inline-drawer-content').html();
         const originalElement = $(target).parent().parent().parent().find('.inline-drawer-content');
         const template = $('#zoomed_avatar_template').html();
@@ -745,7 +749,7 @@ function doPopout(e) {
             loadSettings();
         });
     } else {
-        console.debug('saw existing popout, removing');
+        log('saw existing popout, removing');
         $('#qmExtensionPopout').fadeOut(animation_duration, () => { $('#qmExtensionPopoutClose').trigger('click'); });
     }
 }
@@ -776,7 +780,7 @@ function setupListeners() {
     $('#qmemory_max_messages_per_request').off('click').on('input', onMaxMessagesPerRequestInput);
     $('#qmemory_include_wi_scan').off('input').on('input', onMemoryIncludeWIScanInput);
     $('#qmSettingsBlockToggle').off('click').on('click', function () {
-        console.log('saw settings button click');
+        log('saw settings button click');
         $('#qmSettingsBlock').slideToggle(200, 'swing'); //toggleClass("hidden");
     });
 }
@@ -795,7 +799,7 @@ async function addExtensionControls() {
 
 jQuery(async function () {
     // entry point
-    console.log("Loading Qvink Memory extension...")
+    log("Loading Qvink Memory extension...")
     await addExtensionControls();
     loadSettings();
 
@@ -832,8 +836,8 @@ jQuery(async function () {
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'log',
         callback: (args) => {
-            console.log("CHAT: ")
-            console.log(getContext().chat)
+            log("CHAT: ")
+            log(getContext().chat)
         },
         helpString: 'log chat',
     }));
