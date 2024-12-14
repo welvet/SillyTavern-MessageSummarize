@@ -788,10 +788,9 @@ function setupListeners() {
 
 async function addExtensionControls() {
     log("Adding extension controls...")
-    const settingsHtml = await renderExtensionTemplateAsync(MODULE_DIR, 'settings', { defaultSettings });
-    log("Container: ", $(`#${MODULE_NAME}_container`))
+    const settingsHtml = await $.get(`${MODULE_DIR}/settings.html`);
+    $("#extensions_settings2").append(settingsHtml);
     log("Settings HTML: ", settingsHtml)
-    $(`#${MODULE_NAME}_container`).append(settingsHtml);
 
     //setupListeners();
     $('#qmExtensionPopoutButton').off('click').on('click', function (e) {
