@@ -31,7 +31,7 @@ import { commonEnumProviders } from '../../../slash-commands/SlashCommandCommonE
 export { MODULE_NAME };
 
 const MODULE_NAME = 'qvink_memory';
-const MODULE_DIR = `third-party/${MODULE_NAME}`;
+const MODULE_DIR = `scripts/extensions/third-party/${MODULE_NAME}`;
 
 let lastCharacterId = null;
 let lastGroupId = null;
