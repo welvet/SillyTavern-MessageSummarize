@@ -144,53 +144,6 @@ const defaultSettings = {
 };
 
 
-// UI handling
-function loadSettings() {
-    log("Loading Settings...")
-    // Load default settings if not present
-    if (Object.keys(extension_settings.qvink_memory).length === 0) {
-        Object.assign(extension_settings.qvink_memory, defaultSettings);
-    }
-    for (const key of Object.keys(defaultSettings)) {
-        if (extension_settings.qvink_memory[key] === undefined) {
-            extension_settings.qvink_memory[key] = defaultSettings[key];
-        }
-    }
-
-    // Load the current settings into the UI and trigger their change events
-    $('#qm_source').val(extension_settings.qvink_memory.source).trigger('change');
-    $('#qmemory_frozen').prop('checked', extension_settings.qvink_memory.memoryFrozen).trigger('input');
-    $('#qmemory_skipWIAN').prop('checked', extension_settings.qvink_memory.SkipWIAN).trigger('input');
-    $('#qmemory_prompt').val(extension_settings.qvink_memory.prompt).trigger('input');
-    $('#qmemory_prompt_words').val(extension_settings.qvink_memory.promptWords).trigger('input');
-    $('#qmemory_prompt_interval').val(extension_settings.qvink_memory.promptInterval).trigger('input');
-    $('#qmemory_template').val(extension_settings.qvink_memory.template).trigger('input');
-    $('#qmemory_depth').val(extension_settings.qvink_memory.depth).trigger('input');
-    $('#qmemory_role').val(extension_settings.qvink_memory.role).trigger('input');
-    $(`input[name="qmemory_position"][value="${extension_settings.qvink_memory.position}"]`).prop('checked', true).trigger('input');
-    $('#qmemory_prompt_words_force').val(extension_settings.qvink_memory.promptForceWords).trigger('input');
-    $(`input[name="qmemory_prompt_builder"][value="${extension_settings.qvink_memory.prompt_builder}"]`).prop('checked', true).trigger('input');
-    $('#qmemory_override_response_length').val(extension_settings.qvink_memory.overrideResponseLength).trigger('input');
-    $('#qmemory_max_messages_per_request').val(extension_settings.qvink_memory.maxMessagesPerRequest).trigger('input');
-    $('#qmemory_include_wi_scan').prop('checked', extension_settings.qvink_memory.scan).trigger('input');
-    switchSourceControls(extension_settings.qvink_memory.source);
-}
-
-function onSummarySourceChange(event) {
-    // Update the source setting and switch the source-specific controls
-    const value = event.target.value;
-    extension_settings.qvink_memory.source = value;
-    switchSourceControls(value);
-    saveSettingsDebounced();
-}
-
-function switchSourceControls(value) {
-    // Hide/show the source-specific settings
-    $('#qmemory_settings [data-summary-source]').each((_, element) => {
-        const source = element.dataset.summarySource.split(',').map(s => s.trim());
-        $(element).toggle(source.includes(value));
-    });
-}
 
 
 
@@ -706,6 +659,56 @@ function summarize_chat(replace=false) {
 
 
 
+
+// UI handling
+function loadSettings() {
+    log("Loading Settings...")
+    // Load default settings if not present
+    log(extension_settings.qvink_memory)
+    if (Object.keys(extension_settings.qvink_memory).length === 0) {
+        Object.assign(extension_settings.qvink_memory, defaultSettings);
+    }
+    for (const key of Object.keys(defaultSettings)) {
+        if (extension_settings.qvink_memory[key] === undefined) {
+            extension_settings.qvink_memory[key] = defaultSettings[key];
+        }
+    }
+
+    // Load the current settings into the UI and trigger their change events
+    $('#qm_source').val(extension_settings.qvink_memory.source).trigger('change');
+    $('#qmemory_frozen').prop('checked', extension_settings.qvink_memory.memoryFrozen).trigger('input');
+    $('#qmemory_skipWIAN').prop('checked', extension_settings.qvink_memory.SkipWIAN).trigger('input');
+    $('#qmemory_prompt').val(extension_settings.qvink_memory.prompt).trigger('input');
+    $('#qmemory_prompt_words').val(extension_settings.qvink_memory.promptWords).trigger('input');
+    $('#qmemory_prompt_interval').val(extension_settings.qvink_memory.promptInterval).trigger('input');
+    $('#qmemory_template').val(extension_settings.qvink_memory.template).trigger('input');
+    $('#qmemory_depth').val(extension_settings.qvink_memory.depth).trigger('input');
+    $('#qmemory_role').val(extension_settings.qvink_memory.role).trigger('input');
+    $(`input[name="qmemory_position"][value="${extension_settings.qvink_memory.position}"]`).prop('checked', true).trigger('input');
+    $('#qmemory_prompt_words_force').val(extension_settings.qvink_memory.promptForceWords).trigger('input');
+    $(`input[name="qmemory_prompt_builder"][value="${extension_settings.qvink_memory.prompt_builder}"]`).prop('checked', true).trigger('input');
+    $('#qmemory_override_response_length').val(extension_settings.qvink_memory.overrideResponseLength).trigger('input');
+    $('#qmemory_max_messages_per_request').val(extension_settings.qvink_memory.maxMessagesPerRequest).trigger('input');
+    $('#qmemory_include_wi_scan').prop('checked', extension_settings.qvink_memory.scan).trigger('input');
+    switchSourceControls(extension_settings.qvink_memory.source);
+}
+
+function onSummarySourceChange(event) {
+    // Update the source setting and switch the source-specific controls
+    const value = event.target.value;
+    extension_settings.qvink_memory.source = value;
+    switchSourceControls(value);
+    saveSettingsDebounced();
+}
+
+function switchSourceControls(value) {
+    // Hide/show the source-specific settings
+    $('#qmemory_settings [data-summary-source]').each((_, element) => {
+        const source = element.dataset.summarySource.split(',').map(s => s.trim());
+        $(element).toggle(source.includes(value));
+    });
+}
+
 function doPopout(e) {
     log('QM popout button clicked')
     const target = e.target;
@@ -790,9 +793,7 @@ async function addExtensionControls() {
     log("Adding extension controls...")
     const settingsHtml = await $.get(`${MODULE_DIR}/settings.html`);
     $("#extensions_settings2").append(settingsHtml);
-    log("Settings HTML: ", settingsHtml)
-
-    //setupListeners();
+    setupListeners();
     $('#qmExtensionPopoutButton').off('click').on('click', function (e) {
         doPopout(e);
         e.stopPropagation();
