@@ -31,6 +31,7 @@ import { commonEnumProviders } from '../../../slash-commands/SlashCommandCommonE
 export { MODULE_NAME };
 
 const MODULE_NAME = 'qvink_memory';
+const MODULE_DIR = `third_party/${MODULE_NAME}`;
 
 let lastCharacterId = null;
 let lastGroupId = null;
@@ -787,7 +788,7 @@ function setupListeners() {
 
 async function addExtensionControls() {
     log("Adding extension controls...")
-    const settingsHtml = await renderExtensionTemplateAsync(MODULE_NAME, 'settings', { defaultSettings });
+    const settingsHtml = await renderExtensionTemplateAsync(MODULE_DIR, 'settings', { defaultSettings });
     log("Container: ", $(`#${MODULE_NAME}_container`))
     log("Settings HTML: ", settingsHtml)
     $(`#${MODULE_NAME}_container`).append(settingsHtml);
