@@ -1,149 +1,152 @@
-<div id="qmemory_settings">
+<div id="qvink_memory_settings">
     <div class="inline-drawer">
+
         <div class="inline-drawer-toggle inline-drawer-header">
             <div class="flex-container alignitemscenter margin0">
-                <b data-i18n="ext_sum_title">Qvink Memory</b>
-                <i id="qmExtensionPopoutButton" class="fa-solid fa-window-restore menu_button margin0"></i>
+                <b>Qvink Memory</b>
+                <i id="popout_button" class="fa-solid fa-window-restore menu_button margin0"></i>
             </div>
             <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
         </div>
+
         <div class="inline-drawer-content">
-            <div id="qmExtensionDrawerContents">
-                <label for="qm_source" data-i18n="ext_sum_with">Summarize with:</label>
-                <select id="qm_source">
-                    <option value="main" data-i18n="ext_sum_main_api">Main API</option>
-                    <option value="extras">Extras API</option>
-                    <option value="webllm" data-i18n="ext_sum_webllm">WebLLM Extension</option>
-                </select><br>
+            <div id="drawer_content">
+                <span class="flex1" >Current Memory:</span>
+                <textarea id="current_memory" class="text_pole textarea_compact" rows="6" placeholder="Current memory injection will display here" readonly></textarea>
 
                 <div class="flex-container justifyspacebetween alignitemscenter">
-                    <span class="flex1" data-i18n="ext_sum_current_qm">Current Memory:</span>
-                    <div id="qmemory_restore" class="menu_button flex1 margin0" data-i18n="[title]ext_sum_restore_tip" title="Show the current memory context">
-                        <span data-i18n="ext_sum_restore_previous">Show Memory</span>
+                    <div id="rerun_memory" class="menu_button flex1 margin0" title="Re-summarize all memories using current settings.">
+                        <span>Rerun Memories</span>
+                    </div>
+                    <div id="refresh_memory" class="menu_button flex1 margin0" title="Refresh memory from current state (just in case)">
+                        <span>Refresh</span>
                     </div>
                 </div>
 
-                <textarea id="qmemory_contents" class="text_pole textarea_compact" rows="6" data-i18n="[placeholder]ext_sum_memory_placeholder" placeholder="Summary will be generated here..."></textarea>
-                <div class="qmemory_contents_controls">
-                    <div id="qmemory_force_summarize" data-summary-source="main,webllm" class="menu_button menu_button_icon" title="Trigger a summary update right now." data-i18n="[title]ext_sum_force_tip">
-                        <i class="fa-solid fa-database"></i>
-                        <span data-i18n="ext_sum_force_text">Summarize now</span>
-                    </div>
-                    <label for="qmemory_frozen" title="Disable automatic summary updates. While paused, the summary remains as-is. You can still force an update by pressing the Summarize now button (which is only available with the Main API)." data-i18n="[title]Disable automatic summary updates. While paused, the summary remains as-is. You can still force an update by pressing the Summarize now button (which is only available with the Main API).">
-                        <input id="qmemory_frozen" type="checkbox" />
-                        <span data-i18n="ext_sum_pause">Pause</span>
+                <div class="main_settings">
+                    <label for="enabled" title="Whether the extension is enabled" class="checkbox_label">
+                        <input id="enabled" type="checkbox" />
+                        <span>Enabled</span>
                     </label>
-                    <label data-summary-source="main" for="qmemory_skipWIAN" title="Omit World Info and Author's Note from text to be summarized. Only has an effect when using the Main API. The Extras API always omits WI/AN." data-i18n="[title]Omit World Info and Author's Note from text to be summarized. Only has an effect when using the Main API. The Extras API always omits WI/AN.">
-                        <input id="qmemory_skipWIAN" type="checkbox" />
-                        <span data-i18n="ext_sum_no_wi_an">No WI/AN</span>
+                    <label for="block_chat" title="Block input while summarizing" class="checkbox_label">
+                        <input id="block_chat" type="checkbox" />
+                        <span>Block Chat</span>
                     </label>
                 </div>
-                <div class="qmemory_contents_controls">
-                    <div id="qmSettingsBlockToggle" class="menu_button menu_button_icon" data-i18n="[title]ext_sum_settings_tip" title="Edit summarization prompt, insertion position, etc.">
-                        <i class="fa-solid fa-cog"></i>
-                        <span data-i18n="ext_sum_settings">Summary Settings</span>
+
+                <label for="prompt" class="title_restorable">
+                    <span>Summary Prompt</span>
+                    <div id="prompt_restore" title="Restore default prompt" class="right_menu_button">
+                        <div class="fa-solid fa-clock-rotate-left"></div>
                     </div>
+                </label>
+                <textarea id="prompt" class="text_pole textarea_compact" rows="6" placeholder="The prompt for generating summaries of individual messages"></textarea>
+
+                <label for="include_world_info" title="Include World Info as context when summarizing?" class="checkbox_label">
+                    <input id="include_world_info" type="checkbox" />
+                    <span>Include World Info</span>
+                </label>
+
+                <label for="include_user_messages" title="Whether to summarize user messages" class="checkbox_label">
+                    <input id="include_user_messages" type="checkbox" />
+                    <span>Include User Messages</span>
+                </label>
+
+                <label for="include_names" title="Whether to include the name of the sender in the summary prompt." class="checkbox_label">
+                    <input id="include_names" type="checkbox" />
+                    <span>Include Names</span>
+                </label>
+
+                <label for="message_length_threshold" title="The minimum token length a message has to be in order to get summarized.">
+                    <input id="message_length_threshold" class="text_pole widthUnset" type="number" min="0" max="999" />
+                    <span>Message Length Threshold</span>
+                </label>
+
+                <label for="summary_maximum_length" title="The maximum token length a summary is allowed to be before cutting it off.">
+                    <input id="summary_maximum_length" class="text_pole widthUnset" type="number" min="0" max="999" />
+                    <span>Summary Max Length</span>
+                </label>
+
+                <div class="template">
+                    <label for="template">Injection Template</label>
+                    <textarea id="template" class="text_pole textarea_compact" rows="2"  placeholder="Use &lcub;&lcub;long_memory&rcub;&rcub; and &lcub;&lcub;short_memory&rcub;&rcub; "></textarea>
                 </div>
-                <div id="qmSettingsBlock" style="display:none;">
-                    <div data-summary-source="main">
-                        <label data-i18n="ext_sum_prompt_builder">
-                            Prompt builder
-                        </label>
-                        <label class="checkbox_label" for="qmemory_prompt_builder_raw_blocking" data-i18n="[title]ext_sum_prompt_builder_1_desc" title="Extension will build its own prompt using messages that were not summarized yet. Blocks the chat until the summary is generated.">
-                            <input id="qmemory_prompt_builder_raw_blocking" type="radio" name="qmemory_prompt_builder" value="1" />
-                            <span data-i18n="ext_sum_prompt_builder_1">Raw, blocking</span>
-                        </label>
-                        <label class="checkbox_label" for="qmemory_prompt_builder_raw_non_blocking" data-i18n="[title]ext_sum_prompt_builder_2_desc" title="Extension will build its own prompt using messages that were not summarized yet. Does not block the chat while the summary is being generated. Not all backends support this mode.">
-                            <input id="qmemory_prompt_builder_raw_non_blocking" type="radio" name="qmemory_prompt_builder" value="2" />
-                            <span data-i18n="ext_sum_prompt_builder_2">Raw, non-blocking</span>
-                        </label>
-                        <label class="checkbox_label" id="qmemory_prompt_builder_default" data-i18n="[title]ext_sum_prompt_builder_3_desc" title="Extension will use the regular main prompt builder and add the summary request to it as the last system message.">
-                            <input id="qmemory_prompt_builder_default" type="radio" name="qmemory_prompt_builder" value="0" />
-                            <span data-i18n="ext_sum_prompt_builder_3">Classic, blocking</span>
-                        </label>
-                    </div>
-                    <div data-summary-source="main,webllm">
-                        <label for="qmemory_prompt" class="title_restorable">
-                            <span data-i18n="Summary Prompt">Summary Prompt</span>
-                            <div id="qmemory_prompt_restore" data-i18n="[title]ext_sum_restore_default_prompt_tip" title="Restore default prompt" class="right_menu_button">
-                                <div class="fa-solid fa-clock-rotate-left"></div>
-                            </div>
-                        </label>
-                        <textarea id="qmemory_prompt" class="text_pole textarea_compact" rows="6" data-i18n="[placeholder]ext_sum_prompt_placeholder" placeholder="This prompt will be sent to AI to request the summary generation. &lcub;&lcub;words&rcub;&rcub; will resolve to the 'Number of words' parameter."></textarea>
-                        <label for="qmemory_prompt_words"><span data-i18n="ext_sum_target_length_1">Target summary length</span> <span data-i18n="ext_sum_target_length_2">(</span><span id="qmemory_prompt_words_value"></span><span data-i18n="ext_sum_target_length_3"> words)</span></label>
-                        <input id="qmemory_prompt_words" type="range" value="{{defaultSettings.promptWords}}" min="{{defaultSettings.promptMinWords}}" max="{{defaultSettings.promptMaxWords}}" step="{{defaultSettings.promptWordsStep}}" />
-                        <label for="qmemory_override_response_length">
-                            <span data-i18n="ext_sum_api_response_length_1">API response length</span> <span data-i18n="ext_sum_api_response_length_2">(</span><span id="qmemory_override_response_length_value"></span><span data-i18n="ext_sum_api_response_length_3"> tokens)</span>
-                            <small class="qmemory_disabled_hint" data-i18n="ext_sum_0_default">0 = default</small>
-                        </label>
-                        <input id="qmemory_override_response_length" type="range" value="{{defaultSettings.overrideResponseLength}}" min="{{defaultSettings.overrideResponseLengthMin}}" max="{{defaultSettings.overrideResponseLengthMax}}" step="{{defaultSettings.overrideResponseLengthStep}}" />
-                        <label for="qmemory_max_messages_per_request">
-                            <span data-i18n="ext_sum_raw_max_msg">[Raw/WebLLM] Max messages per request</span> (<span id="qmemory_max_messages_per_request_value"></span>)
-                            <small class="qmemory_disabled_hint" data-i18n="ext_sum_0_unlimited">0 = unlimited</small>
-                        </label>
-                        <input id="qmemory_max_messages_per_request" type="range" value="{{defaultSettings.maxMessagesPerRequest}}" min="{{defaultSettings.maxMessagesPerRequestMin}}" max="{{defaultSettings.maxMessagesPerRequestMax}}" step="{{defaultSettings.maxMessagesPerRequestStep}}" />
-                        <h4 data-i18n="Update frequency" class="textAlignCenter">
-                            Update frequency
-                        </h4>
-                        <label for="qmemory_prompt_interval" class="title_restorable">
-                            <span>
-                                <span data-i18n="ext_sum_update_every_messages_1">Update every</span> <span id="qmemory_prompt_interval_value"></span><span data-i18n="ext_sum_update_every_messages_2"> messages</span>
-                                <small class="qmemory_disabled_hint" data-i18n="ext_sum_0_disable">0 = disable</small>
-                            </span>
-                            <div id="qmemory_prompt_interval_auto" data-i18n="[title]ext_sum_auto_adjust_desc" title="Try to automatically adjust the interval based on the chat metrics." class="right_menu_button">
-                                <div class="fa-solid fa-wand-magic-sparkles"></div>
-                            </div>
-                        </label>
-                        <input id="qmemory_prompt_interval" type="range" value="{{defaultSettings.promptInterval}}" min="{{defaultSettings.promptMinInterval}}" max="{{defaultSettings.promptMaxInterval}}" step="{{defaultSettings.promptIntervalStep}}" />
-                        <label for="qmemory_prompt_words_force" class="title_restorable">
-                            <span>
-                                <span data-i18n="ext_sum_update_every_words_1">Update every</span> <span id="qmemory_prompt_words_force_value"></span><span data-i18n="ext_sum_update_every_words_2"> words</span>
-                                <small class="qmemory_disabled_hint" data-i18n="ext_sum_0_disable">0 = disable</small>
-                            </span>
-                            <div id="qmemory_prompt_words_auto" data-i18n="[title]ext_sum_auto_adjust_desc" title="Try to automatically adjust the interval based on the chat metrics." class="right_menu_button">
-                                <div class="fa-solid fa-wand-magic-sparkles"></div>
-                            </div>
-                        </label>
-                        <input id="qmemory_prompt_words_force" type="range" value="{{defaultSettings.promptForceWords}}" min="{{defaultSettings.promptMinForceWords}}" max="{{defaultSettings.promptMaxForceWords}}" step="{{defaultSettings.promptForceWordsStep}}" />
-                        <small data-i18n="ext_sum_both_sliders">If both sliders are non-zero, then both will trigger summary updates at their respective intervals.</small>
-                        <hr>
-                    </div>
-                    <div class="qmemory_template">
-                        <label for="qmemory_template" data-i18n="ext_sum_injection_template">Injection Template</label>
-                        <textarea id="qmemory_template" class="text_pole textarea_compact" rows="2" data-i18n="[placeholder]ext_sum_memory_template_placeholder" placeholder="&lcub;&lcub;summary&rcub;&rcub; will resolve to the current summary contents."></textarea>
-                    </div>
-                    <label for="qmemory_position" data-i18n="ext_sum_injection_position">Injection Position</label>
-                    <label class="checkbox_label" for="qmemory_include_wi_scan" data-i18n="[title]ext_sum_include_wi_scan_desc" title="Include the latest summary in the WI scan.">
-                        <input id="qmemory_include_wi_scan" type="checkbox" />
-                        <span data-i18n="ext_sum_include_wi_scan">Include in World Info Scanning</span>
+
+
+                <!-- Long-term memory -->
+                <label for="long_term_context_limit" title="The max proportion of the context that long-term memory can take up.">
+                    <span>Long-Term Context Proportion</span>
+                    <input id="long_term_context_limit" class="text_pole widthUnset" type="number" min="0" max="999" />
+                </label>
+                <label class="checkbox_label" for="long_term_scan" title="Include long-term memory in the World Info Scan">
+                    <input id="long_term_scan" type="checkbox" />
+                    <span>Include in World Info Scanning</span>
+                </label>
+                <label>Long-Term Memory Injection Position</label>
+                <div class="radio_group">
+                    <label>
+                        <input type="radio" name="long_term_position" value="-1" />
+                        <span>None (not injected)</span>
+                        <i class="fa-solid fa-info-circle" title="Not injected. You can still access it via the &lcub;&lcub;long_memory&rcub;&rcub; macro."></i>
                     </label>
-                    <div class="radio_group">
-                        <label>
-                            <input type="radio" name="qmemory_position" value="-1" />
-                            <span data-i18n="None (not injected)">None (not injected)</span>
-                            <i class="fa-solid fa-info-circle" title="The summary will not be injected into the prompt. You can still access it via the &lcub;&lcub;summary&rcub;&rcub; macro." data-i18n="[title]ext_sum_injection_position_none"></i>
-                        </label>
-                        <label>
-                            <input type="radio" name="qmemory_position" value="2" />
-                            <span data-i18n="Before Main Prompt / Story String">Before Main Prompt / Story String</span>
-                        </label>
-                        <label>
-                            <input type="radio" name="qmemory_position" value="0" />
-                            <span data-i18n="After Main Prompt / Story String">After Main Prompt / Story String</span>
-                        </label>
-                        <label class="flex-container alignItemsCenter" title="How many messages before the current end of the chat." data-i18n="[title]How many messages before the current end of the chat.">
-                            <input type="radio" name="qmemory_position" value="1" />
-                            <span data-i18n="In-chat @ Depth">In-chat @ Depth</span>
-                            <input id="qmemory_depth" class="text_pole widthUnset" type="number" min="0" max="999" />
-                            <span data-i18n="as">as</span>
-                            <select id="qmemory_role" class="text_pole widthNatural">
-                                <option value="0" data-i18n="System">System</option>
-                                <option value="1" data-i18n="User">User</option>
-                                <option value="2" data-i18n="Assistant">Assistant</option>
-                            </select>
-                        </label>
-                    </div>
+                    <label>
+                        <input type="radio" name="long_term_position" value="2" />
+                        <span>Before Main Prompt / Story String</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="long_term_position" value="0" />
+                        <span >After Main Prompt / Story String</span>
+                    </label>
+                    <label class="flex-container alignItemsCenter" title="How many messages before the current end of the chat.">
+                        <input type="radio" name="long_term_position" value="1" />
+                        <span>In-chat at depth</span>
+                        <input id="long_term_depth" class="text_pole widthUnset" type="number" min="0" max="999" />
+                        <span>as</span>
+                        <select id="long_term_role" class="text_pole widthNatural">
+                            <option value="0">System</option>
+                            <option value="1">User</option>
+                            <option value="2">Assistant</option>
+                        </select>
+                    </label>
                 </div>
+
+                <!-- Short-term memory -->
+                <label for="short_term_context_limit" title="The max proportion of the context that short-term memory can take up.">
+                    <span>Short-Term Context Proportion</span>
+                    <input id="short_term_context_limit" class="text_pole widthUnset" type="number" min="0" max="999" />
+                </label>
+                <label class="checkbox_label" for="short_term_scan" title="Include short-term memory in the World Info Scan">
+                    <input id="short_term_scan" type="checkbox" />
+                    <span>Include in World Info Scanning</span>
+                </label>
+                <label>Short-Term Memory Injection Position</label>
+                <div class="radio_group">
+                    <label>
+                        <input type="radio" name="short_term_position" value="-1" />
+                        <span>None (not injected)</span>
+                        <i class="fa-solid fa-info-circle" title="Not injected. You can still access it via the &lcub;&lcub;short_memory&rcub;&rcub; macro."></i>
+                    </label>
+                    <label>
+                        <input type="radio" name="short_term_position" value="2" />
+                        <span>Before Main Prompt / Story String</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="short_term_position" value="0" />
+                        <span >After Main Prompt / Story String</span>
+                    </label>
+                    <label class="flex-container alignItemsCenter" title="How many messages before the current end of the chat.">
+                        <input type="radio" name="short_term_position" value="1" />
+                        <span>In-chat at depth</span>
+                        <input id="short_term_depth" class="text_pole widthUnset" type="number" min="0" max="999" />
+                        <span>as</span>
+                        <select id="short_term_role" class="text_pole widthNatural">
+                            <option value="0">System</option>
+                            <option value="1">User</option>
+                            <option value="2">Assistant</option>
+                        </select>
+                    </label>
+                </div>
+
             </div>
         </div>
     </div>
