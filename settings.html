@@ -11,7 +11,8 @@
 
         <div class="inline-drawer-content">
             <div id="drawer_content">
-                <h4 class="textAlignCenter">Current Memory State</h4>
+                <h4 class="textAlignCenter">Current Memory State <i class="fa-solid fa-info-circle" title="The current state of memory for this chat. Updates automatically as additional memory is added."></i></h4>
+
                 <textarea id="memory_display" class="text_pole textarea_compact" rows="6" placeholder="Current memory injection will display here" readonly></textarea>
 
                 <div class="flex-container justifyspacebetween alignitemscenter">
@@ -52,7 +53,6 @@
                     <label>
                         <input type="radio" name="long_term_position" value="-1" />
                         <span>None (not injected)</span>
-                        <i class="fa-solid fa-info-circle" title="Not injected. You can still access it via the &lcub;&lcub;long_memory&rcub;&rcub; macro."></i>
                     </label>
                     <label>
                         <input type="radio" name="long_term_position" value="2" />
@@ -94,7 +94,6 @@
                     <label>
                         <input type="radio" name="short_term_position" value="-1" />
                         <span>None (not injected)</span>
-                        <i class="fa-solid fa-info-circle" title="Not injected. You can still access it via the &lcub;&lcub;short_memory&rcub;&rcub; macro."></i>
                     </label>
                     <label>
                         <input type="radio" name="short_term_position" value="2" />

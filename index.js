@@ -37,19 +37,13 @@ const MODULE_NAME_FANCY = 'Qvink Memory';
 const long_memory_macro = `${MODULE_NAME}_long_memory`;
 const short_memory_macro = `${MODULE_NAME}_short_memory`;
 
-let lastCharacterId = null;
-let lastGroupId = null;
-let lastChatId = null;
-let lastMessageHash = null;
-let lastMessageId = null;
-let inApiCall = false;
 
-const defaultPrompt = `Summarize the given text in a single, very short and concise statement of fact.
+const defaultPrompt = `Summarize the given fictional narrative in a single, very short and concise statement of fact.
 State only events that will need to be remembered in the future.
 Include names when possible.
 Response must be in the past tense.
-Maintain the same point of view as the text (i.e. if the text uses "you", use "your" in the response).
-Your response must only contain the summary. If there is nothing worth summarizing, do not respond.`;
+Maintain the same point of view as the text (i.e. if the text uses "you", use "your" in the response). If an observer is unspecified, assume it is "you".
+Your response must ONLY contain the summary. If there is nothing worth summarizing, do not respond.`;
 const default_long_template = `[Following is a list of events that occurred in the past]:\n{{${long_memory_macro}}}`
 const default_short_template = `[Following is a list of recent events]:\n{{${short_memory_macro}}}`
 
@@ -68,8 +62,6 @@ const defaultSettings = {
 
     long_term_context_limit: 0.1,  // percentage of context size to use as long-term memory limit
     short_term_context_limit: 0.1,  // percentage of context size to use as short-term memory limit
-
-    // TODO implement context limits
 
     long_term_position: extension_prompt_types.IN_PROMPT,
     long_term_role: extension_prompt_roles.SYSTEM,
@@ -117,11 +109,9 @@ function count_tokens(text, padding = 0) {
 function get_context_size() {
     return getMaxContextSize();
 }
-
 function get_long_token_limit() {
     let long_term_context_limit = get_settings('long_term_context_limit');
     let context_size = get_context_size();
-    log("LONG TERM CONTEXT LIMIT: "+ context_size + " " + long_term_context_limit+ " " + Math.floor(context_size * long_term_context_limit))
     return Math.floor(context_size * long_term_context_limit);
 }
 function get_short_token_limit() {
@@ -129,6 +119,7 @@ function get_short_token_limit() {
     let context_size = get_context_size();
     return Math.floor(context_size * short_term_context_limit);
 }
+
 
 /**
  * Bind a UI element to a setting.
@@ -193,7 +184,7 @@ function bind_setting(selector, key, type=null) {
         set_settings(key, value)
 
         // refresh memory state
-        refresh_memory();
+        refresh_memory_debounced();
     });
 
     // trigger the change event to update the setting once
@@ -232,16 +223,20 @@ function on_restore_prompt_click() {
 
 function update_message_visuals() {
     // Update the message divs according to memory status
+    let global_class = `${MODULE_NAME}_item`;
     let short_memory_class = `${MODULE_NAME}_short_memory`;
     let long_memory_class = `${MODULE_NAME}_long_memory`;
 
-    let short_div = `<div class="${short_memory_class}">Short-term Memory</div>`;
-    let long_div = `<div class="${long_memory_class}">Long-term Memory</div>`;
+    let short_div = `<div class="${global_class}">Short-term Memory</div>`;
+    let long_div = `<div class="${global_class}">Long-term Memory</div>`;
+    let remember_div = `<div class="${global_class}">Remembered</div>`;
 
     let chat = getContext().chat;
     for (let i=chat.length-1; i >= 0; i--) {
         let message = chat[i];
         let include = get_memory(message, 'include');
+        let error = get_memory(message, 'error');
+        let remember = get_memory(message, 'remember');
 
         // it will have an attribute "mesid" that is the message index
         let div_element = $(`div[mesid="${i}"]`);
@@ -251,8 +246,7 @@ function update_message_visuals() {
         }
 
         // remove any existing memory divs
-        div_element.find(`div.${short_memory_class}`).remove();
-        div_element.find(`div.${long_memory_class}`).remove();
+        div_element.find(`div.${global_class}`).remove();
 
         // if it's not marked for inclusion, skip
         if (!include) {
@@ -263,11 +257,21 @@ function update_message_visuals() {
         let name_element = div_element.find('div.ch_name');
         let name_child = name_element.children().first();
 
+        // if there was an error, mark it as such
+        if (error) {
+            name_child.after(`<div class="${global_class}">Error: ${error}</div>`);
+            continue;
+        }
+
         // place a new div right after the first child element of the name element
         if (include === 'short') {
             name_child.after(short_div);
         } else if (include === 'long') {
             name_child.after(long_div);
+        }
+
+        if (remember) {
+            name_child.after(remember_div);
         }
 
     }
@@ -289,15 +293,6 @@ function store_memory(message, key, value) {
 function get_memory(message, key) {
     // get information from the message object
     return message.extra?.[MODULE_NAME]?.[key];
-}
-
-function save_last_values() {
-    const context = getContext();
-    lastGroupId = context.groupId;
-    lastCharacterId = context.characterId;
-    lastChatId = context.chatId;
-    lastMessageId = context.chat?.length ?? null;
-    debug(`Saved last values: ${lastGroupId}, ${lastCharacterId}, ${lastChatId}, ${lastMessageId}`);
 }
 
 function remember_message(index=null) {
@@ -360,7 +355,7 @@ function text_within_long_limit(text) {
 
 function update_message_inclusion_flags() {
     // Update all messages in the chat, flagging them as short-term or long-term memories to include in the injection.
-    debug("Updating short and long term memory flags...")
+    log("Updating message inclusion flags...")
     let context = getContext();
     let chat = context.chat;
 
@@ -375,6 +370,13 @@ function update_message_inclusion_flags() {
         let include = check_message_exclusion(message)
         if (!include) {
             store_memory(message, 'include', null);
+            continue;
+        }
+
+        // if it doesn't have a memory on it, don't include it
+        if (!get_memory(message, 'memory')) {
+            store_memory(message, 'include', null);
+            error(`Message ${i} does not have a summary, excluding it from memory injection.`);
             continue;
         }
 
@@ -413,20 +415,43 @@ function update_message_inclusion_flags() {
 
 // Summarization
 async function summarize_text(text) {
-    // TODO: add world info as context here
     text = ` ${get_settings('prompt')}\n\nText to Summarize:\n${text}`;
 
-    /**
-     * Generates a message using the provided prompt.
-     * @param {string} prompt Prompt to generate a message from
-     * @param {string} api API to use. Main API is used if not specified.
-     * @param {boolean} instructOverride true to override instruct mode, false to use the default value
-     * @param {boolean} quietToLoud true to generate a message in system mode, false to generate a message in character mode
-     * @param {string} [systemPrompt] System prompt to use. Only Instruct mode or OpenAI.
-     * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
-     * @returns {Promise<string>} Generated message
-     */
-    return await generateRaw(text, '', false, false, '', get_settings('summary_maximum_length'));
+    // get size of text
+    let token_size = count_tokens(text);
+    debug(`Summarizing text with ${token_size} tokens...`)
+
+    let context_size = get_context_size();
+    if (token_size > context_size) {
+        error(`Text ${token_size} exceeds context size ${context_size}.`);
+    }
+
+    let include_world_info = get_settings('include_world_info');
+    if (include_world_info) {
+        /**
+         * Background generation based on the provided prompt.
+         * @param {string} quiet_prompt Instruction prompt for the AI
+         * @param {boolean} quietToLoud Whether the message should be sent in a foreground (loud) or background (quiet) mode
+         * @param {boolean} skipWIAN whether to skip addition of World Info and Author's Note into the prompt
+         * @param {string} quietImage Image to use for the quiet prompt
+         * @param {string} quietName Name to use for the quiet prompt (defaults to "System:")
+         * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
+         * @returns
+         */
+        return await generateQuietPrompt(text, false, false, '', '', get_settings('summary_maximum_length'));
+    } else {
+        /**
+         * Generates a message using the provided prompt.
+         * @param {string} prompt Prompt to generate a message from
+         * @param {string} api API to use. Main API is used if not specified.
+         * @param {boolean} instructOverride true to override instruct mode, false to use the default value
+         * @param {boolean} quietToLoud true to generate a message in system mode, false to generate a message in character mode
+         * @param {string} [systemPrompt] System prompt to use. Only Instruct mode or OpenAI.
+         * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
+         * @returns {Promise<string>} Generated message
+         */
+        return await generateRaw(text, '', false, false, '', get_settings('summary_maximum_length'));
+    }
 }
 
 /**
@@ -465,6 +490,12 @@ async function summarize_message(index=null, replace=false) {
     let summary = await summarize_text(text)
     store_memory(message, 'memory', summary);
     store_memory(message, 'hash', message_hash);  // store the hash of the message that we just summarized
+    debug("Message summarized: " + summary)
+    if (!summary) {  // generation failed
+        error(`Failed to summarize message ${index} - generation failed.`);
+        store_memory(message, 'error', "Failed");  // clear the memory if generation failed
+    }
+
 }
 
 /**
@@ -547,13 +578,14 @@ function refresh_memory() {
 
     set_memory_display(`${long_injection}\n\n${short_injection}`)  // update the memory display
 }
+const refresh_memory_debounced = debounce(refresh_memory, debounce_timeout.relaxed);
 
 /**
  * Perform summarization on the entire chat, optionally replacing existing summaries.
  * @param replace {boolean} Whether to replace existing summaries (default false)
  */
 async function summarize_chat(replace=false) {
-    debug('Summarizing chat...')
+    log('Summarizing chat...')
     let context = getContext();
 
     // optionally block user from sending chat messages while summarization is in progress
@@ -568,7 +600,7 @@ async function summarize_chat(replace=false) {
     if (get_settings('block_chat')) {
         activateSendButtons();
     }
-    debug('Chat summarized')
+    log('Chat summarized')
     refresh_memory()
 }
 
@@ -614,7 +646,8 @@ async function onChatEvent(event=null) {
             await summarize_chat(false);  // summarize the chat, but don't replace existing summaries UNLESS they changed since last summarization
             break;
         case 'message_swiped':  // when this event occurs, don't do anything (a new_message event will follow)
-            debug("Message swiped")
+            debug("Message swiped, reloading memory")
+            refresh_memory()
             break;
         default:
             debug("Unknown event, refreshing memory")
