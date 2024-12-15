@@ -1,0 +1,6 @@
+- Need to handle swiping.
+- Add a dashed line at long-term limit?
+- Message context menu option to mark as remembered
+- Display of progress when summarizing?
+- Include a few previous messages in the summary prompt, and specify that it should only include NEW events? (avoid diplicates?)
+- Include an option to include just the user's last message in the summary prompt as well, instead of giving it its own summary?
