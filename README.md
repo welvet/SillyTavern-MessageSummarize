@@ -14,7 +14,7 @@ Cons, with attempted solutions:
 - If you use Context Shifting, performing the summarizations each time breaks it unless you include your static World Info in the summarization prompt. I've added this as a configuration option.
 - If a message is too small, it is still summarized for short-term memory even if it isn't relevant. I've added a config setting to exclude messages under a given token length.
 - If a summarization is wrong, it can affect subsequent messages. I've added a menu button to regenerate a summary if needed.
-
+- If you want to add the extension to an existing chat, summarization might take awhile. The extension will only summarize messages until it reaches the desired limits, and you can stop it at any time.
 
 ### Current Features
 - Automatically handles swiping, editing, and deleting messages.
@@ -26,7 +26,7 @@ Cons, with attempted solutions:
 
 ### Todo
 - Figure out how to limit the number of regular chat messages injected into the prompt so they can be replaced by the summaries.
-- Ability to edit summaries from where they are displayed under the message
+- Ability to edit summaries.
 - Maybe include a few previous messages (or summaries) in the summary prompt, and specify that it should only include NEW events? This could aid in consistency and avoid duplicate info.
 - Include an option to prepend the user's last message in the summary prompt as well.
-- Add a button to transfer all summaries into a lorebook entry
+- Add a button to transfer all summaries marked for long-term memory into a lorebook entry
