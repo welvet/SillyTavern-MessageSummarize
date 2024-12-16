@@ -22,7 +22,7 @@
                 </div>
 
                 <!-- Injection settings -->
-                <h4 class="textAlignCenter">Injection Settings</h4>
+                <h4 class="textAlignCenter">Inclusion Criteria  <i class="fa-solid fa-info-circle" title="Determines which messages are included in the memory injection. Changing these may require re-summarization, since excluded messages aren't summarized."></i></h4>
                 <label for="include_user_messages" title="Whether to include user messages." class="checkbox_label">
                     <input id="include_user_messages" type="checkbox" />
                     <span>Include User Messages</span>
@@ -32,97 +32,97 @@
                     <input id="message_length_threshold" class="text_pole widthUnset" type="number" min="0" max="999" />
                     <span>Message Length Threshold</span>
                 </label>
-
-
-                <!-- Long-term memory -->
-                <h4 class="textAlignCenter">Long-Term Memory Injection</h4>
-                <div class="template">
-                    <label for="long_template">Injection Template</label>
-                    <textarea id="long_template" class="text_pole textarea_compact" rows="2"  placeholder="Use &lcub;&lcub;qvink_long_memory&rcub;&rcub;"></textarea>
-                </div>
-                <label for="long_term_context_limit" title="The max proportion of the context that long-term memory can take up.">
-                    <input id="long_term_context_limit" class="text_pole widthUnset" type="number" min="0" max="999" />
-                    <span>Long-Term Context Proportion (<span id="long_term_context_limit_display"></span>)</span>
-                </label>
-                <label class="checkbox_label" for="long_term_scan" title="Include long-term memory in the World Info Scan">
-                    <input id="long_term_scan" type="checkbox" />
-                    <span>Include in World Info Scanning</span>
-                </label>
-                <label>Long-Term Memory Injection Position</label>
-                <div class="radio_group">
-                    <label>
-                        <input type="radio" name="long_term_position" value="-1" />
-                        <span>None (not injected)</span>
-                    </label>
-                    <label>
-                        <input type="radio" name="long_term_position" value="2" />
-                        <span>Before Main Prompt / Story String</span>
-                    </label>
-                    <label>
-                        <input type="radio" name="long_term_position" value="0" />
-                        <span >After Main Prompt / Story String</span>
-                    </label>
-                    <label class="flex-container alignItemsCenter" title="How many messages before the current end of the chat.">
-                        <input type="radio" name="long_term_position" value="1" />
-                        <span>In-chat at depth</span>
-                        <input id="long_term_depth" class="text_pole widthUnset" type="number" min="0" max="999" />
-                        <span>as</span>
-                        <select id="long_term_role" class="text_pole widthNatural">
-                            <option value="0">System</option>
-                            <option value="1">User</option>
-                            <option value="2">Assistant</option>
-                        </select>
-                    </label>
-                </div>
+                <br><br>
 
                 <!-- Short-term memory -->
                 <h4 class="textAlignCenter">Short-Term Memory Injection</h4>
                 <div class="template">
-                    <label for="short_template">Injection Template</label>
                     <textarea id="short_template" class="text_pole textarea_compact" rows="2"  placeholder="Use &lcub;&lcub;qvink_short_memory&rcub;&rcub;"></textarea>
                 </div>
-                <label for="short_term_context_limit" title="The max proportion of the context that short-term memory can take up.">
-                    <input id="short_term_context_limit" class="text_pole widthUnset" type="number" min="0" max="999" />
-                    <span>Short-Term Context Proportion (<span id="short_term_context_limit_display"></span>)</span>
+                <label for="short_term_context_limit" title="The max percent of the context that short-term memory can take up.">
+                    <input id="short_term_context_limit" class="text_pole widthUnset" type="number" min="0" max="100" />
+                    <span>Short-Term Context % (<span id="short_term_context_limit_display"></span> tk)</span>
                 </label>
                 <label class="checkbox_label" for="short_term_scan" title="Include short-term memory in the World Info Scan">
                     <input id="short_term_scan" type="checkbox" />
                     <span>Include in World Info Scanning</span>
                 </label>
-                <label>Short-Term Memory Injection Position</label>
                 <div class="radio_group">
                     <label>
                         <input type="radio" name="short_term_position" value="-1" />
-                        <span>None (not injected)</span>
+                        <span>Do not inject</span>
                     </label>
                     <label>
                         <input type="radio" name="short_term_position" value="2" />
-                        <span>Before Main Prompt / Story String</span>
+                        <span>Inject before main prompt / story string</span>
                     </label>
                     <label>
                         <input type="radio" name="short_term_position" value="0" />
-                        <span >After Main Prompt / Story String</span>
+                        <span >Inject after main prompt / story string</span>
                     </label>
                     <label class="flex-container alignItemsCenter" title="How many messages before the current end of the chat.">
                         <input type="radio" name="short_term_position" value="1" />
-                        <span>In-chat at depth</span>
-                        <input id="short_term_depth" class="text_pole widthUnset" type="number" min="0" max="999" />
+                        <span>Inject in chat at depth</span>
+                        <input id="short_term_depth" class="text_pole inline_setting" type="number" min="0" max="99" />
                         <span>as</span>
-                        <select id="short_term_role" class="text_pole widthNatural">
+                        <select id="short_term_role" class="text_pole inline_setting">
                             <option value="0">System</option>
                             <option value="1">User</option>
                             <option value="2">Assistant</option>
                         </select>
                     </label>
                 </div>
+                <br><br>
 
+                <!-- Long-term memory -->
+                <h4 class="textAlignCenter">Long-Term Memory Injection</h4>
+                <div class="template">
+                    <textarea id="long_template" class="text_pole textarea_compact" rows="2"  placeholder="Use &lcub;&lcub;qvink_long_memory&rcub;&rcub;"></textarea>
+                </div>
+                <label for="long_term_context_limit" title="The max percent of the context that long-term memory can take up.">
+                    <input id="long_term_context_limit" class="text_pole widthUnset" type="number" min="0" max="100" />
+                    <span>Long-Term Context % (<span id="long_term_context_limit_display"></span> tk)</span>
+                </label>
+                <label class="checkbox_label" for="long_term_scan" title="Include long-term memory in the World Info Scan">
+                    <input id="long_term_scan" type="checkbox" />
+                    <span>Include in World Info Scanning</span>
+                </label>
+                <div class="radio_group">
+                    <label>
+                        <input type="radio" name="long_term_position" value="-1" />
+                        <span>Do not inject</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="long_term_position" value="2" />
+                        <span>Inject before main prompt / story string</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="long_term_position" value="0" />
+                        <span>Inject after main prompt / story string</span>
+                    </label>
+                    <label class="flex-container alignItemsCenter" title="How many messages before the current end of the chat.">
+                        <input type="radio" name="long_term_position" value="1" />
+                        <span>Inject in chat at depth</span>
+                        <input id="long_term_depth" class="text_pole inline_setting" type="number" min="0" max="99" />
+                        <span>as</span>
+                        <select id="long_term_role" class="text_pole inline_setting">
+                            <option value="0">System</option>
+                            <option value="1">User</option>
+                            <option value="2">Assistant</option>
+                        </select>
+                    </label>
+                </div>
+                <br>
 
 
                 <!-- Summarization -->
                 <h4 class="textAlignCenter">Summarization</h4>
                 <div class="flex-container justifyspacebetween alignitemscenter">
-                    <div id="rerun_memory" class="menu_button flex1 margin0" title="Re-summarize all memories using current summarization settings.">
+                    <div id="rerun_memory" class="menu_button flex2" title="Re-summarize all memories using current summarization settings.">
                         <span>Regenerate All Memories</span>
+                    </div>
+                    <div id="stop_summarization" class="menu_button flex1" title="Stop summarizing the chat.">
+                        <span>Stop</span>
                     </div>
                 </div>
                 <label for="prompt" class="title_restorable">
@@ -139,17 +139,17 @@
                 </label>
 
 
-                <label for="include_world_info" title="Include World Info as context when summarizing?" class="checkbox_label">
+                <label for="include_world_info" title="Include World Info as context when summarizing. If your world info is static, this can allow Context Shifting to work between summarizations." class="checkbox_label">
                     <input id="include_world_info" type="checkbox" />
                     <span>Include World Info</span>
                 </label>
 
-                <label for="include_names" title="Include the name of the sender in the summary prompt?" class="checkbox_label">
+                <label for="include_names" title="Include the name of the sender in the summary prompt." class="checkbox_label">
                     <input id="include_names" type="checkbox" />
                     <span>Include Names</span>
                 </label>
 
-                <label for="block_chat" title="Block chat input while summarizing?" class="checkbox_label">
+                <label for="block_chat" title="Block chat input while summarizing." class="checkbox_label">
                     <input id="block_chat" type="checkbox" />
                     <span>Block Chat</span>
                 </label>
@@ -158,6 +158,7 @@
                     <input id="summary_maximum_length" class="text_pole widthUnset" type="number" min="0" max="999" />
                     <span>Summary Max Length</span>
                 </label>
+                <br><br>
 
 
                 <h4 class="textAlignCenter">Misc.</h4>
@@ -165,6 +166,21 @@
                     <input id="debug_mode" type="checkbox" />
                     <span>Debug Mode</span>
                 </label>
+
+                <label for="display_memories" title="Display summarizations below each message" class="checkbox_label">
+                    <input id="display_memories" type="checkbox" />
+                    <span>Display Memories</span>
+                </label>
+
+                <!--
+                <div class="flex-container justifyspacebetween alignitemscenter">
+                    <div id="dump_to_lorebook" class="menu_button flex1" title="Dump all memories marked for long-term memory to a lorebook entry">
+                        <span>Dump to Lorebook</span>
+                    </div>
+                </div>
+                <textarea id="lorebook_entry" class="text_pole textarea_compact" rows="1" placeholder="Lorebook entry to dump to"></textarea>
+                -->
+
             </div>
         </div>
     </div>

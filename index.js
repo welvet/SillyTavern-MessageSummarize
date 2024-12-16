@@ -16,6 +16,7 @@ import {
     getMaxContextSize,
     setExtensionPrompt,
     streamingProcessor,
+    stopGeneration,
 } from '../../../../script.js';
 import { is_group_generating, selected_group } from '../../../group-chats.js';
 import { loadMovingUIState } from '../../../power-user.js';
@@ -34,10 +35,19 @@ const MODULE_NAME = 'qvink_memory';
 const MODULE_DIR = `scripts/extensions/third-party/${MODULE_NAME}`;
 const MODULE_NAME_FANCY = 'Qvink Memory';
 
+// CSS classes (must match the CSS file because I'm too stupid to figure out how to do this properly)
+const css_message_div = "qvink_memory_display"
+const css_short_memory = "qvink_short_memory"
+const css_long_memory = "qvink_long_memory"
+const css_remember_memory = "qvink_remember_memory"
+const global_div_class = `${MODULE_NAME}_item`;  // class put on all added divs to identify them
+
+
+// Macros for long-term and short-term memory injection
 const long_memory_macro = `${MODULE_NAME}_long_memory`;
 const short_memory_macro = `${MODULE_NAME}_short_memory`;
 
-
+// Settings
 const defaultPrompt = `Summarize the given fictional narrative in a single, very short and concise statement of fact.
 State only events that will need to be remembered in the future.
 Include names when possible.
@@ -46,7 +56,6 @@ Maintain the same point of view as the text (i.e. if the text uses "you", use "y
 Your response must ONLY contain the summary. If there is nothing worth summarizing, do not respond.`;
 const default_long_template = `[Following is a list of events that occurred in the past]:\n{{${long_memory_macro}}}`
 const default_short_template = `[Following is a list of recent events]:\n{{${short_memory_macro}}}`
-
 const defaultSettings = {
     auto_summarize: true,   // whether to automatically summarize chat messages
     include_world_info: false,  // include world info in context when summarizing
@@ -59,9 +68,11 @@ const defaultSettings = {
     include_user_messages: false,  // include user messages in summarization
     include_names: false,  // include sender names in summary prompt
     debug_mode: false,  // enable debug mode
+    lorebook_entry: null,  // lorebook entry to dump memories to
+    display_memories: true,  // display memories in the chat below each message
 
-    long_term_context_limit: 0.1,  // percentage of context size to use as long-term memory limit
-    short_term_context_limit: 0.1,  // percentage of context size to use as short-term memory limit
+    long_term_context_limit: 10,  // percentage of context size to use as long-term memory limit
+    short_term_context_limit: 10,  // percentage of context size to use as short-term memory limit
 
     long_term_position: extension_prompt_types.IN_PROMPT,
     long_term_role: extension_prompt_roles.SYSTEM,
@@ -72,8 +83,9 @@ const defaultSettings = {
     short_term_depth: 2,
     short_term_role: extension_prompt_roles.SYSTEM,
     short_term_scan: false,
-};
 
+    stop_summarization: false  // toggled to stop summarization, then toggled back to false.
+};
 
 
 // Utility functions
@@ -95,29 +107,35 @@ function initialize_settings() {
     extension_settings[MODULE_NAME] = extension_settings[MODULE_NAME] || defaultSettings;
 }
 function set_settings(key, value) {
+    // Set a setting for the extension and save it
     extension_settings[MODULE_NAME][key] = value;
     saveSettingsDebounced();
     debug(`Setting [${key}] updated to [${value}]`);
 }
 function get_settings(key) {
+    // Get a setting for the extension, or the default value if not set
     return extension_settings[MODULE_NAME]?.[key] ?? defaultSettings[key];
 }
 
 function count_tokens(text, padding = 0) {
+    // count the number of tokens in a text
     return getTokenCount(text, padding);
 }
 function get_context_size() {
+    // Get the current context size
     return getMaxContextSize();
 }
 function get_long_token_limit() {
+    // Get the long-term memory token limit, given the current context size and settings
     let long_term_context_limit = get_settings('long_term_context_limit');
     let context_size = get_context_size();
-    return Math.floor(context_size * long_term_context_limit);
+    return Math.floor(context_size * long_term_context_limit/100);
 }
 function get_short_token_limit() {
+    // Get the short-term memory token limit, given the current context size and settings
     let short_term_context_limit = get_settings('short_term_context_limit');
     let context_size = get_context_size();
-    return Math.floor(context_size * short_term_context_limit);
+    return Math.floor(context_size * short_term_context_limit/100);
 }
 
 
@@ -125,21 +143,22 @@ function get_short_token_limit() {
  * Bind a UI element to a setting.
  * @param selector {string} jQuery Selector for the UI element
  * @param key {string} Key of the setting
- * @param type {string} Type of the setting (number, boolean, etc)
+ * @param type {string} Type of the setting (number, boolean)
  */
 function bind_setting(selector, key, type=null) {
+    // Bind a UI element to a setting, so if the UI element changes, the setting is updated
     let element = $(selector);
 
     // if no elements found, log error
     if (element.length === 0) {
-        log(`Error: No element found for selector [${selector}] for setting [${key}]`);
+        error(`No element found for selector [${selector}] for setting [${key}]`);
         return;
     }
 
-    // detect if it's a text area
+    // default trigger for a settings update is on a "change" event
     let trigger = 'change';
 
-    // If a textarea, every keypress triggers an update
+    // If a textarea, instead make every keypress triggers an update
     if (element.is('textarea')) {
         trigger = 'input';
     }
@@ -155,7 +174,7 @@ function bind_setting(selector, key, type=null) {
     let setting_value = get_settings(key);
 
     // initialize the UI element with the setting value
-    if (radio) {  // if a radio group, check the one that matches the setting value
+    if (radio) {  // if a radio group, select the one that matches the setting value
         let selected = element.filter(`[value="${setting_value}"]`)
         if (selected.length === 0) {
             error(`Error: No radio button found for value [${setting_value}] for setting [${key}]`);
@@ -163,9 +182,9 @@ function bind_setting(selector, key, type=null) {
         }
         selected.prop('checked', true);
     } else {  // otherwise, set the value directly
-        if (type === 'boolean') {
+        if (type === 'boolean') {  // checkbox
             element.prop('checked', setting_value);
-        } else {
+        } else {  // text input or dropdown
             element.val(setting_value);
         }
     }
@@ -173,28 +192,30 @@ function bind_setting(selector, key, type=null) {
     // Make the UI element update the setting when changed
     element.on(trigger, function (event) {
         let value;
-        if (type === 'number') {
+        if (type === 'number') {  // number input
             value = Number($(this).val());
-        } else if (type === 'boolean') {
+        } else if (type === 'boolean') {  // checkbox
             value = Boolean($(this).prop('checked'));
-        } else {
+        } else {  // text input or dropdown
             value = $(this).val();
         }
 
+        // update the setting
         set_settings(key, value)
 
-        // refresh memory state
-        refresh_memory_debounced();
+        // refresh memory state (update message inclusion criteria, etc)
+        if (trigger === 'change') {
+            refresh_memory();
+        } else if (trigger === 'input') {
+            refresh_memory_debounced();  // debounce the refresh for input elements
+        }
     });
-
-    // trigger the change event to update the setting once
-    element.trigger(trigger);
 }
 function bind_function(id, func) {
-    // bind a function to an element
+    // bind a function to an element (typically a button or input)
     let element = $(id);
     if (element.length === 0) {
-        log(`Error: No element found for selector [${id}]`);
+        error(`No element found for selector [${id}] when binding function`);
         return;
     }
 
@@ -220,61 +241,65 @@ function set_memory_display(text='') {
 function on_restore_prompt_click() {
     $('#prompt').val(defaultPrompt).trigger('input');
 }
-
-function update_message_visuals() {
-    // Update the message divs according to memory status
-    let global_class = `${MODULE_NAME}_item`;
-    let short_memory_class = `${MODULE_NAME}_short_memory`;
-    let long_memory_class = `${MODULE_NAME}_long_memory`;
-
-    let short_div = `<div class="${global_class}">Short-term Memory</div>`;
-    let long_div = `<div class="${global_class}">Long-term Memory</div>`;
-    let remember_div = `<div class="${global_class}">Remembered</div>`;
+function update_message_visuals(i, style=true, text=null) {
+    // Update the message visuals according to its current memory status
+    // Each message div will have a div added to it with the memory for that message.
+    // Even if there is no memory, I add the div because otherwise the spacing changes when the memory is added later.
 
     let chat = getContext().chat;
-    for (let i=chat.length-1; i >= 0; i--) {
-        let message = chat[i];
-        let include = get_memory(message, 'include');
-        let error = get_memory(message, 'error');
-        let remember = get_memory(message, 'remember');
+    let message = chat[i];
+    let memory = get_memory(message, 'memory');
+    let include = get_memory(message, 'include');
+    let error = get_memory(message, 'error');
+    let remember = get_memory(message, 'remember');
 
-        // it will have an attribute "mesid" that is the message index
-        let div_element = $(`div[mesid="${i}"]`);
-        if (div_element.length === 0) {
-            error(`Could not find message element for message ${i} while updating message visuals`);
-            continue;
-        }
-
-        // remove any existing memory divs
-        div_element.find(`div.${global_class}`).remove();
-
-        // if it's not marked for inclusion, skip
-        if (!include) {
-            continue;
-        }
-
-        // get the name container class=ch_name
-        let name_element = div_element.find('div.ch_name');
-        let name_child = name_element.children().first();
-
-        // if there was an error, mark it as such
-        if (error) {
-            name_child.after(`<div class="${global_class}">Error: ${error}</div>`);
-            continue;
-        }
-
-        // place a new div right after the first child element of the name element
-        if (include === 'short') {
-            name_child.after(short_div);
-        } else if (include === 'long') {
-            name_child.after(long_div);
-        }
-
-        if (remember) {
-            name_child.after(remember_div);
-        }
-
+    // it will have an attribute "mesid" that is the message index
+    let div_element = $(`div[mesid="${i}"]`);
+    if (div_element.length === 0) {
+        error(`Could not find message element for message ${i} while updating message visuals`);
+        return
     }
+
+    // remove any existing added divs
+    div_element.find(`div.${global_div_class}`).remove();
+
+    // If setting isn't enabled, don't display memories
+    if (!get_settings('display_memories')) {
+        return
+    }
+
+    // get the div holding the main message text
+    let message_element = div_element.find('div.mes_text');
+
+    let style_class = ''
+    if (style) {
+        if (remember && include) {  // marked to be remembered and included in memory anywhere
+            style_class = css_long_memory
+        } else if (include === "short") { // not marked to remember, but included in short-term memory
+            style_class = css_short_memory
+        } else if (remember) {  // marked to be remembered but not included in memory
+            style_class = css_remember_memory
+        }
+    }
+
+    // if no text is provided, use the memory text
+    if (!text) {
+        text = ""  // default text when no memory
+        if (memory) {
+            text = `Memory: ${memory}`
+        } else if (error) {
+            style_class = ''  // clear the style class if there's an error
+            text = `Error: ${error}`
+        }
+    }
+
+    // Insert a new div right after that for the summary
+    message_element.after(`<div class="${global_div_class} ${css_message_div} ${style_class}">${text}</div>`);
+}
+function scroll_to_bottom_of_chat() {
+    // Scroll to the bottom of the chat
+    let chat = $('#chat');
+    chat.scrollTop(chat[0].scrollHeight);
 }
 
 // Memory functions
@@ -336,26 +361,11 @@ function check_message_exclusion(message) {
 
     return true;
 }
-function text_within_short_limit(text) {
-    // check if the text is within the short-term memory size
-    let short_term_context_limit = get_settings('short_term_context_limit');
-    let context_size = get_context_size();
-    let token_limit = context_size * short_term_context_limit;
-    let token_size = count_tokens(text);
-    return token_size <= token_limit;
-}
-function text_within_long_limit(text) {
-    // check if the text is within the long-term memory size
-    let long_term_context_limit = get_settings('long_term_context_limit');
-    let context_size = get_context_size();
-    let token_limit = context_size * long_term_context_limit;
-    let token_size = count_tokens(text);
-    return token_size <= token_limit;
-}
 
 function update_message_inclusion_flags() {
     // Update all messages in the chat, flagging them as short-term or long-term memories to include in the injection.
-    log("Updating message inclusion flags...")
+    // This has to be run on the entire chat since it needs to take the context limits into account.
+    debug("Updating message inclusion flags...")
     let context = getContext();
     let chat = context.chat;
 
@@ -385,7 +395,8 @@ function update_message_inclusion_flags() {
 
             // check short-term memory limit
             let short_memory_text = get_short_memory(i, end);
-            if (!text_within_short_limit(short_memory_text)) {
+            let short_token_size = count_tokens(short_memory_text);
+            if (short_token_size > get_short_token_limit()) {
                 short_limit_reached = true;
             }
             continue
@@ -399,7 +410,8 @@ function update_message_inclusion_flags() {
 
             // check long-term memory limit
             let long_memory_text = get_long_memory(i, end);
-            if (!text_within_long_limit(long_memory_text)) {
+            let long_token_size = count_tokens(long_memory_text);
+            if (long_token_size > get_long_token_limit()) {
                 long_limit_reached = true;
             }
             continue
@@ -409,7 +421,10 @@ function update_message_inclusion_flags() {
         store_memory(message, 'include', null);
     }
 
-    update_message_visuals();  // update the message visuals accordingly
+    // update the message visuals of each message, styled according to the inclusion criteria
+    for (let i=chat.length-1; i >= 0; i--) {
+        update_message_visuals(i, true);
+    }
 }
 
 
@@ -478,6 +493,10 @@ async function summarize_message(index=null, replace=false) {
         return;
     }
 
+    // Temporarily update the message summary text to indicate that it's being summarized (no styling based on inclusion criteria)
+    // A full visual update with style should be done on the whole chat after inclusion criteria have been recalculated
+    update_message_visuals(index, false, "Summarizing...")
+
     // summarize it
     debug(`Summarizing message ${index}...`)
     let text = message.mes;
@@ -487,14 +506,31 @@ async function summarize_message(index=null, replace=false) {
         text = `[${message.name}]:\n${text}`;
     }
 
-    let summary = await summarize_text(text)
-    store_memory(message, 'memory', summary);
-    store_memory(message, 'hash', message_hash);  // store the hash of the message that we just summarized
-    debug("Message summarized: " + summary)
-    if (!summary) {  // generation failed
-        error(`Failed to summarize message ${index} - generation failed.`);
-        store_memory(message, 'error', "Failed");  // clear the memory if generation failed
+    let summary;
+    let err = null;
+    try {
+        summary = await summarize_text(text)
+    } catch (e) {
+        if (e === "Clicked stop button") {  // summarization was aborted
+            err = "Summarization aborted"
+        } else {
+            error(`Unrecognized error when summarizing message ${index}: ${e}`)
+        }
+        summary = null
     }
+
+    if (summary) {
+        debug("Message summarized: " + summary)
+        store_memory(message, 'memory', summary);
+        store_memory(message, 'hash', message_hash);  // store the hash of the message that we just summarized
+    } else {  // generation failed
+        error(`Failed to summarize message ${index} - generation failed.`);
+        store_memory(message, 'error', err || "Summarization failed");  // store the error message
+        store_memory(message, 'memory', null);  // clear the memory if generation failed
+    }
+
+    // update the message summary text again, still no styling
+    update_message_visuals(index, false)
 
 }
 
@@ -580,6 +616,13 @@ function refresh_memory() {
 }
 const refresh_memory_debounced = debounce(refresh_memory, debounce_timeout.relaxed);
 
+function stop_summarization() {
+    // Immediately stop summarization of the chat
+    set_settings('stop_summarization', true);  // set the flag to stop summarization of the chat
+    stopGeneration();  // stop generation on current message
+    log("Aborted summarization.")
+}
+
 /**
  * Perform summarization on the entire chat, optionally replacing existing summaries.
  * @param replace {boolean} Whether to replace existing summaries (default false)
@@ -588,19 +631,31 @@ async function summarize_chat(replace=false) {
     log('Summarizing chat...')
     let context = getContext();
 
+    // set "stop summarization" to false
+    set_settings('stop_summarization', false);
+
     // optionally block user from sending chat messages while summarization is in progress
     if (get_settings('block_chat')) {
         deactivateSendButtons();
     }
 
-    for (let i = 0; i < context.chat.length; i++) {
+    for (let i = context.chat.length-1; i >= 0; i--) {
+        if (get_settings('stop_summarization')) {  // check if summarization should be stopped
+            log('Summarization stopped');
+            break;
+        }
         await summarize_message(i, replace);
+    }
+
+    if (get_settings('stop_summarization')) {  // check if summarization was stopped
+        set_settings('stop_summarization', false);  // reset the flag
+    } else {  // summarization completed normally
+        log('Chat summarized')
     }
 
     if (get_settings('block_chat')) {
         activateSendButtons();
     }
-    log('Chat summarized')
     refresh_memory()
 }
 
@@ -665,13 +720,16 @@ function setupListeners() {
         e.stopPropagation();
     })
     bind_function('#rerun_memory', async (e) => {
-        set_memory_display("Loading...");  // clear the memory display
+        set_memory_display("Summarizing...");  // clear the memory display
         await summarize_chat(true);  // rerun summarization, replacing existing summaries
         refresh_memory();  // refresh the memory (and the display) when finished
     })
-    bind_function('#refresh_memory', (e) => {
-        refresh_memory();  // refresh memory (and the display)
-    })
+    bind_function('#refresh_memory', refresh_memory);
+    bind_function('#stop_summarization', stop_summarization);
+
+    // todo
+    //bind_function('#dump_to_lorebook', dump_memories_to_lorebook);
+    //bind_setting('#lorebook_entry', 'lorebook_entry')
 
     bind_setting('#auto_summarize', 'auto_summarize', 'boolean');
     bind_setting('#include_world_info', 'include_world_info', 'boolean');
@@ -682,6 +740,14 @@ function setupListeners() {
     bind_setting('#message_length_threshold', 'message_length_threshold', 'number');
     bind_setting('#summary_maximum_length', 'summary_maximum_length', 'number');
     bind_setting('#debug_mode', 'debug_mode', 'boolean');
+    bind_setting('#display_memories', 'display_memories', 'boolean')
+
+    bind_setting('#short_template', 'short_template');
+    bind_setting('#short_term_context_limit', 'short_term_context_limit', 'number');
+    bind_setting('input[name="short_term_position"]', 'short_term_position');
+    bind_setting('#short_term_depth', 'short_term_depth', 'number');
+    bind_setting('#short_term_role', 'short_term_role');
+    bind_setting('#short_term_scan', 'short_term_scan', 'boolean');
 
     bind_setting('#long_template', 'long_template');
     bind_setting('#long_term_context_limit', 'long_term_context_limit', 'number');
@@ -690,12 +756,7 @@ function setupListeners() {
     bind_setting('#long_term_role', 'long_term_role');
     bind_setting('#long_term_scan', 'long_term_scan', 'boolean');
 
-    bind_setting('#short_template', 'short_template');
-    bind_setting('#short_term_context_limit', 'short_term_context_limit', 'number');
-    bind_setting('input[name="short_term_position"]', 'short_term_position');
-    bind_setting('#short_term_depth', 'short_term_depth', 'number');
-    bind_setting('#short_term_role', 'short_term_role');
-    bind_setting('#short_term_scan', 'short_term_scan', 'boolean');
+
 
     // update the displayed token limit when the input changes
     // Has to happen after the bind_setting calls, so changing the input sets the setting, then updates the display
@@ -755,6 +816,14 @@ function do_popout(e) {
             $('#qmExtensionPopout').remove();
         });
     });
+}
+
+function dump_memories_to_lorebook() {
+    // Dump all memories marked for remembering to a lorebook entry.
+    let entry = get_settings('lorebook_entry');
+    let lorebook = getCharacterLore();
+    log("LOREBOOK: " + lorebook)
+
 }
 
 // Entry point

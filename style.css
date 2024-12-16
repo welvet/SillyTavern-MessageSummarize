@@ -16,3 +16,49 @@
 #qmExtensionPopout {
     overflow: auto;
 }
+
+/* Dropdowns in a line of text */
+select.inline_setting {
+    margin: 0;
+    padding: 0 5px;
+    width: unset !important;
+    min-width: unset !important;
+    max-width: unset !important;
+    height: 1.2em;
+}
+/* text input in a line of text */
+input.inline_setting     {
+    margin: 0;
+    padding: 0 0 0 5px;
+    width: unset !important;
+    min-width: unset !important;
+    max-width: unset !important;
+    height: 1em;
+}
+
+/*
+Div displaying the memory on a message.
+By default, text is greyed to indicate that is it not injected.
+*/
+.qvink_memory_display {
+    margin: 0 0 5px 0;
+    font-size: small;
+    font-style: italic;
+    color: grey;
+}
+
+/* to style short-term memories. */
+.qvink_memory_display.qvink_short_memory {
+    color: seagreen;
+}
+/* to style long-term memories. */
+.qvink_memory_display.qvink_long_memory {
+    color:royalblue;
+}
+/* to style memories marked for long-term, but are past the context limit */
+.qvink_memory_display.qvink_remember_memory {
+    color: darkred;
+}
+
+
+
