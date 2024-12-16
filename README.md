@@ -30,3 +30,4 @@ Cons, with attempted solutions:
 - Maybe include a few previous messages (or summaries) in the summary prompt, and specify that it should only include NEW events? 
 This could aid in consistency and avoid duplicate info. Might also have to opposite effect though.
 - Add a button to transfer all summaries marked for long-term memory into a lorebook entry
+- allow character-specific settings.
