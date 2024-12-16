@@ -23,7 +23,7 @@
 
                 <!-- Injection settings -->
                 <h4 class="textAlignCenter">Inclusion Criteria  <i class="fa-solid fa-info-circle" title="Determines which messages are included in the memory injection. Changing these may require re-summarization, since excluded messages aren't summarized."></i></h4>
-                <label for="include_user_messages" title="Whether to include user messages." class="checkbox_label">
+                <label for="include_user_messages" title="Include user message summaries in memory." class="checkbox_label">
                     <input id="include_user_messages" type="checkbox" />
                     <span>Include User Messages</span>
                 </label>
@@ -133,7 +133,7 @@
                 </label>
                 <textarea id="prompt" class="text_pole textarea_compact" rows="6" placeholder="The prompt for generating summaries of individual messages. When this changes, only new summaries made will use it. To re-generate summaries, click 'Regenerate All Memories'"></textarea>
 
-                <label for="auto_summarize" title="Enable automatic summarization (creates summarization for any new or edited message)" class="checkbox_label">
+                <label for="auto_summarize" title="Enable automatic summarization. New assistant messages will be summarized after being sent, edited, or swiped." class="checkbox_label">
                     <input id="auto_summarize" type="checkbox" />
                     <span>Automatic Summarization</span>
                 </label>
@@ -147,6 +147,11 @@
                 <label for="include_names" title="Include the name of the sender in the summary prompt." class="checkbox_label">
                     <input id="include_names" type="checkbox" />
                     <span>Include Names</span>
+                </label>
+
+                <label for="include_last_user_message" title="Include the previous user message when summarizing assistant messages." class="checkbox_label">
+                    <input id="include_last_user_message" type="checkbox" />
+                    <span>Include Last User Message</span>
                 </label>
 
                 <label for="block_chat" title="Block chat input while summarizing." class="checkbox_label">

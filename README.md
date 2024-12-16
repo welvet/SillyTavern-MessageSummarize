@@ -27,6 +27,6 @@ Cons, with attempted solutions:
 ### Todo
 - Figure out how to limit the number of regular chat messages injected into the prompt so they can be replaced by the summaries.
 - Ability to edit summaries.
-- Maybe include a few previous messages (or summaries) in the summary prompt, and specify that it should only include NEW events? This could aid in consistency and avoid duplicate info.
-- Include an option to prepend the user's last message in the summary prompt as well.
+- Maybe include a few previous messages (or summaries) in the summary prompt, and specify that it should only include NEW events? 
+This could aid in consistency and avoid duplicate info. Might also have to opposite effect though.
 - Add a button to transfer all summaries marked for long-term memory into a lorebook entry

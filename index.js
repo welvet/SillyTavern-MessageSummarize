@@ -70,6 +70,7 @@ const defaultSettings = {
     debug_mode: false,  // enable debug mode
     lorebook_entry: null,  // lorebook entry to dump memories to
     display_memories: true,  // display memories in the chat below each message
+    include_last_user_message: false,  // include the last user message in the summarization prompt
 
     long_term_context_limit: 10,  // percentage of context size to use as long-term memory limit
     short_term_context_limit: 10,  // percentage of context size to use as short-term memory limit
@@ -561,10 +562,11 @@ async function summarize_text(text) {
  */
 async function summarize_message(index=null, replace=false) {
     let context = getContext();
+    let chat = context.chat;
 
     // Default to the last message, min 0
-    index = Math.max(index ?? context.chat.length - 1, 0)
-    let message = context.chat[index]
+    index = Math.max(index ?? chat.length - 1, 0)
+    let message = chat[index]
     let message_hash = getStringHash(message.mes);
 
     // check message exclusion criteria first
@@ -582,14 +584,35 @@ async function summarize_message(index=null, replace=false) {
     // A full visual update with style should be done on the whole chat after inclusion criteria have been recalculated
     update_message_visuals(index, false, "Summarizing...")
 
+
+    let messages_to_include = []
+
+    // Add the last user message to the prompt if enabled
+    if (get_settings('include_last_user_message')) {
+        let last_message = chat[index-1]
+        if (last_message.is_user) {
+            messages_to_include.push(last_message)
+        }
+    }
+
+    messages_to_include.push(message)
+
+    // Create the text to summarize
+    let texts = []
+    for (let m of messages_to_include) {
+        // Add the sender name to the prompt if enabled
+        if (get_settings('include_names')) {
+            texts.push(`[${m.name}]: ${m.mes}`);
+        } else {
+            texts.push(`${m.mes}`);
+        }
+    }
+
+    // join the messages with newlines
+    let text = texts.join('\n\n')
+
     // summarize it
     debug(`Summarizing message ${index}...`)
-    let text = message.mes;
-
-    // Add the sender name to the prompt if enabled
-    if (get_settings('include_names')) {
-        text = `[${message.name}]:\n${text}`;
-    }
 
     let summary;
     let err = null;
@@ -769,6 +792,7 @@ function setupListeners() {
     bind_setting('#summary_maximum_length', 'summary_maximum_length', 'number');
     bind_setting('#debug_mode', 'debug_mode', 'boolean');
     bind_setting('#display_memories', 'display_memories', 'boolean')
+    bind_setting('#include_last_user_message', 'include_last_user_message', 'boolean')
 
     bind_setting('#short_template', 'short_template');
     bind_setting('#short_term_context_limit', 'short_term_context_limit', 'number');
