@@ -53,7 +53,7 @@ By default, text is greyed to indicate that is it not injected.
 }
 /* to style long-term memories. */
 .qvink_memory_display.qvink_long_memory {
-    color:royalblue;
+    color: steelblue;
 }
 /* to style memories marked for long-term, but are past the context limit */
 .qvink_memory_display.qvink_remember_memory {

@@ -302,6 +302,33 @@ function scroll_to_bottom_of_chat() {
     chat.scrollTop(chat[0].scrollHeight);
 }
 
+function initialize_message_buttons() {
+    // Add the message buttons to the chat messages
+
+    let remember_button_class = `${MODULE_NAME}_remember_button`
+    let summarize_button_class = `${MODULE_NAME}_summarize_button`
+
+    let remember_button = $(`<div title="Remember (toggle)" class="mes_button ${remember_button_class} fa-solid fa-brain interactable" tabindex="0"></div>`);
+    let summarize_button = $(`<div title="Summarize" class="mes_button ${summarize_button_class} fa-solid fa-feather interactable" tabindex="0"></div>`);
+
+    $("#message_template .mes_buttons .extraMesButtons").prepend(summarize_button);
+    $("#message_template .mes_buttons .extraMesButtons").prepend(remember_button);
+
+    // button events
+    $(document).on("click", `.${remember_button_class}`, async function () {
+        const messageBlock = $(this).closest(".mes");
+        const messageId = Number(messageBlock.attr("mesid"));
+        remember_message_toggle(messageId);
+    });
+    $(document).on("click", `.${summarize_button_class}`, async function () {
+        const messageBlock = $(this).closest(".mes");
+        const messageId = Number(messageBlock.attr("mesid"));
+        await summarize_message(messageId, true);  // summarize the message, replacing the existing summary
+        refresh_memory();
+    });
+}
+
+
 // Memory functions
 function store_memory(message, key, value) {
     // store information on the message object
@@ -320,17 +347,24 @@ function get_memory(message, key) {
     return message.extra?.[MODULE_NAME]?.[key];
 }
 
-function remember_message(index=null) {
-    // Set a message to be remembered as long-term memory
+async function remember_message_toggle(index=null) {
+    // Toggle the "remember" status of a message
     let context = getContext();
 
     // Default to the last message, min 0
     index = Math.max(index ?? context.chat.length-1, 0)
 
-    // Mark it as remembered
+    // toggle
     let message = context.chat[index]
-    store_memory(message, 'remember', true);
-    log(`Set message ${index} to be remembered in long-term memory`);
+    store_memory(message, 'remember', !get_memory(message, 'remember'));
+
+    let new_status = get_memory(message, 'remember')
+    debug(`Set message ${index} remembered status: ${new_status}`);
+
+    if (new_status) {  // if it was marked as remembered, summarize if it there is no summary
+        await summarize_message(messageId, false);
+    }
+    refresh_memory();
 }
 
 
@@ -365,13 +399,13 @@ function check_message_exclusion(message) {
 function update_message_inclusion_flags() {
     // Update all messages in the chat, flagging them as short-term or long-term memories to include in the injection.
     // This has to be run on the entire chat since it needs to take the context limits into account.
-    debug("Updating message inclusion flags...")
     let context = getContext();
     let chat = context.chat;
 
-    // iterate through the chat in reverse order and mark the messages that should be included in short-term memory
+    // iterate through the chat in reverse order and mark the messages that should be included in short-term and long-term memory
     let short_limit_reached = false;
     let long_limit_reached = false;
+    let long_term_end_index = null;  // index of the most recent message that doesn't fit in short-term memory
     let end = chat.length - 1;
     for (let i = end; i >= 0; i--) {
         let message = chat[i];
@@ -386,35 +420,32 @@ function update_message_inclusion_flags() {
         // if it doesn't have a memory on it, don't include it
         if (!get_memory(message, 'memory')) {
             store_memory(message, 'include', null);
-            error(`Message ${i} does not have a summary, excluding it from memory injection.`);
             continue;
         }
 
         if (!short_limit_reached) {  // short-term limit hasn't been reached yet
-            store_memory(message, 'include', 'short');  // mark the message as short-term
-
-            // check short-term memory limit
-            let short_memory_text = get_short_memory(i, end);
+            let short_memory_text = concatenate_summaries(i, end);  // add up all the summaries down to this point
             let short_token_size = count_tokens(short_memory_text);
-            if (short_token_size > get_short_token_limit()) {
+            if (short_token_size > get_short_token_limit()) {  // over context limit
                 short_limit_reached = true;
+                long_term_end_index = i;  // this is where long-term memory ends and short-term begins
+            } else {  // under context limit
+                store_memory(message, 'include', 'short');  // mark the message as short-term
+                continue
             }
-            continue
         }
 
         // if the short-term limit has been reached, check the long-term limit
-
         let remember = get_memory(message, 'remember');
         if (!long_limit_reached && remember) {  // long-term limit hasn't been reached yet and the message was marked to be remembered
-            store_memory(message, 'include', 'long');  // mark the message as long-term
-
-            // check long-term memory limit
-            let long_memory_text = get_long_memory(i, end);
+            let long_memory_text = concatenate_summaries(i, long_term_end_index, false, true)  // get all messages marked for remembering in long-term memory
             let long_token_size = count_tokens(long_memory_text);
-            if (long_token_size > get_long_token_limit()) {
+            if (long_token_size > get_long_token_limit()) {  // over context limit
                 long_limit_reached = true;
+            } else {
+                store_memory(message, 'include', 'long');  // mark the message as long-term
+                continue
             }
-            continue
         }
 
         // if we haven't marked it for inclusion yet, mark it as excluded
@@ -427,6 +458,51 @@ function update_message_inclusion_flags() {
     }
 }
 
+function concatenate_summaries(start=null, end=null, include=null, remember=null) {
+    // Given a start and end, concatenate the summaries of the messages in that range
+    // Excludes messages that don't meet the inclusion criteria
+
+    let context = getContext();
+    let chat = context.chat;
+
+    // Default start is 0
+    start = Math.max(start ?? 0, 0)
+
+    // Default end is the last message
+    end = Math.max(end ?? context.chat.length - 1, 0)
+
+    // assert start is less than end
+    if (start > end) {
+        error('Cannot concatenate summaries: start index is greater than end index');
+        return '';
+    }
+
+    // iterate through messages
+    let summaries = [];
+    for (let i = start; i <= end; i++) {
+        let message = chat[i];
+
+        // check against the message exclusion criteria
+        if (!check_message_exclusion(message)) {
+            continue;
+        }
+
+        // If an inclusion flag is provided, check if the message is marked for that inclusion
+        if (include && get_memory(message, 'include') !== include) {
+            continue;
+        }
+        if (remember && get_memory(message, 'remember') !== remember) {
+            continue;
+        }
+
+        let summary = get_memory(message, 'memory');
+        summaries.push(summary)
+    }
+
+    // Add an asterisk to the beginning of each summary and join them with newlines
+    summaries = summaries.map((s) => `* ${s}`);
+    return summaries.join('\n');
+}
 
 // Summarization
 async function summarize_text(text) {
@@ -434,7 +510,6 @@ async function summarize_text(text) {
 
     // get size of text
     let token_size = count_tokens(text);
-    debug(`Summarizing text with ${token_size} tokens...`)
 
     let context_size = get_context_size();
     if (token_size > context_size) {
@@ -531,74 +606,20 @@ async function summarize_message(index=null, replace=false) {
 
     // update the message summary text again, still no styling
     update_message_visuals(index, false)
-
 }
 
-/**
- * Given an index range, concatenate the summaries and return the result.
- * @param start {number} Start index (default 0)
- * @param end {number|null} End index (default second-to-last message)
- * @param long_term {boolean} Whether to include only long-term memories (default false)
- * @param short_term {boolean} Whether to include only short-term memories (default false)
- * @returns {string} Concatenated summaries
- * Note 1: messages are still subject to the exclusion criteria checked by check_message_exclusion()
- */
-function concatenate_summaries(start, end=null, long_term=false, short_term=false) {
-    let context = getContext();
 
-    // Default start is 0
-    start = Math.max(start ?? 0, 0)
-
-    // Default end is the second-to-last message
-    end = Math.max(end ?? context.chat.length - 1, 0)
-
-    // assert start is less than end
-    if (start > end) {
-        error('Cannot concatenate summaries: start index is greater than end index');
-        return '';
-    }
-
-    // iterate through the chat in reverse order and collect the summaries
-    let summaries = [];
-    for (let i = end; i >= start; i--) {
-        let message = context.chat[i];
-
-        // check against the message exclusion criteria
-        if (!check_message_exclusion(message)) {
-            continue;
-        }
-
-        let inclusion = get_memory(message, 'include');
-        if ((inclusion === 'short' && short_term) || (inclusion === 'long' && long_term)) {
-            let memory = get_memory(message, 'memory');
-            if (memory) {  // add the summary for this message if it exists
-                summaries.push(memory);
-            } else {
-                error(`Message ${i} does not have a summary, but is marked for inclusion ${inclusion}`);
-            }
-        }
-    }
-
-    // Reverse the summaries (since we iterated in reverse order)
-    summaries.reverse();
-
-    // Add an asterisk to the beginning of each summary and join them with newlines
-    summaries = summaries.map((s) => `* ${s}`);
-    return summaries.join('\n');
-}
-function get_long_memory(start=0, end=null) {
+function get_long_memory() {
     // get the injection text for long-term memory
-    return concatenate_summaries(start, end, true, false);
+    return concatenate_summaries(null, null, "long");
 }
-function get_short_memory(start=0, end=null) {
+function get_short_memory() {
     // get the injection text for short-term memory
-    return concatenate_summaries(start, end, false, true);
+    return concatenate_summaries(null, null, "short");
 }
 
-
-/** Update the current memory prompt and display */
 function refresh_memory() {
-    // regenerate the memory prompt to inject, and update the memory display
+    // Update the UI according to the current state of the chat memories, and update the injection prompts accordingly
     update_message_inclusion_flags()  // update the inclusion flags for all messages
     let long_memory = get_long_memory();
     let short_memory = get_short_memory();
@@ -623,11 +644,8 @@ function stop_summarization() {
     log("Aborted summarization.")
 }
 
-/**
- * Perform summarization on the entire chat, optionally replacing existing summaries.
- * @param replace {boolean} Whether to replace existing summaries (default false)
- */
 async function summarize_chat(replace=false) {
+    // Perform summarization on the entire chat, optionally replacing existing summaries
     log('Summarizing chat...')
     let context = getContext();
 
@@ -833,9 +851,12 @@ jQuery(async function () {
     // Load settings
     initialize_settings();
 
-    // Set up UI
+    // Set up settings UI
     $("#extensions_settings2").append(await $.get(`${MODULE_DIR}/settings.html`));  // load html
     setupListeners();  // setup UI listeners
+
+    // message buttons
+    initialize_message_buttons();
 
     // Event listeners
     eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, () => onChatEvent('new_message'));
@@ -846,44 +867,28 @@ jQuery(async function () {
 
     // Slash commands
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'remember',
-        callback: (args) => {
-            remember_message(args.index);
-        },
-        helpString: 'Mark the latest chat message as a long-term memory',
-        unnamedArgumentList: [
-            SlashCommandArgument.fromProps({
-                name: 'index',
-                description: 'Index of the message to remember',
-                isRequired: false,
-                typeList: ARGUMENT_TYPE.NUMBER,
-            }),
-        ],
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'initialize_memory',
-        callback: (args) => {
-            summarize_chat(args.replace);
-        },
-        helpString: 'Summarize all chat messages',
-        namedArgumentList: [
-            SlashCommandNamedArgument.fromProps({
-                name: 'replace',
-                description: 'Replace existing summaries',
-                isRequired: false,
-                typeList: ARGUMENT_TYPE.BOOLEAN,
-            }),
-        ],
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'log_chat',
         callback: (args) => {
             log("CHAT: ")
             log(getContext().chat)
         },
         helpString: 'log chat',
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'remember',
+        callback: (args) => {
+            remember_message_toggle(args.index);
+        },
+        helpString: 'Toggle the remember status of a message',
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                name: 'index',
+                description: 'Index of the message to toggle',
+                isRequired: false,
+                typeList: ARGUMENT_TYPE.NUMBER,
+            }),
+        ],
     }));
 
     // Macros
