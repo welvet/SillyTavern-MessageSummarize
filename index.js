@@ -326,6 +326,16 @@ function initialize_message_buttons() {
         await summarize_message(messageId, true);  // summarize the message, replacing the existing summary
         refresh_memory();
     });
+
+    // when a message is hidden/unhidden, trigger a memory refresh
+    $(document).on("click", ".mes_hide", async function () {
+        refresh_memory();
+    })
+    $(document).on("click", ".mes_unhide", async function () {
+        refresh_memory();
+    })
+
+
 }
 
 
@@ -679,7 +689,7 @@ async function summarize_chat(replace=false) {
 
 
 // Event handling
-async function onChatEvent(event=null) {
+async function on_chat_event(event=null) {
     // When the chat is updated, check if the summarization should be triggered
     debug("Chat updated, checking if summarization should be triggered... "+event)
 
@@ -859,11 +869,11 @@ jQuery(async function () {
     initialize_message_buttons();
 
     // Event listeners
-    eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, () => onChatEvent('new_message'));
-    eventSource.on(event_types.MESSAGE_DELETED, () => onChatEvent('message_deleted'));
-    eventSource.on(event_types.MESSAGE_EDITED, () => onChatEvent('message_edited'));
-    eventSource.on(event_types.MESSAGE_SWIPED,() => onChatEvent('message_swiped'));
-    eventSource.on(event_types.CHAT_CHANGED, () => onChatEvent('chat_changed'));
+    eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, () => on_chat_event('new_message'));
+    eventSource.on(event_types.MESSAGE_DELETED, () => on_chat_event('message_deleted'));
+    eventSource.on(event_types.MESSAGE_EDITED, () => on_chat_event('message_edited'));
+    eventSource.on(event_types.MESSAGE_SWIPED,() => on_chat_event('message_swiped'));
+    eventSource.on(event_types.CHAT_CHANGED, () => on_chat_event('chat_changed'));
 
     // Slash commands
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
