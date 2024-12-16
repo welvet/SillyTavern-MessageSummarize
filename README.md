@@ -16,6 +16,14 @@ Cons, with attempted solutions:
 - If a summarization is wrong, it can affect subsequent messages. I've added a menu button to regenerate a summary if needed.
 - If you want to add the extension to an existing chat, summarization might take awhile. The extension will only summarize messages until it reaches the desired limits, and you can stop it at any time.
 
+
+### Usage
+- Install the extension
+- Any new assistant message will be automatically summarized.
+- To mark a memory for long-term memory, click the "brain" icon in the message button menu.
+- To re-summarize a message, click the "quill" icon in the message button menu.
+
+
 ### Current Features
 - Automatically handles swiping, editing, and deleting messages.
 - Popout config menu - customize summarization settings, injection settings, and message inclusion criteria
