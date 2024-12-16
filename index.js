@@ -87,7 +87,7 @@ const defaultSettings = {
 
     stop_summarization: false  // toggled to stop summarization, then toggled back to false.
 };
-
+const settings_ui_map = {}  // map of settings to UI elements
 
 // Utility functions
 function log(message) {
@@ -105,7 +105,14 @@ function error(message) {
 const saveChatDebounced = debounce(() => getContext().saveChat(), debounce_timeout.relaxed);
 
 function initialize_settings() {
-    extension_settings[MODULE_NAME] = extension_settings[MODULE_NAME] || defaultSettings;
+    if (!extension_settings[MODULE_NAME]) {
+        extension_settings[MODULE_NAME] = structuredClone(defaultSettings);
+    }
+}
+function reset_settings() {
+    extension_settings[MODULE_NAME] = structuredClone(defaultSettings);
+    console.log(defaultSettings)
+    load_settings();
 }
 function set_settings(key, value) {
     // Set a setting for the extension and save it
@@ -149,6 +156,7 @@ function get_short_token_limit() {
 function bind_setting(selector, key, type=null) {
     // Bind a UI element to a setting, so if the UI element changes, the setting is updated
     let element = $(selector);
+    settings_ui_map[key] = [element, type]
 
     // if no elements found, log error
     if (element.length === 0) {
@@ -229,6 +237,38 @@ function bind_function(id, func) {
         element.on('click', function (event) {
             func(event);
         });
+    }
+}
+function set_setting_ui_element(key, element, type) {
+    // Set a UI element to the current setting value
+    let radio = false;
+    if (element.is('input[type="radio"]')) {
+        radio = true;
+    }
+
+    // get the setting value
+    let setting_value = get_settings(key);
+
+    // initialize the UI element with the setting value
+    if (radio) {  // if a radio group, select the one that matches the setting value
+        let selected = element.filter(`[value="${setting_value}"]`)
+        if (selected.length === 0) {
+            error(`Error: No radio button found for value [${setting_value}] for setting [${key}]`);
+            return;
+        }
+        selected.prop('checked', true);
+    } else {  // otherwise, set the value directly
+        if (type === 'boolean') {  // checkbox
+            element.prop('checked', setting_value);
+        } else {  // text input or dropdown
+            element.val(setting_value);
+        }
+    }
+}
+function load_settings() {
+    // set all UI elements to their current settings
+    for (let [key, [element, type]] of Object.entries(settings_ui_map)) {
+        set_setting_ui_element(key, element, type);
     }
 }
 
@@ -777,6 +817,7 @@ function setupListeners() {
     })
     bind_function('#refresh_memory', refresh_memory);
     bind_function('#stop_summarization', stop_summarization);
+    bind_function('#revert_settings', reset_settings);
 
     // todo
     //bind_function('#dump_to_lorebook', dump_memories_to_lorebook);
