@@ -149,9 +149,12 @@ function get_short_token_limit() {
 // Settings Management
 function initialize_settings() {
     if (extension_settings[MODULE_NAME] !== undefined) {  // setting already initialized
-        return
+        log("Settings already initialized.")
+        soft_reset_settings();
+    } else {  // no settings present, first time initializing
+        log("Extension settings not found. Initializing...")
+        hard_reset_settings();
     }
-    hard_reset_settings();
 }
 function hard_reset_settings() {
     // Set the settings to the completely fresh values, deleting all profiles too
@@ -162,6 +165,22 @@ function hard_reset_settings() {
         ...default_settings,
         ...profile_settings
     });
+}
+function soft_reset_settings() {
+    // fix any missing settings without destroying profiles
+    Object.assign(extension_settings[MODULE_NAME], structuredClone(default_settings));
+
+    // check for any missing profiles
+    let profiles = get_settings('profiles');
+    if (!profiles) {  // no profiles found, create the default profile
+        Object.assign(extension_settings[MODULE_NAME], structuredClone(profile_settings));
+    }
+
+    if (Object.keys(profiles).length === 0) {
+        log("No profiles found, creating default profile.")
+        profiles['Default'] = structuredClone(default_settings);
+        set_settings('profiles', profiles);
+    }
 }
 function reset_settings() {
     // reset the current settings to default
@@ -1072,6 +1091,8 @@ async function on_chat_event(event=null) {
     }
 }
 
+// todo: temporary hack to fix the popout
+var popout_button_bound = false;
 
 // UI handling
 function setupListeners() {
@@ -1089,10 +1110,6 @@ function setupListeners() {
     });
 
     bind_function('#prompt_restore', on_restore_prompt_click);
-    bind_function('#popout_button', (e) => {
-        do_popout(e);
-        e.stopPropagation();
-    })
     bind_function('#rerun_memory', async (e) => {
         set_memory_display("Summarizing...");  // clear the memory display
         await summarize_chat(true);  // rerun summarization, replacing existing summaries
@@ -1101,6 +1118,14 @@ function setupListeners() {
     bind_function('#refresh_memory', refresh_memory);
     bind_function('#stop_summarization', stop_summarization);
     bind_function('#revert_settings', reset_settings);
+
+    if (!popout_button_bound) {
+        popout_button_bound = true;
+        bind_function('#popout_button', (e) => {
+            do_popout(e);
+            e.stopPropagation();
+        })
+    }
 
     // todo
     //bind_function('#dump_to_lorebook', dump_memories_to_lorebook);
@@ -1145,6 +1170,7 @@ function setupListeners() {
 
     refresh_settings()
 }
+
 
 function do_popout(e) {
     // popout the memory display
