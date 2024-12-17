@@ -24,7 +24,7 @@ Cons, with attempted solutions:
 - To re-summarize a message, click the "quill" icon in the message button menu.
 
 
-### Current Features
+### Notable Features
 - Automatically handles swiping, editing, and deleting messages.
 - Popout config menu - customize summarization settings, injection settings, and message inclusion criteria
 - Configuration profiles - save and load different configurations profiles and set one to be auto-loaded for each character.

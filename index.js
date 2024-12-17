@@ -213,7 +213,7 @@ function load_profile(profile=null) {
 async function rename_profile() {
     // Rename the current profile via user input
     let old_name = get_settings('profile');
-    let new_name = await Popup.show.input("THIS IS A HEADER", `Enter a new name:`, old_name);
+    let new_name = await Popup.show.input("Rename Configuration Profile", `Enter a new name:`, old_name);
 
     // if it's the same name or none provided, do nothing
     if (!new_name || old_name === new_name) {
