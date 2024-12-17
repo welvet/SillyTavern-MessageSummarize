@@ -32,7 +32,7 @@ import { commonEnumProviders } from '../../../slash-commands/SlashCommandCommonE
 export { MODULE_NAME };
 
 // Version ID
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 
 // THe module name modifies where settings are stored, where information is stored on message objects, macros, etc.
 const MODULE_NAME = 'qvink_memory';
@@ -43,8 +43,10 @@ const MODULE_NAME_FANCY = 'Qvink Memory';
 const css_message_div = "qvink_memory_display"
 const css_short_memory = "qvink_short_memory"
 const css_long_memory = "qvink_long_memory"
-const css_remember_memory = "qvink_remember_memory"
-const global_div_class = `${MODULE_NAME}_item`;  // class put on all added divs to identify them
+const css_remember_memory = `qvink_remember_memory`
+const summary_div_class = `qvink_memory_text`  // class put on all added summary divs to identify them
+const css_button_separator = `qvink_memory_button_separator`
+const css_edit_textarea = `qvink_memory_edit_textarea`
 
 // Macros for long-term and short-term memory injection
 const long_memory_macro = `${MODULE_NAME}_long_memory`;
@@ -102,6 +104,10 @@ const profile_settings = {
 }
 const settings_ui_map = {}  // map of settings to UI elements
 
+
+
+
+
 // Utility functions
 function log(message) {
     console.log(`[${MODULE_NAME_FANCY}]`, message);
@@ -116,7 +122,31 @@ function error(message) {
 }
 
 const saveChatDebounced = debounce(() => getContext().saveChat(), debounce_timeout.relaxed);
+function count_tokens(text, padding = 0) {
+    // count the number of tokens in a text
+    return getTokenCount(text, padding);
+}
+function get_context_size() {
+    // Get the current context size
+    return getMaxContextSize();
+}
+function get_long_token_limit() {
+    // Get the long-term memory token limit, given the current context size and settings
+    let long_term_context_limit = get_settings('long_term_context_limit');
+    let context_size = get_context_size();
+    return Math.floor(context_size * long_term_context_limit/100);
+}
+function get_short_token_limit() {
+    // Get the short-term memory token limit, given the current context size and settings
+    let short_term_context_limit = get_settings('short_term_context_limit');
+    let context_size = get_context_size();
+    return Math.floor(context_size * short_term_context_limit/100);
+}
 
+
+
+
+// Settings Management
 function initialize_settings() {
     if (extension_settings[MODULE_NAME] !== undefined) {  // setting already initialized
         return
@@ -147,6 +177,146 @@ function get_settings(key) {
     // Get a setting for the extension, or the default value if not set
     return extension_settings[MODULE_NAME]?.[key] ?? default_settings[key];
 }
+
+/**
+ * Bind a UI element to a setting.
+ * @param selector {string} jQuery Selector for the UI element
+ * @param key {string} Key of the setting
+ * @param type {string} Type of the setting (number, boolean)
+ * @param callback {function} Callback function to run when the setting is updated
+ */
+function bind_setting(selector, key, type=null, callback=null) {
+    // Bind a UI element to a setting, so if the UI element changes, the setting is updated
+    let element = $(selector);
+    settings_ui_map[key] = [element, type]
+
+    // if no elements found, log error
+    if (element.length === 0) {
+        error(`No element found for selector [${selector}] for setting [${key}]`);
+        return;
+    }
+
+    // default trigger for a settings update is on a "change" event
+    let trigger = 'change';
+
+    // If a textarea, instead make every keypress triggers an update
+    if (element.is('textarea')) {
+        trigger = 'input';
+    }
+
+    // Set the UI element to the current setting value
+    set_setting_ui_element(key, element, type);
+
+    // Make the UI element update the setting when changed
+    element.on(trigger, function (event) {
+        let value;
+        if (type === 'number') {  // number input
+            value = Number($(this).val());
+        } else if (type === 'boolean') {  // checkbox
+            value = Boolean($(this).prop('checked'));
+        } else {  // text input or dropdown
+            value = $(this).val();
+        }
+
+        // update the setting
+        set_settings(key, value)
+
+        // trigger callback if provided, passing the new value
+        if (callback !== null) {
+            callback(value);
+        }
+
+        // update the save icon highlight
+        update_save_icon_highlight();
+
+        // refresh memory state (update message inclusion criteria, etc)
+        if (trigger === 'change') {
+            refresh_memory();
+        } else if (trigger === 'input') {
+            refresh_memory_debounced();  // debounce the refresh for input elements
+        }
+    });
+}
+function set_setting_ui_element(key, element, type) {
+    // Set a UI element to the current setting value
+    let radio = false;
+    if (element.is('input[type="radio"]')) {
+        radio = true;
+    }
+
+    // get the setting value
+    let setting_value = get_settings(key);
+
+    // initialize the UI element with the setting value
+    if (radio) {  // if a radio group, select the one that matches the setting value
+        let selected = element.filter(`[value="${setting_value}"]`)
+        if (selected.length === 0) {
+            error(`Error: No radio button found for value [${setting_value}] for setting [${key}]`);
+            return;
+        }
+        selected.prop('checked', true);
+    } else {  // otherwise, set the value directly
+        if (type === 'boolean') {  // checkbox
+            element.prop('checked', setting_value);
+        } else {  // text input or dropdown
+            element.val(setting_value);
+        }
+    }
+}
+function update_save_icon_highlight() {
+    // If the current settings are different than the current profile, highlight the save button
+    if (detect_settings_difference()) {
+        $('#save_profile').addClass('button_highlight');
+    } else {
+        $('#save_profile').removeClass('button_highlight');
+    }
+}
+function refresh_settings() {
+    // Refresh all settings UI elements according to the current settings
+    debug("Refreshing settings...")
+
+    // Set the UI profile dropdowns to reflect the available profiles
+    let profile_options = Object.keys(get_settings('profiles'));
+    let choose_profile_dropdown = $('#profile').empty();
+    let character_profiles_dropdown = $('#character_profile').empty();
+    for (let profile of profile_options) {
+        choose_profile_dropdown.append(`<option value="${profile}">${profile}</option>`);
+        character_profiles_dropdown.append(`<option value="${profile}">${profile}</option>`);
+    }
+
+    // iterate through the settings map and set each element to the current setting value
+    for (let [key, [element, type]] of Object.entries(settings_ui_map)) {
+        set_setting_ui_element(key, element, type);
+    }
+
+    // set the character profile dropdown to the current character's profile
+    character_profiles_dropdown.val(get_character_profile());
+
+    // update the save icon highlight
+    update_save_icon_highlight();
+}
+function bind_function(id, func) {
+    // bind a function to an element (typically a button or input)
+    let element = $(id);
+    if (element.length === 0) {
+        error(`No element found for selector [${id}] when binding function`);
+        return;
+    }
+
+    // check if it's an input element, and bind a "change" event if so
+    if (element.is('input')) {
+        element.on('change', function (event) {
+            func(event);
+        });
+    } else {  // otherwise, bind a "click" event
+        element.on('click', function (event) {
+            func(event);
+        });
+    }
+}
+
+
+
 
 // Profile management
 function copy_settings(profile=null) {
@@ -300,165 +470,8 @@ function load_character_profile() {
 }
 
 
-/**
- * Bind a UI element to a setting.
- * @param selector {string} jQuery Selector for the UI element
- * @param key {string} Key of the setting
- * @param type {string} Type of the setting (number, boolean)
- * @param callback {function} Callback function to run when the setting is updated
- */
-function bind_setting(selector, key, type=null, callback=null) {
-    // Bind a UI element to a setting, so if the UI element changes, the setting is updated
-    let element = $(selector);
-    settings_ui_map[key] = [element, type]
-
-    // if no elements found, log error
-    if (element.length === 0) {
-        error(`No element found for selector [${selector}] for setting [${key}]`);
-        return;
-    }
-
-    // default trigger for a settings update is on a "change" event
-    let trigger = 'change';
-
-    // If a textarea, instead make every keypress triggers an update
-    if (element.is('textarea')) {
-        trigger = 'input';
-    }
-
-    // Set the UI element to the current setting value
-    set_setting_ui_element(key, element, type);
-
-    // Make the UI element update the setting when changed
-    element.on(trigger, function (event) {
-        let value;
-        if (type === 'number') {  // number input
-            value = Number($(this).val());
-        } else if (type === 'boolean') {  // checkbox
-            value = Boolean($(this).prop('checked'));
-        } else {  // text input or dropdown
-            value = $(this).val();
-        }
-
-        // update the setting
-        set_settings(key, value)
-
-        // trigger callback if provided, passing the new value
-        if (callback !== null) {
-            callback(value);
-        }
-
-        // update the save icon highlight
-        update_save_icon_highlight();
-
-        // refresh memory state (update message inclusion criteria, etc)
-        if (trigger === 'change') {
-            refresh_memory();
-        } else if (trigger === 'input') {
-            refresh_memory_debounced();  // debounce the refresh for input elements
-        }
-    });
-}
-function set_setting_ui_element(key, element, type) {
-    // Set a UI element to the current setting value
-    let radio = false;
-    if (element.is('input[type="radio"]')) {
-        radio = true;
-    }
-
-    // get the setting value
-    let setting_value = get_settings(key);
-
-    // initialize the UI element with the setting value
-    if (radio) {  // if a radio group, select the one that matches the setting value
-        let selected = element.filter(`[value="${setting_value}"]`)
-        if (selected.length === 0) {
-            error(`Error: No radio button found for value [${setting_value}] for setting [${key}]`);
-            return;
-        }
-        selected.prop('checked', true);
-    } else {  // otherwise, set the value directly
-        if (type === 'boolean') {  // checkbox
-            element.prop('checked', setting_value);
-        } else {  // text input or dropdown
-            element.val(setting_value);
-        }
-    }
-}
-function update_save_icon_highlight() {
-    // If the current settings are different than the current profile, highlight the save button
-    if (detect_settings_difference()) {
-        $('#save_profile').addClass('button_highlight');
-    } else {
-        $('#save_profile').removeClass('button_highlight');
-    }
-}
-function refresh_settings() {
-    // Refresh all settings UI elements according to the current settings
-    debug("Refreshing settings...")
-
-    // Set the UI profile dropdowns to reflect the available profiles
-    let profile_options = Object.keys(get_settings('profiles'));
-    let choose_profile_dropdown = $('#profile').empty();
-    let character_profiles_dropdown = $('#character_profile').empty();
-    for (let profile of profile_options) {
-        choose_profile_dropdown.append(`<option value="${profile}">${profile}</option>`);
-        character_profiles_dropdown.append(`<option value="${profile}">${profile}</option>`);
-    }
-
-    // iterate through the settings map and set each element to the current setting value
-    for (let [key, [element, type]] of Object.entries(settings_ui_map)) {
-        set_setting_ui_element(key, element, type);
-    }
-
-    // set the character profile dropdown to the current character's profile
-    character_profiles_dropdown.val(get_character_profile());
-
-    // update the save icon highlight
-    update_save_icon_highlight();
-}
-
-function bind_function(id, func) {
-    // bind a function to an element (typically a button or input)
-    let element = $(id);
-    if (element.length === 0) {
-        error(`No element found for selector [${id}] when binding function`);
-        return;
-    }
-
-    // check if it's an input element, and bind a "change" event if so
-    if (element.is('input')) {
-        element.on('change', function (event) {
-            func(event);
-        });
-    } else {  // otherwise, bind a "click" event
-        element.on('click', function (event) {
-            func(event);
-        });
-    }
-}
 
 
-function count_tokens(text, padding = 0) {
-    // count the number of tokens in a text
-    return getTokenCount(text, padding);
-}
-function get_context_size() {
-    // Get the current context size
-    return getMaxContextSize();
-}
-function get_long_token_limit() {
-    // Get the long-term memory token limit, given the current context size and settings
-    let long_term_context_limit = get_settings('long_term_context_limit');
-    let context_size = get_context_size();
-    return Math.floor(context_size * long_term_context_limit/100);
-}
-function get_short_token_limit() {
-    // Get the short-term memory token limit, given the current context size and settings
-    let short_term_context_limit = get_settings('short_term_context_limit');
-    let context_size = get_context_size();
-    return Math.floor(context_size * short_term_context_limit/100);
-}
 
 // UI functions
 function set_memory_display(text='') {
@@ -468,6 +481,15 @@ function set_memory_display(text='') {
 }
 function on_restore_prompt_click() {
     $('#prompt').val(default_prompt).trigger('input');
+}
+function get_message_div(index) {
+    // given a message index, get the div element for that message
+    let div = $(`div[mesid="${index}"]`);
+    if (div.length === 0) {
+        error(`Could not find message div for message ${index}`);
+        return null;
+    }
+    return div;
 }
 function update_message_visuals(i, style=true, text=null) {
     // Update the message visuals according to its current memory status
@@ -482,14 +504,10 @@ function update_message_visuals(i, style=true, text=null) {
     let remember = get_memory(message, 'remember');
 
     // it will have an attribute "mesid" that is the message index
-    let div_element = $(`div[mesid="${i}"]`);
-    if (div_element.length === 0) {
-        error(`Could not find message element for message ${i} while updating message visuals`);
-        return
-    }
+    let div_element = get_message_div(i);
 
     // remove any existing added divs
-    div_element.find(`div.${global_div_class}`).remove();
+    div_element.find(`div.${summary_div_class}`).remove();
 
     // If setting isn't enabled, don't display memories
     if (!get_settings('display_memories')) {
@@ -521,49 +539,105 @@ function update_message_visuals(i, style=true, text=null) {
         }
     }
 
-    // Insert a new div right after that for the summary
-    message_element.after(`<div class="${global_div_class} ${css_message_div} ${style_class}">${text}</div>`);
+    // create the div element for the memory and add it to the message div
+    let memory_div = $(`<div class="${summary_div_class} ${css_message_div} ${style_class}">${text}</div>`)
+    message_element.after(memory_div);
+
+    // add a click event to the memory div to edit the memory
+    memory_div.on('click', function () {
+        edit_memory(i);
+    })
 }
 function scroll_to_bottom_of_chat() {
     // Scroll to the bottom of the chat
     let chat = $('#chat');
     chat.scrollTop(chat[0].scrollHeight);
 }
+function edit_memory(index) {
+    // Allow the user to edit a message summary
+    let message = getContext().chat[index];
+    let message_div = get_message_div(index);
+
+    // get the current memory text
+    let memory = get_memory(message, 'memory').trim() ?? '';
+
+    // find the div holding the memory text
+    let memory_div = message_div.find(`div.${summary_div_class}`);
+
+    // Hide the memory div and add the textarea
+    let textarea = $(`<textarea class="${css_message_div} ${css_edit_textarea}" rows="1"></textarea>`);
+    memory_div.hide();
+    memory_div.after(textarea);
+    textarea.focus();  // focus on the textarea
+    textarea.val(memory);  // set the textarea value to the memory text (this is done after focus to keep the cursor at the end)
+
+    function confirm_edit() {
+        let new_memory = textarea.val();
+        store_memory(message, 'memory', new_memory);
+        textarea.remove();  // remove the textarea
+        memory_div.show();  // show the memory div
+        refresh_memory();
+        debug(`Edited memory for message ${index}`);
+    }
+
+    function cancel_edit() {
+        textarea.remove();  // remove the textarea
+        memory_div.show();  // show the memory div
+    }
+
+    // save when the textarea loses focus, or when enter is pressed
+    textarea.on('blur', confirm_edit);
+    textarea.on('keydown', function (event) {
+        if (event.key === 'Enter') {  // confirm edit
+            event.preventDefault();
+            confirm_edit();
+        } else if (event.key === 'Escape') {  // cancel edit
+            event.preventDefault();
+            cancel_edit();
+        }
+    })
+}
 function initialize_message_buttons() {
     // Add the message buttons to the chat messages
 
     let remember_button_class = `${MODULE_NAME}_remember_button`
     let summarize_button_class = `${MODULE_NAME}_summarize_button`
+    let edit_button_class = `${MODULE_NAME}_edit_button`
 
-    let remember_button = $(`<div title="Remember (toggle)" class="mes_button ${remember_button_class} fa-solid fa-brain interactable" tabindex="0"></div>`);
-    let summarize_button = $(`<div title="Summarize" class="mes_button ${summarize_button_class} fa-solid fa-feather interactable" tabindex="0"></div>`);
+    let html = `
+<div title="Remember (toggle)" class="mes_button ${remember_button_class} fa-solid fa-brain" tabindex="0"></div>
+<div title="Summarize (AI)" class="mes_button ${summarize_button_class} fa-solid fa-feather" tabindex="0"></div>
+<div title="Edit Summary" class="mes_button ${edit_button_class} fa-solid fa-pencil" tabindex="0"></div>
+<span class="${css_button_separator}"></span>
+`
 
-    $("#message_template .mes_buttons .extraMesButtons").prepend(summarize_button);
-    $("#message_template .mes_buttons .extraMesButtons").prepend(remember_button);
+    $("#message_template .mes_buttons .extraMesButtons").prepend(html);
 
     // button events
     $(document).on("click", `.${remember_button_class}`, async function () {
-        const messageBlock = $(this).closest(".mes");
-        const messageId = Number(messageBlock.attr("mesid"));
-        remember_message_toggle(messageId);
+        const message_block = $(this).closest(".mes");
+        const message_id = Number(message_block.attr("mesid"));
+        remember_message_toggle(message_id);
     });
     $(document).on("click", `.${summarize_button_class}`, async function () {
-        const messageBlock = $(this).closest(".mes");
-        const messageId = Number(messageBlock.attr("mesid"));
-        await summarize_message(messageId, true);  // summarize the message, replacing the existing summary
+        const message_block = $(this).closest(".mes");
+        const message_id = Number(message_block.attr("mesid"));
+        await summarize_message(message_id, true);  // summarize the message, replacing the existing summary
         refresh_memory();
+    });
+    $(document).on("click", `.${edit_button_class}`, async function () {
+        const message_block = $(this).closest(".mes");
+        const message_id = Number(message_block.attr("mesid"));
+        await edit_memory(message_id);
     });
 
     // when a message is hidden/unhidden, trigger a memory refresh
-    $(document).on("click", ".mes_hide", async function () {
-        refresh_memory();
-    })
-    $(document).on("click", ".mes_unhide", async function () {
-        refresh_memory();
-    })
+    $(document).on("click", ".mes_hide", refresh_memory);
+    $(document).on("click", ".mes_unhide", refresh_memory);
 
 
 }
+
 
 
 // Memory functions
@@ -583,7 +657,6 @@ function get_memory(message, key) {
     // get information from the message object
     return message.extra?.[MODULE_NAME]?.[key];
 }
-
 async function remember_message_toggle(index=null) {
     // Toggle the "remember" status of a message
     let context = getContext();
@@ -637,7 +710,6 @@ function check_message_exclusion(message) {
 
     return true;
 }
-
 function update_message_inclusion_flags() {
     // Update all messages in the chat, flagging them as short-term or long-term memories to include in the injection.
     // This has to be run on the entire chat since it needs to take the context limits into account.
@@ -699,7 +771,6 @@ function update_message_inclusion_flags() {
         update_message_visuals(i, true);
     }
 }
-
 function concatenate_summaries(start=null, end=null, include=null, remember=null) {
     // Given a start and end, concatenate the summaries of the messages in that range
     // Excludes messages that don't meet the inclusion criteria
@@ -745,6 +816,16 @@ function concatenate_summaries(start=null, end=null, include=null, remember=null
     summaries = summaries.map((s) => `* ${s}`);
     return summaries.join('\n');
 }
+function get_long_memory() {
+    // get the injection text for long-term memory
+    return concatenate_summaries(null, null, "long");
+}
+function get_short_memory() {
+    // get the injection text for short-term memory
+    return concatenate_summaries(null, null, "short");
+}
+
+
 
 // Summarization
 async function summarize_text(text) {
@@ -872,16 +953,6 @@ async function summarize_message(index=null, replace=false) {
     update_message_visuals(index, false)
 }
 
-
-function get_long_memory() {
-    // get the injection text for long-term memory
-    return concatenate_summaries(null, null, "long");
-}
-function get_short_memory() {
-    // get the injection text for short-term memory
-    return concatenate_summaries(null, null, "short");
-}
-
 function refresh_memory() {
     // Update the UI according to the current state of the chat memories, and update the injection prompts accordingly
     update_message_inclusion_flags()  // update the inclusion flags for all messages
@@ -948,6 +1019,7 @@ async function summarize_chat(replace=false) {
 }
 
 
+
 // Event handling
 async function on_chat_event(event=null) {
     // When the chat is updated, check if the summarization should be triggered
@@ -976,6 +1048,7 @@ async function on_chat_event(event=null) {
             debug('Chat or character changed');
             load_character_profile();  // load the profile for the current character
             refresh_memory();  // refresh the memory state
+            scroll_to_bottom_of_chat();  // scroll to the bottom of the chat (area was added due to memories)
             break;
         case 'message_deleted':  // message was deleted
             debug("Message deleted, refreshing memory")
@@ -998,6 +1071,7 @@ async function on_chat_event(event=null) {
             refresh_memory();
     }
 }
+
 
 // UI handling
 function setupListeners() {
@@ -1137,7 +1211,7 @@ jQuery(async function () {
 
     // Set up settings UI
     $("#extensions_settings2").append(await $.get(`${MODULE_DIR}/settings.html`));  // load html
-    $("h4").append(`<span class="version_id">v${VERSION}</span>`)
+    $("h4").append(`<span class="version_id">v${VERSION}</span>`)   // add version number to each header
 
     // setup UI listeners
     setupListeners();

@@ -72,5 +72,15 @@ By default, text is greyed to indicate that is it not injected.
     color: darkred;
 }
 
+/* Style the message buttons, separating them from the rest */
+.qvink_memory_button_separator {
+    margin: 0 2em;
+}
+
+/* memory edit text area needs a bit of negative top margin to fit right */
+.qvink_memory_edit_textarea {
+    margin-top: -6px;
+}
+
 
 

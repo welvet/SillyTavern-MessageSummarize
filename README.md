@@ -32,6 +32,7 @@ Cons, with attempted solutions:
   - Green: Included in short-term memory
   - Blue: Marked for long-term memory (included in short-term or long-term memory)
   - Red: Marked for long-term memory, but now out of context.
+- Directly edit a summary by clicking on it or clicking the "pencil" icon in the message button menu.
 
 ### Todo
 - ~~Handle swiping, editing, and deleting summaries~~
@@ -41,7 +42,7 @@ Cons, with attempted solutions:
 - ~~ability to stop summarization at any time~~
 - ~~Support stepped thoughts extension~~
 - Fix issue that is inadvertently changing the completion config for some reason.
-- Ability to edit summaries.
+- ~~Ability to edit summaries.~~
 - Figure out how to limit the number of regular chat messages injected into the prompt so they can be replaced by the summaries.
 - Custom exclusion criteria for messages?
 - Maybe include a few previous messages (or summaries) in the summary prompt, and specify that it should only include NEW events? 
