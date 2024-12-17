@@ -68,7 +68,7 @@ const default_settings = {
     include_world_info: false,  // include world info in context when summarizing
     prompt: default_prompt,
     block_chat: true,  // block input when summarizing
-    summary_maximum_length: 20,  // maximum token length of the summary
+    summary_maximum_length: 30,  // maximum token length of the summary
     include_names: false,  // include sender names in summary prompt
     include_last_user_message: false,  // include the last user message in the summarization prompt
 
