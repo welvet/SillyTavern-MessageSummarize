@@ -39,6 +39,7 @@ Cons, with attempted solutions:
 - ~~Display summaries below each message~~
 - ~~config profiles, and allow character-specific settings to be saved~~
 - ~~ability to stop summarization at any time~~
+- ~~Support stepped thoughts extension~~
 - Fix issue that is inadvertently changing the completion config for some reason.
 - Custom exclusion criteria for messages?
 - Figure out how to limit the number of regular chat messages injected into the prompt so they can be replaced by the summaries.
