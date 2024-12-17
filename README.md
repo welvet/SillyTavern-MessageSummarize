@@ -41,7 +41,8 @@ Cons, with attempted solutions:
 - ~~config profiles, and allow character-specific settings to be saved~~
 - ~~ability to stop summarization at any time~~
 - ~~Support stepped thoughts extension~~
-- Fix issue that is inadvertently changing the completion config for some reason.
+- Fix issue that is sometimes inadvertently changing the completion config for some reason.
+- Fix issue causing the popout to be destroyed when pressing escape.
 - ~~Ability to edit summaries.~~
 - Figure out how to limit the number of regular chat messages injected into the prompt so they can be replaced by the summaries.
 - Custom exclusion criteria for messages?
