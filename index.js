@@ -597,7 +597,7 @@ async function remember_message_toggle(index=null) {
     debug(`Set message ${index} remembered status: ${new_status}`);
 
     if (new_status) {  // if it was marked as remembered, summarize if it there is no summary
-        await summarize_message(messageId, false);
+        await summarize_message(index, false);
     }
     refresh_memory();
 }
@@ -890,10 +890,16 @@ function refresh_memory() {
     let short_template = get_settings('short_template')
 
     let long_injection = substituteParamsExtended(long_template, { [long_memory_macro]: long_memory });
-    let short_injection = substituteParamsExtended(short_template, { [short_memory_macro]: short_memory });
+    let short_injection = substituteParamsExtended(short_template, {[short_memory_macro]: short_memory});
 
-    setExtensionPrompt(`${MODULE_NAME}_long`,  long_injection,  get_settings('long_term_position'), get_settings('long_term_depth'), get_settings('long_term_scan'), get_settings('long_term_role'));
-    setExtensionPrompt(`${MODULE_NAME}_short`, short_injection, get_settings('short_term_position'), get_settings('short_term_depth'), get_settings('short_term_scan'), get_settings('short_term_role'));
+    // inject the memories into the templates, if they exist
+    if (long_memory) {
+        setExtensionPrompt(`${MODULE_NAME}_long`,  long_injection,  get_settings('long_term_position'), get_settings('long_term_depth'), get_settings('long_term_scan'), get_settings('long_term_role'));
+    }
+
+    if (short_memory) {
+        setExtensionPrompt(`${MODULE_NAME}_short`, short_injection, get_settings('short_term_position'), get_settings('short_term_depth'), get_settings('short_term_scan'), get_settings('short_term_role'));
+    }
 
     set_memory_display(`${long_injection}\n\n${short_injection}`)  // update the memory display
 }
