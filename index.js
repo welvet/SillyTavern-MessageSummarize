@@ -61,6 +61,7 @@ const default_settings = {
     // inclusion criteria
     message_length_threshold: 10,  // minimum message token length for summarization
     include_user_messages: false,  // include user messages in summarization
+    include_thought_messages: false,  // include thought messages in summarization (Stepped Thinking extension)
 
     // summarization settings
     auto_summarize: true,   // whether to automatically summarize chat messages
@@ -613,6 +614,11 @@ function check_message_exclusion(message) {
 
     // check if it's a user message
     if (!get_settings('include_user_messages') && message.is_user) {
+        return false
+    }
+
+    // check if it's a thought message
+    if (!get_settings('include_thought_messages') && message.is_thoughts) {
         return false
     }
 
