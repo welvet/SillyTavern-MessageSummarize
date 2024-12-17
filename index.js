@@ -174,6 +174,7 @@ function soft_reset_settings() {
     let profiles = get_settings('profiles');
     if (!profiles) {  // no profiles found, create the default profile
         Object.assign(extension_settings[MODULE_NAME], structuredClone(profile_settings));
+        profiles = get_settings('profiles');
     }
 
     if (Object.keys(profiles).length === 0) {
