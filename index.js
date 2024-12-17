@@ -31,6 +31,9 @@ import { MacrosParser } from '../../../macros.js';
 import { commonEnumProviders } from '../../../slash-commands/SlashCommandCommonEnumsProvider.js';
 export { MODULE_NAME };
 
+// Version ID
+const VERSION = '0.2.0';
+
 // THe module name modifies where settings are stored, where information is stored on message objects, macros, etc.
 const MODULE_NAME = 'qvink_memory';
 const MODULE_DIR = `scripts/extensions/third-party/${MODULE_NAME}`;
@@ -42,7 +45,6 @@ const css_short_memory = "qvink_short_memory"
 const css_long_memory = "qvink_long_memory"
 const css_remember_memory = "qvink_remember_memory"
 const global_div_class = `${MODULE_NAME}_item`;  // class put on all added divs to identify them
-
 
 // Macros for long-term and short-term memory injection
 const long_memory_macro = `${MODULE_NAME}_long_memory`;
@@ -1135,7 +1137,10 @@ jQuery(async function () {
 
     // Set up settings UI
     $("#extensions_settings2").append(await $.get(`${MODULE_DIR}/settings.html`));  // load html
-    setupListeners();  // setup UI listeners
+    $("h4").append(`<span class="version_id">v${VERSION}</span>`)
+
+    // setup UI listeners
+    setupListeners();
 
     // message buttons
     initialize_message_buttons();

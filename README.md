@@ -41,9 +41,9 @@ Cons, with attempted solutions:
 - ~~ability to stop summarization at any time~~
 - ~~Support stepped thoughts extension~~
 - Fix issue that is inadvertently changing the completion config for some reason.
-- Custom exclusion criteria for messages?
-- Figure out how to limit the number of regular chat messages injected into the prompt so they can be replaced by the summaries.
 - Ability to edit summaries.
+- Figure out how to limit the number of regular chat messages injected into the prompt so they can be replaced by the summaries.
+- Custom exclusion criteria for messages?
 - Maybe include a few previous messages (or summaries) in the summary prompt, and specify that it should only include NEW events? 
 This could aid in consistency and avoid duplicate info. Might also have to opposite effect though.
 - Add a button to transfer all summaries marked for long-term memory into a lorebook entry
@@ -52,11 +52,13 @@ This could aid in consistency and avoid duplicate info. Might also have to oppos
 
 ### Troubleshooting:
 
-- "ForbiddenError: invalid csrf token" - You opened ST in multiple tabs. Close them.
+- "ForbiddenError: invalid csrf token": You opened ST in multiple tabs.
 
-- "Syntax Error: No number after minus sign in JSON at position X" - update your koboldcpp.
+- "Syntax Error: No number after minus sign in JSON at position X": update your koboldcpp.
 
-- Summaries seem to be continuing the conversation rather than summarizing - probably an issue with your instruct template.
+- Just updated and things are broken: try reloading the page.
+
+- Summaries seem to be continuing the conversation rather than summarizing: probably an issue with your instruct template.
 Make sure you are using the correct template for your model, and make sure that system messages are properly distinct from user messages (summaries use a system prompt).
 
 

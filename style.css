@@ -1,3 +1,10 @@
+.version_id {
+    font-size: 0.4em;
+    color: white;
+    opacity: 0.05;
+    margin: 0 5px;
+}
+
 #qvink_memory_settings {
     display: flex;
     flex-direction: column;
