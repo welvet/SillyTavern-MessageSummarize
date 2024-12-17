@@ -18,6 +18,7 @@ import {
     streamingProcessor,
     stopGeneration,
 } from '../../../../script.js';
+import { Popup } from '../../../popup.js';
 import { is_group_generating, selected_group } from '../../../group-chats.js';
 import { loadMovingUIState } from '../../../power-user.js';
 import { dragElement } from '../../../RossAscends-mods.js';
@@ -48,7 +49,7 @@ const long_memory_macro = `${MODULE_NAME}_long_memory`;
 const short_memory_macro = `${MODULE_NAME}_short_memory`;
 
 // Settings
-const defaultPrompt = `Summarize the given fictional narrative in a single, very short and concise statement of fact.
+const default_prompt = `Summarize the given fictional narrative in a single, very short and concise statement of fact.
 State only events that will need to be remembered in the future.
 Include names when possible.
 Response must be in the past tense.
@@ -56,37 +57,46 @@ Maintain the same point of view as the text (i.e. if the text uses "you", use "y
 Your response must ONLY contain the summary. If there is nothing worth summarizing, do not respond.`;
 const default_long_template = `[Following is a list of events that occurred in the past]:\n{{${long_memory_macro}}}`
 const default_short_template = `[Following is a list of recent events]:\n{{${short_memory_macro}}}`
-const defaultSettings = {
+const default_settings = {
+    // inclusion criteria
+    message_length_threshold: 10,  // minimum message token length for summarization
+    include_user_messages: false,  // include user messages in summarization
+
+    // summarization settings
     auto_summarize: true,   // whether to automatically summarize chat messages
     include_world_info: false,  // include world info in context when summarizing
-    prompt: defaultPrompt,
-    long_template: default_long_template,
-    short_template: default_short_template,
-    block_chat: false,  // block input when summarizing
-    message_length_threshold: 10,  // minimum message token length for summarization
+    prompt: default_prompt,
+    block_chat: true,  // block input when summarizing
     summary_maximum_length: 20,  // maximum token length of the summary
-    include_user_messages: false,  // include user messages in summarization
     include_names: false,  // include sender names in summary prompt
-    debug_mode: false,  // enable debug mode
-    lorebook_entry: null,  // lorebook entry to dump memories to
-    display_memories: true,  // display memories in the chat below each message
     include_last_user_message: false,  // include the last user message in the summarization prompt
 
+    // injection settings
+    long_template: default_long_template,
     long_term_context_limit: 10,  // percentage of context size to use as long-term memory limit
-    short_term_context_limit: 10,  // percentage of context size to use as short-term memory limit
-
     long_term_position: extension_prompt_types.IN_PROMPT,
     long_term_role: extension_prompt_roles.SYSTEM,
     long_term_depth: 2,
     long_term_scan: false,
 
+    short_template: default_short_template,
+    short_term_context_limit: 10,  // percentage of context size to use as short-term memory limit
     short_term_position: extension_prompt_types.IN_PROMPT,
     short_term_depth: 2,
     short_term_role: extension_prompt_roles.SYSTEM,
     short_term_scan: false,
 
-    stop_summarization: false  // toggled to stop summarization, then toggled back to false.
+    // misc
+    debug_mode: false,  // enable debug mode
+    stop_summarization: false,  // toggled to stop summarization, then toggled back to false.
+    lorebook_entry: null,  // lorebook entry to dump memories to
+    display_memories: true,  // display memories in the chat below each message
 };
+const profile_settings = {
+    profiles: {},  // dict of profiles by name
+    character_profiles: {},  // dict of character IDs to profiles
+    profile: 'Default', // Current profile
+}
 const settings_ui_map = {}  // map of settings to UI elements
 
 // Utility functions
@@ -105,45 +115,185 @@ function error(message) {
 const saveChatDebounced = debounce(() => getContext().saveChat(), debounce_timeout.relaxed);
 
 function initialize_settings() {
-    if (!extension_settings[MODULE_NAME]) {
-        extension_settings[MODULE_NAME] = structuredClone(defaultSettings);
+    if (extension_settings[MODULE_NAME] !== undefined) {  // setting already initialized
+        return
     }
+    hard_reset_settings();
+}
+function hard_reset_settings() {
+    // Set the settings to the completely fresh values, deleting all profiles too
+    if (profile_settings['profiles']['Default'] === undefined) {  // if the default profile doesn't exist, create it
+        profile_settings['profiles']['Default'] = structuredClone(default_settings);
+    }
+    extension_settings[MODULE_NAME] = structuredClone({
+        ...default_settings,
+        ...profile_settings
+    });
 }
 function reset_settings() {
-    extension_settings[MODULE_NAME] = structuredClone(defaultSettings);
-    console.log(defaultSettings)
-    load_settings();
+    // reset the current settings to default
+    Object.assign(extension_settings[MODULE_NAME], structuredClone(default_settings))
+    refresh_settings();   // refresh the UI
 }
 function set_settings(key, value) {
     // Set a setting for the extension and save it
     extension_settings[MODULE_NAME][key] = value;
     saveSettingsDebounced();
-    debug(`Setting [${key}] updated to [${value}]`);
 }
 function get_settings(key) {
     // Get a setting for the extension, or the default value if not set
-    return extension_settings[MODULE_NAME]?.[key] ?? defaultSettings[key];
+    return extension_settings[MODULE_NAME]?.[key] ?? default_settings[key];
 }
 
-function count_tokens(text, padding = 0) {
-    // count the number of tokens in a text
-    return getTokenCount(text, padding);
+// Profile management
+function copy_settings(profile=null) {
+    // copy the setting from the given profile (or current settings if none provided)
+    let settings;
+
+    if (!profile) {  // no profile given, copy current settings
+        settings = structuredClone(extension_settings[MODULE_NAME]);
+    } else {  // copy from the profile
+        let profiles = get_settings('profiles');
+        if (profiles[profile] === undefined) {  // profile doesn't exist, return empty
+            return {}
+        }
+
+        // copy the settings from the profile
+        settings = structuredClone(profiles[profile]);
+    }
+
+    // remove profile settings from the copied settings
+    for (let key of Object.keys(profile_settings)) {
+        delete settings[key];
+    }
+    return settings;
 }
-function get_context_size() {
-    // Get the current context size
-    return getMaxContextSize();
+function detect_settings_difference(profile=null) {
+    // check if the current settings differ from the given profile
+    if (!profile) {  // if none provided, compare to the current profile
+        profile = get_settings('profile')
+    }
+    let current_settings = copy_settings();
+    let profile_settings = copy_settings(profile);
+    return JSON.stringify(current_settings) !== JSON.stringify(profile_settings);
 }
-function get_long_token_limit() {
-    // Get the long-term memory token limit, given the current context size and settings
-    let long_term_context_limit = get_settings('long_term_context_limit');
-    let context_size = get_context_size();
-    return Math.floor(context_size * long_term_context_limit/100);
+function save_profile(profile=null) {
+    // Save the current settings to the given profile
+    if (!profile) {  // if none provided, save to the current profile
+        profile = get_settings('profile');
+    }
+    log("Saving Configuration Profile: "+profile);
+
+    // save the current settings to the profile
+    let profiles = get_settings('profiles');
+    profiles[profile] = copy_settings();
+    set_settings('profiles', profiles);
+
+    // update the button highlight
+    update_save_icon_highlight();
 }
-function get_short_token_limit() {
-    // Get the short-term memory token limit, given the current context size and settings
-    let short_term_context_limit = get_settings('short_term_context_limit');
-    let context_size = get_context_size();
-    return Math.floor(context_size * short_term_context_limit/100);
+function load_profile(profile=null) {
+    // load a given settings profile
+    if (!profile) {  // if none provided, reload the current profile
+        profile = get_settings('profile');
+    }
+
+    let settings = copy_settings(profile);  // copy the settings from the profile
+    if (!settings) {
+        error("Profile not found: "+profile);
+        return;
+    }
+
+    log("Loading Configuration Profile: "+profile);
+    Object.assign(extension_settings[MODULE_NAME], settings);  // update the settings
+    set_settings('profile', profile);  // set the current profile
+    refresh_settings();
+}
+async function rename_profile() {
+    // Rename the current profile via user input
+    let old_name = get_settings('profile');
+    let new_name = await Popup.show.input("THIS IS A HEADER", `Enter a new name:`, old_name);
+
+    // if it's the same name or none provided, do nothing
+    if (!new_name || old_name === new_name) {
+        return;
+    }
+
+    let profiles = get_settings('profiles');
+
+    // check if the new name already exists
+    if (profiles[new_name]) {
+        error(`Profile [${new_name}] already exists`);
+        return;
+    }
+
+    // rename the profile
+    profiles[new_name] = profiles[old_name];
+    delete profiles[old_name];
+    set_settings('profiles', profiles);
+    set_settings('profile', new_name);  // set the current profile to the new name
+
+    // if any characters are using the old profile, update it to the new name
+    let character_profiles = get_settings('character_profiles');
+    for (let [characterId, character_profile] of Object.entries(character_profiles)) {
+        if (character_profile === old_name) {
+            character_profiles[characterId] = new_name;
+        }
+    }
+
+    log(`Renamed profile [${old_name}] to [${new_name}]`);
+    refresh_settings()
+}
+function new_profile() {
+    // create a new profile
+    let profiles = get_settings('profiles');
+    let profile = 'New Profile';
+    let i = 1;
+    while (profiles[profile]) {
+        profile = `New Profile ${i}`;
+        i++;
+    }
+    save_profile(profile);
+    load_profile(profile);
+}
+function delete_profile() {
+    // Delete the current profile
+    if (get_settings('profiles').length === 1) {
+        error("Cannot delete your last profile");
+        return;
+    }
+    let profile = get_settings('profile');
+    let profiles = get_settings('profiles');
+    log(`Deleting Configuration Profile: ${profile}`);
+    delete profiles[profile];
+    set_settings('profiles', profiles);
+    load_profile('Default');
+}
+function set_character_profile(profile) {
+    // Make the current profile the default for the current character
+    let context = getContext();
+    let characterId = context.characterId;
+    if (!characterId) {  // no character selected
+        return;
+    }
+
+    let character_profiles = get_settings('character_profiles');
+    character_profiles[characterId] = profile;
+    log(`Set character [${characterId}] to use profile [${profile}]`);
+    set_settings('character_profiles', character_profiles);
+}
+function get_character_profile(characterId) {
+    // Get the profile for a given character
+    if (!characterId) {  // if none given, assume the current character
+        characterId = getContext().characterId;
+    }
+    let character_profiles = get_settings('character_profiles');
+    return character_profiles[characterId] ?? 'Default';
+}
+function load_character_profile() {
+    // Load the settings profile for the current character
+    let profile = get_character_profile();
+    load_profile(profile);
 }
 
 
@@ -152,8 +302,9 @@ function get_short_token_limit() {
  * @param selector {string} jQuery Selector for the UI element
  * @param key {string} Key of the setting
  * @param type {string} Type of the setting (number, boolean)
+ * @param callback {function} Callback function to run when the setting is updated
  */
-function bind_setting(selector, key, type=null) {
+function bind_setting(selector, key, type=null, callback=null) {
     // Bind a UI element to a setting, so if the UI element changes, the setting is updated
     let element = $(selector);
     settings_ui_map[key] = [element, type]
@@ -172,31 +323,8 @@ function bind_setting(selector, key, type=null) {
         trigger = 'input';
     }
 
-    // detect if it's a radio button group
-    let radio = false
-    if (element.is('input[type="radio"]')) {
-        trigger = 'change';
-        radio = true;
-    }
-
-    // get the setting value
-    let setting_value = get_settings(key);
-
-    // initialize the UI element with the setting value
-    if (radio) {  // if a radio group, select the one that matches the setting value
-        let selected = element.filter(`[value="${setting_value}"]`)
-        if (selected.length === 0) {
-            error(`Error: No radio button found for value [${setting_value}] for setting [${key}]`);
-            return;
-        }
-        selected.prop('checked', true);
-    } else {  // otherwise, set the value directly
-        if (type === 'boolean') {  // checkbox
-            element.prop('checked', setting_value);
-        } else {  // text input or dropdown
-            element.val(setting_value);
-        }
-    }
+    // Set the UI element to the current setting value
+    set_setting_ui_element(key, element, type);
 
     // Make the UI element update the setting when changed
     element.on(trigger, function (event) {
@@ -212,6 +340,14 @@ function bind_setting(selector, key, type=null) {
         // update the setting
         set_settings(key, value)
 
+        // trigger callback if provided, passing the new value
+        if (callback !== null) {
+            callback(value);
+        }
+
+        // update the save icon highlight
+        update_save_icon_highlight();
+
         // refresh memory state (update message inclusion criteria, etc)
         if (trigger === 'change') {
             refresh_memory();
@@ -219,25 +355,6 @@ function bind_setting(selector, key, type=null) {
             refresh_memory_debounced();  // debounce the refresh for input elements
         }
     });
-}
-function bind_function(id, func) {
-    // bind a function to an element (typically a button or input)
-    let element = $(id);
-    if (element.length === 0) {
-        error(`No element found for selector [${id}] when binding function`);
-        return;
-    }
-
-    // check if it's an input element, and bind a "change" event if so
-    if (element.is('input')) {
-        element.on('change', function (event) {
-            func(event);
-        });
-    } else {  // otherwise, bind a "click" event
-        element.on('click', function (event) {
-            func(event);
-        });
-    }
 }
 function set_setting_ui_element(key, element, type) {
     // Set a UI element to the current setting value
@@ -265,13 +382,80 @@ function set_setting_ui_element(key, element, type) {
         }
     }
 }
-function load_settings() {
-    // set all UI elements to their current settings
+function update_save_icon_highlight() {
+    // If the current settings are different than the current profile, highlight the save button
+    if (detect_settings_difference()) {
+        $('#save_profile').addClass('button_highlight');
+    } else {
+        $('#save_profile').removeClass('button_highlight');
+    }
+}
+function refresh_settings() {
+    // Refresh all settings UI elements according to the current settings
+    debug("Refreshing settings...")
+
+    // Set the UI profile dropdowns to reflect the available profiles
+    let profile_options = Object.keys(get_settings('profiles'));
+    let choose_profile_dropdown = $('#profile').empty();
+    let character_profiles_dropdown = $('#character_profile').empty();
+    for (let profile of profile_options) {
+        choose_profile_dropdown.append(`<option value="${profile}">${profile}</option>`);
+        character_profiles_dropdown.append(`<option value="${profile}">${profile}</option>`);
+    }
+
+    // iterate through the settings map and set each element to the current setting value
     for (let [key, [element, type]] of Object.entries(settings_ui_map)) {
         set_setting_ui_element(key, element, type);
     }
+
+    // set the character profile dropdown to the current character's profile
+    character_profiles_dropdown.val(get_character_profile());
+
+    // update the save icon highlight
+    update_save_icon_highlight();
 }
 
+function bind_function(id, func) {
+    // bind a function to an element (typically a button or input)
+    let element = $(id);
+    if (element.length === 0) {
+        error(`No element found for selector [${id}] when binding function`);
+        return;
+    }
+
+    // check if it's an input element, and bind a "change" event if so
+    if (element.is('input')) {
+        element.on('change', function (event) {
+            func(event);
+        });
+    } else {  // otherwise, bind a "click" event
+        element.on('click', function (event) {
+            func(event);
+        });
+    }
+}
+
+
+function count_tokens(text, padding = 0) {
+    // count the number of tokens in a text
+    return getTokenCount(text, padding);
+}
+function get_context_size() {
+    // Get the current context size
+    return getMaxContextSize();
+}
+function get_long_token_limit() {
+    // Get the long-term memory token limit, given the current context size and settings
+    let long_term_context_limit = get_settings('long_term_context_limit');
+    let context_size = get_context_size();
+    return Math.floor(context_size * long_term_context_limit/100);
+}
+function get_short_token_limit() {
+    // Get the short-term memory token limit, given the current context size and settings
+    let short_term_context_limit = get_settings('short_term_context_limit');
+    let context_size = get_context_size();
+    return Math.floor(context_size * short_term_context_limit/100);
+}
 
 // UI functions
 function set_memory_display(text='') {
@@ -280,7 +464,7 @@ function set_memory_display(text='') {
     display.scrollTop(display[0].scrollHeight);
 }
 function on_restore_prompt_click() {
-    $('#prompt').val(defaultPrompt).trigger('input');
+    $('#prompt').val(default_prompt).trigger('input');
 }
 function update_message_visuals(i, style=true, text=null) {
     // Update the message visuals according to its current memory status
@@ -342,7 +526,6 @@ function scroll_to_bottom_of_chat() {
     let chat = $('#chat');
     chat.scrollTop(chat[0].scrollHeight);
 }
-
 function initialize_message_buttons() {
     // Add the message buttons to the chat messages
 
@@ -777,7 +960,8 @@ async function on_chat_event(event=null) {
     switch (event) {
         case 'chat_changed':  // Chat or character changed
             debug('Chat or character changed');
-            refresh_memory();
+            load_character_profile();  // load the profile for the current character
+            refresh_memory();  // refresh the memory state
             break;
         case 'message_deleted':  // message was deleted
             debug("Message deleted, refreshing memory")
@@ -805,6 +989,17 @@ async function on_chat_event(event=null) {
 function setupListeners() {
     debug("Setting up listeners...")
 
+    // Trigger profile changes
+    bind_function('#save_profile', () => save_profile());
+    bind_function('#restore_profile', () => load_profile());
+    bind_function('#rename_profile', () => rename_profile())
+    bind_function('#new_profile', new_profile);
+    bind_function('#delete_profile', delete_profile);
+    bind_function('#character_profile', (e) => {
+        let profile = $(e.target).val();
+        set_character_profile(profile);
+    });
+
     bind_function('#prompt_restore', on_restore_prompt_click);
     bind_function('#popout_button', (e) => {
         do_popout(e);
@@ -823,6 +1018,8 @@ function setupListeners() {
     //bind_function('#dump_to_lorebook', dump_memories_to_lorebook);
     //bind_setting('#lorebook_entry', 'lorebook_entry')
 
+    bind_setting('#profile', 'profile', 'text', load_profile);
+
     bind_setting('#auto_summarize', 'auto_summarize', 'boolean');
     bind_setting('#include_world_info', 'include_world_info', 'boolean');
     bind_setting('#block_chat', 'block_chat', 'boolean');
@@ -836,31 +1033,29 @@ function setupListeners() {
     bind_setting('#include_last_user_message', 'include_last_user_message', 'boolean')
 
     bind_setting('#short_template', 'short_template');
-    bind_setting('#short_term_context_limit', 'short_term_context_limit', 'number');
-    bind_setting('input[name="short_term_position"]', 'short_term_position');
+    bind_setting('input[name="short_term_position"]', 'short_term_position', 'number');
     bind_setting('#short_term_depth', 'short_term_depth', 'number');
     bind_setting('#short_term_role', 'short_term_role');
     bind_setting('#short_term_scan', 'short_term_scan', 'boolean');
+    bind_setting('#short_term_context_limit', 'short_term_context_limit', 'number', () => {
+        $('#short_term_context_limit_display').text(get_short_token_limit());
+    });
 
     bind_setting('#long_template', 'long_template');
-    bind_setting('#long_term_context_limit', 'long_term_context_limit', 'number');
-    bind_setting('input[name="long_term_position"]', 'long_term_position');
+    bind_setting('input[name="long_term_position"]', 'long_term_position', 'number');
     bind_setting('#long_term_depth', 'long_term_depth', 'number');
     bind_setting('#long_term_role', 'long_term_role');
     bind_setting('#long_term_scan', 'long_term_scan', 'boolean');
+    bind_setting('#long_term_context_limit', 'long_term_context_limit', 'number', () => {
+        $('#long_term_context_limit_display').text(get_long_token_limit());  // update the displayed token limit
+    });
 
 
-
-    // update the displayed token limit when the input changes
-    // Has to happen after the bind_setting calls, so changing the input sets the setting, then updates the display
-    bind_function('#long_term_context_limit', () => {
-        $('#long_term_context_limit_display').text(get_long_token_limit());
-    })
-    bind_function('#short_term_context_limit', () => {
-        $('#short_term_context_limit_display').text(get_short_token_limit());
-    })
-    $('#long_term_context_limit').trigger('change');  // trigger the change event once to update the display at start
+    // trigger the change event once to update the display at start
+    $('#long_term_context_limit').trigger('change');
     $('#short_term_context_limit').trigger('change');
+
+    refresh_settings()
 }
 
 function do_popout(e) {
@@ -964,6 +1159,25 @@ jQuery(async function () {
                 typeList: ARGUMENT_TYPE.NUMBER,
             }),
         ],
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'hard_reset',
+        callback: (args) => {
+            hard_reset_settings()
+            refresh_settings()
+            refresh_memory()
+        },
+        helpString: 'Hard reset all setttings',
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'log_settings',
+        callback: (args) => {
+            log("SETTINGS: ")
+            log(extension_settings[MODULE_NAME])
+        },
+        helpString: 'Log current settings',
     }));
 
     // Macros

@@ -11,6 +11,22 @@
 
         <div class="inline-drawer-content">
             <div id="drawer_content">
+
+                <h4 class="textAlignCenter">Default Profile for Current Character <i class="fa-solid fa-info-circle" title="Choose a profile to be selected automatically when you use the current character."></i></h4>
+                <select id="character_profile" class="flex1 text_pole"></select>
+
+                <hr>
+                <h4 class="textAlignCenter">Active Profile <i class="fa-solid fa-info-circle" title="The configuration profile currently active."></i></h4>
+                <div class="flex-container justifyspacebetween alignitemscenter">
+                    <select id="profile" class="flex1 text_pole" title="The currently selected profile"></select>
+                    <i id="save_profile" class="menu_button fa-solid fa-save interactable" title="Save current profile" tabindex="0"></i>
+                    <i id="rename_profile" class="menu_button fa-solid fa-pencil interactable" title="Rename current profile" tabindex="0"></i>
+                    <i id="new_profile" class="menu_button fa-solid fa-file-circle-plus interactable" title="Create new profile" tabindex="0"></i>
+                    <i id="restore_profile" class="menu_button fa-solid fa-recycle interactable" title="Restore current profile" tabindex="0"></i>
+                    <i id="delete_profile" class="menu_button fa-solid fa-trash-can interactable" title="Delete current profile" tabindex="0"></i>
+                </div>
+
+                <hr>
                 <h4 class="textAlignCenter">Current Memory State <i class="fa-solid fa-info-circle" title="The current state of memory for this chat. Updates automatically as additional memory is added."></i></h4>
 
                 <textarea id="memory_display" class="text_pole textarea_compact" rows="6" placeholder="Current memory injection will display here" readonly></textarea>
@@ -22,6 +38,7 @@
                 </div>
 
                 <!-- Injection settings -->
+                <hr>
                 <h4 class="textAlignCenter">Inclusion Criteria  <i class="fa-solid fa-info-circle" title="Determines which messages are included in the memory injection. Changing these may require re-summarization, since excluded messages aren't summarized."></i></h4>
                 <label for="include_user_messages" title="Include user message summaries in memory." class="checkbox_label">
                     <input id="include_user_messages" type="checkbox" />
@@ -32,9 +49,9 @@
                     <input id="message_length_threshold" class="text_pole widthUnset" type="number" min="0" max="999" />
                     <span>Message Length Threshold</span>
                 </label>
-                <br><br>
 
                 <!-- Short-term memory -->
+                <hr>
                 <h4 class="textAlignCenter">Short-Term Memory Injection</h4>
                 <div class="template">
                     <textarea id="short_template" class="text_pole textarea_compact" rows="2"  placeholder="Use &lcub;&lcub;qvink_short_memory&rcub;&rcub;"></textarea>
@@ -72,9 +89,9 @@
                         </select>
                     </label>
                 </div>
-                <br><br>
 
                 <!-- Long-term memory -->
+                <hr>
                 <h4 class="textAlignCenter">Long-Term Memory Injection</h4>
                 <div class="template">
                     <textarea id="long_template" class="text_pole textarea_compact" rows="2"  placeholder="Use &lcub;&lcub;qvink_long_memory&rcub;&rcub;"></textarea>
@@ -112,10 +129,10 @@
                         </select>
                     </label>
                 </div>
-                <br>
 
 
                 <!-- Summarization -->
+                <hr>
                 <h4 class="textAlignCenter">Summarization</h4>
                 <div class="flex-container justifyspacebetween alignitemscenter">
                     <div id="rerun_memory" class="menu_button flex2" title="Re-summarize all memories using current summarization settings.">
@@ -163,9 +180,9 @@
                     <input id="summary_maximum_length" class="text_pole widthUnset" type="number" min="0" max="999" />
                     <span>Summary Max Length</span>
                 </label>
-                <br><br>
 
-
+                <!-- Misc. -->
+                <hr>
                 <h4 class="textAlignCenter">Misc.</h4>
                 <label for="debug_mode" title="Fill your console with debug messages" class="checkbox_label">
                     <input id="debug_mode" type="checkbox" />
@@ -178,8 +195,8 @@
                 </label>
 
                 <div class="flex-container justifyspacebetween alignitemscenter">
-                    <div id="revert_settings" class="menu_button flex1 margin0" title="Revert all settings to default">
-                        <span>Revert All Settings</span>
+                    <div id="revert_settings" class="menu_button flex1 margin0" title="Revert all settings to default (not the default profile, just the default that comes with the extension).">
+                        <span>Revert Settings</span>
                     </div>
                 </div>
 

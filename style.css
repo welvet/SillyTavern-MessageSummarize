@@ -36,6 +36,11 @@ input.inline_setting     {
     height: 1em;
 }
 
+/* buttons that need to grab your attention (Like the save button when there are unsaved changes) */
+.button_highlight {
+    color: var(--active);
+}
+
 /*
 Div displaying the memory on a message.
 By default, text is greyed to indicate that is it not injected.
