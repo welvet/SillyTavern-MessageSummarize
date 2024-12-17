@@ -22,6 +22,7 @@ Cons, with attempted solutions:
 - Any new assistant message will be automatically summarized.
 - To mark a memory for long-term memory, click the "brain" icon in the message button menu.
 - To re-summarize a message, click the "quill" icon in the message button menu.
+- To edit a summary, click on the summary text or click the "pencil" icon in the message button menu.
 
 
 ### Notable Features
@@ -32,7 +33,6 @@ Cons, with attempted solutions:
   - Green: Included in short-term memory
   - Blue: Marked for long-term memory (included in short-term or long-term memory)
   - Red: Marked for long-term memory, but now out of context.
-- Directly edit a summary by clicking on it or clicking the "pencil" icon in the message button menu.
 
 ### Todo
 - ~~Handle swiping, editing, and deleting summaries~~
