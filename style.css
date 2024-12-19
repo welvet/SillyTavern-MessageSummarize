@@ -74,7 +74,7 @@ By default, text is greyed to indicate that is it not injected.
 
 /* Style the message buttons, separating them from the rest */
 .qvink_memory_button_separator {
-    margin: 0 2em;
+    margin: 0 1em;
 }
 
 /* memory edit text area needs a bit of negative top margin to fit right */
@@ -82,5 +82,11 @@ By default, text is greyed to indicate that is it not injected.
     margin-top: -6px;
 }
 
+/* on small screens, remove the button separator */
+@media all and (max-width: 600px) {
+    .qvink_memory_button_separator {
+        display: none;
+    }
+}
 
 
