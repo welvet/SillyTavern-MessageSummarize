@@ -32,7 +32,7 @@ import { commonEnumProviders } from '../../../slash-commands/SlashCommandCommonE
 export { MODULE_NAME };
 
 // Version ID
-const VERSION = '0.3.1';
+const VERSION = '0.3.2';
 
 // THe module name modifies where settings are stored, where information is stored on message objects, macros, etc.
 const MODULE_NAME = 'qvink_memory';
