@@ -58,12 +58,12 @@ This could aid in consistency and avoid duplicate info. Might also have to oppos
 
 - "Syntax Error: No number after minus sign in JSON at position X": update your koboldcpp.
 
-- Just updated and things are broken: try reloading the page.
+- Just updated and things are broken: try reloading the page. If that fails, you can try using the "/hard_reset" command, but it WILL DELETE YOUR PROFILES.
 
 - Summaries seem to be continuing the conversation rather than summarizing: probably an issue with your instruct template.
-Make sure you are using the correct template for your model, and make sure that system messages are properly distinct from user messages (summaries use a system prompt).
+Make sure you are using the correct template for your model, and make sure that system messages are properly distinct from user messages (the summaries use a system prompt).
 
 
-If it's something else, please turn on "Debug Mode" in the settings and send me the output logs from your browser console.
+If it's something else, please turn on "Debug Mode" in the settings and send me the output logs from your browser console and raise an issue or message on discord.
 
 
