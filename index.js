@@ -590,6 +590,7 @@ function edit_memory(index) {
     memory_div.after(textarea);
     textarea.focus();  // focus on the textarea
     textarea.val(memory);  // set the textarea value to the memory text (this is done after focus to keep the cursor at the end)
+    textarea.height(textarea[0].scrollHeight-10);  // set the height of the textarea to fit the text
 
     function confirm_edit() {
         let new_memory = textarea.val();
