@@ -41,6 +41,7 @@ Cons, with attempted solutions:
 - ~~config profiles, and allow character-specific settings to be saved~~
 - ~~ability to stop summarization at any time~~
 - ~~Support stepped thoughts extension~~
+- ~~Added ability to provide global macros in summarization prompt~~
 - Fix issue that is sometimes inadvertently changing the completion config for some reason.
 - Fix issue causing the popout to be destroyed when pressing escape.
 - ~~Ability to edit summaries.~~
