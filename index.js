@@ -18,9 +18,10 @@ import {
     streamingProcessor,
     stopGeneration,
 } from '../../../../script.js';
+import { formatInstructModeChat } from '../../../instruct-mode.js';
 import { Popup } from '../../../popup.js';
 import { is_group_generating, selected_group } from '../../../group-chats.js';
-import { loadMovingUIState } from '../../../power-user.js';
+import { loadMovingUIState, renderStoryString } from '../../../power-user.js';
 import { dragElement } from '../../../RossAscends-mods.js';
 import { getTextTokens, getTokenCount, tokenizers } from '../../../tokenizers.js';
 import { debounce_timeout } from '../../../constants.js';
@@ -32,7 +33,7 @@ import { commonEnumProviders } from '../../../slash-commands/SlashCommandCommonE
 export { MODULE_NAME };
 
 // Version ID
-const VERSION = '0.3.3';
+const VERSION = '0.3.4';
 
 // THe module name modifies where settings are stored, where information is stored on message objects, macros, etc.
 const MODULE_NAME = 'qvink_memory';
@@ -53,12 +54,18 @@ const long_memory_macro = `${MODULE_NAME}_long_memory`;
 const short_memory_macro = `${MODULE_NAME}_short_memory`;
 
 // Settings
-const default_prompt = `Summarize the given fictional narrative in a single, very short and concise statement of fact.
+const default_prompt = `{{scenario}}
+{{description}}
+{{persona}}
+
+You are a summarization assistant. Summarize the given fictional narrative in a single, very short and concise statement of fact.
 State only events that will need to be remembered in the future.
 Include names when possible.
 Response must be in the past tense.
 Maintain the same point of view as the text (i.e. if the text uses "you", use "your" in the response). If an observer is unspecified, assume it is "you".
-Your response must ONLY contain the summary. If there is nothing worth summarizing, do not respond.`;
+Your response must ONLY contain the summary. If there is nothing worth summarizing, do not respond.;
+Text to Summarize:
+`
 const default_long_template = `[Following is a list of events that occurred in the past]:\n{{${long_memory_macro}}}`
 const default_short_template = `[Following is a list of recent events]:\n{{${short_memory_macro}}}`
 const default_settings = {
@@ -73,7 +80,6 @@ const default_settings = {
     prompt: default_prompt,
     block_chat: true,  // block input when summarizing
     summary_maximum_length: 30,  // maximum token length of the summary
-    include_names: false,  // include sender names in summary prompt
     include_last_user_message: false,  // include the last user message in the summarization prompt
 
     // injection settings
@@ -850,7 +856,9 @@ function get_short_memory() {
 
 // Summarization
 async function summarize_text(text) {
-    text = ` ${get_settings('prompt')}\n\nText to Summarize:\n${text}`;
+    let prompt = get_settings('prompt');
+    prompt = substituteParamsExtended(prompt);  // substitute any macro parameters in the prompt
+    text = `${prompt}\n${text}`;
 
     // get size of text
     let token_size = count_tokens(text);
@@ -933,12 +941,22 @@ async function summarize_message(index=null, replace=false) {
     // Create the text to summarize
     let texts = []
     for (let m of messages_to_include) {
-        // Add the sender name to the prompt if enabled
-        if (get_settings('include_names')) {
-            texts.push(`[${m.name}]: ${m.mes}`);
-        } else {
-            texts.push(`${m.mes}`);
-        }
+        /**
+         * [FROM ST REPO]
+         * Formats instruct mode chat message.
+         * @param {string} name Character name.
+         * @param {string} mes Message text.
+         * @param {boolean} isUser Is the message from the user.
+         * @param {boolean} isNarrator Is the message from the narrator.
+         * @param {string} forceAvatar Force avatar string.
+         * @param {string} name1 User name.
+         * @param {string} name2 Character name.
+         * @param {boolean|number} forceOutputSequence Force to use first/last output sequence (if configured).
+         * @returns {string} Formatted instruct mode chat message.
+         */
+        let ctx = getContext()
+        let text = formatInstructModeChat(m.name, m.mes, m.is_user, false, ctx.name1, ctx.name2, "", null)
+        texts.push(text)
     }
 
     // join the messages with newlines
@@ -1140,7 +1158,6 @@ function setupListeners() {
     bind_setting('#block_chat', 'block_chat', 'boolean');
     bind_setting('#prompt', 'prompt');
     bind_setting('#include_user_messages', 'include_user_messages', 'boolean');
-    bind_setting('#include_names', 'include_names', 'boolean');
     bind_setting('#message_length_threshold', 'message_length_threshold', 'number');
     bind_setting('#summary_maximum_length', 'summary_maximum_length', 'number');
     bind_setting('#debug_mode', 'debug_mode', 'boolean');
@@ -1298,6 +1315,35 @@ jQuery(async function () {
         },
         helpString: 'Log current settings',
     }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'qvink_test',
+        callback: (args) => {
+
+            /**
+             * Formats instruct mode chat message.
+             * @param {string} name Character name.
+             * @param {string} mes Message text.
+             * @param {boolean} isUser Is the message from the user.
+             * @param {boolean} isNarrator Is the message from the narrator.
+             * @param {string} forceAvatar Force avatar string.
+             * @param {string} name1 User name.
+             * @param {string} name2 Character name.
+             * @param {boolean|number} forceOutputSequence Force to use first/last output sequence (if configured).
+             * @returns {string} Formatted instruct mode chat message.
+             */
+            let is_user = false
+            let is_narrator = false
+            let force_avatar = ""
+
+            let val = formatInstructModeChat("NAME", "MESSAGE CONTENTS", is_user, is_narrator, force_avatar, "NAME 1", "NAME 2", 2)
+            log(val)
+
+        },
+        helpString: 'Log current settings',
+    }));
+
+
 
     // Macros
     MacrosParser.registerMacro(short_memory_macro, () => get_short_memory());
