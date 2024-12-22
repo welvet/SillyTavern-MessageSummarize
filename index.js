@@ -33,7 +33,7 @@ import { commonEnumProviders } from '../../../slash-commands/SlashCommandCommonE
 export { MODULE_NAME };
 
 // Version ID
-const VERSION = '0.3.4';
+const VERSION = '0.3.5';
 
 // THe module name modifies where settings are stored, where information is stored on message objects, macros, etc.
 const MODULE_NAME = 'qvink_memory';
@@ -54,16 +54,12 @@ const long_memory_macro = `${MODULE_NAME}_long_memory`;
 const short_memory_macro = `${MODULE_NAME}_short_memory`;
 
 // Settings
-const default_prompt = `{{scenario}}
-{{description}}
-{{persona}}
-
-You are a summarization assistant. Summarize the given fictional narrative in a single, very short and concise statement of fact.
+const default_prompt = `You are a summarization assistant. Summarize the given fictional narrative in a single, very short and concise statement of fact.
 State only events that will need to be remembered in the future.
 Include names when possible.
 Response must be in the past tense.
 Maintain the same point of view as the text (i.e. if the text uses "you", use "your" in the response). If an observer is unspecified, assume it is "you".
-Your response must ONLY contain the summary. If there is nothing worth summarizing, do not respond.;
+Your response must ONLY contain the summary. If there is nothing worth summarizing, do not respond.
 Text to Summarize:
 `
 const default_long_template = `[Following is a list of events that occurred in the past]:\n{{${long_memory_macro}}}`
