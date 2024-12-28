@@ -16,12 +16,12 @@ import {
     getMaxContextSize,
     setExtensionPrompt,
     streamingProcessor,
-    stopGeneration,
+    stopGeneration
 } from '../../../../script.js';
 import { formatInstructModeChat } from '../../../instruct-mode.js';
 import { Popup } from '../../../popup.js';
 import { is_group_generating, selected_group } from '../../../group-chats.js';
-import { loadMovingUIState, renderStoryString } from '../../../power-user.js';
+import { loadMovingUIState, renderStoryString, power_user } from '../../../power-user.js';
 import { dragElement } from '../../../RossAscends-mods.js';
 import { getTextTokens, getTokenCount, tokenizers } from '../../../tokenizers.js';
 import { debounce_timeout } from '../../../constants.js';
@@ -31,9 +31,6 @@ import { ARGUMENT_TYPE, SlashCommandArgument, SlashCommandNamedArgument } from '
 import { MacrosParser } from '../../../macros.js';
 import { commonEnumProviders } from '../../../slash-commands/SlashCommandCommonEnumsProvider.js';
 export { MODULE_NAME };
-
-// Version ID
-const VERSION = '0.3.5';
 
 // THe module name modifies where settings are stored, where information is stored on message objects, macros, etc.
 const MODULE_NAME = 'qvink_memory';
@@ -77,6 +74,7 @@ const default_settings = {
     block_chat: true,  // block input when summarizing
     summary_maximum_length: 30,  // maximum token length of the summary
     include_last_user_message: false,  // include the last user message in the summarization prompt
+    nest_messages_in_prompt: true,  // nest messages to summarize in the prompt for summarization
 
     // injection settings
     long_template: default_long_template,
@@ -199,6 +197,16 @@ function get_settings(key) {
     // Get a setting for the extension, or the default value if not set
     return extension_settings[MODULE_NAME]?.[key] ?? default_settings[key];
 }
+async function get_manifest() {
+    return await fetch(`${MODULE_DIR}/manifest.json`).then(async response => {
+        if (!response.ok) {
+            error(`Error getting manifest.json: status: ${response.status}`);
+            error(response)
+        }
+        return await response.json();
+    })
+}
+
 
 /**
  * Bind a UI element to a setting.
@@ -854,7 +862,24 @@ function get_short_memory() {
 async function summarize_text(text) {
     let prompt = get_settings('prompt');
     prompt = substituteParamsExtended(prompt);  // substitute any macro parameters in the prompt
+
+    let ignore_instruct_template = false;
+    if (!get_settings('nest_messages_in_prompt')) {
+        // If you choose NOT to nest the message in the prompt, I have to ignore the instruct template and reconstruct it manually
+        ignore_instruct_template = true;
+        let ctx = getContext()
+
+        // wrap the main prompt in the instruct template as a system message
+        prompt = formatInstructModeChat("", prompt, false, true, "", "", "", null)
+
+        // append the assistant starting message template to the text
+        let output_sequence = substituteParamsExtended(power_user.instruct.output_sequence, {name: "assistant"});
+        text = `${text}\n${output_sequence}`
+    }
+
+    // add the text to the prompt
     text = `${prompt}\n${text}`;
+
 
     // get size of text
     let token_size = count_tokens(text);
@@ -888,7 +913,8 @@ async function summarize_text(text) {
          * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
          * @returns {Promise<string>} Generated message
          */
-        return await generateRaw(text, '', false, false, '', get_settings('summary_maximum_length'));
+        return await generateRaw(text, '', ignore_instruct_template, false, '', get_settings('summary_maximum_length'));
+
     }
 }
 
@@ -907,7 +933,7 @@ async function summarize_message(index=null, replace=false) {
     let message_hash = getStringHash(message.mes);
 
     // check message exclusion criteria first
-    if (!await check_message_exclusion(message)) {
+    if (!check_message_exclusion(message)) {
         return;
     }
 
@@ -951,7 +977,7 @@ async function summarize_message(index=null, replace=false) {
          * @returns {string} Formatted instruct mode chat message.
          */
         let ctx = getContext()
-        let text = formatInstructModeChat(m.name, m.mes, m.is_user, false, ctx.name1, ctx.name2, "", null)
+        let text = formatInstructModeChat(m.name, m.mes, m.is_user, false, "", ctx.name1, ctx.name2, null)
         texts.push(text)
     }
 
@@ -1159,6 +1185,7 @@ function setupListeners() {
     bind_setting('#debug_mode', 'debug_mode', 'boolean');
     bind_setting('#display_memories', 'display_memories', 'boolean')
     bind_setting('#include_last_user_message', 'include_last_user_message', 'boolean')
+    bind_setting('#nest_messages_in_prompt', 'nest_messages_in_prompt', 'boolean')
 
     bind_setting('#short_template', 'short_template');
     bind_setting('input[name="short_term_position"]', 'short_term_position', 'number');
@@ -1246,6 +1273,12 @@ function dump_memories_to_lorebook() {
 // Entry point
 jQuery(async function () {
     log(`Loading extension...`)
+
+    // Read version from manifest.json
+    const manifest = await get_manifest();
+    log("Manifest: " + manifest);
+    const VERSION = manifest.version;
+    log(`Version: ${VERSION}`)
 
     // Load settings
     initialize_settings();
