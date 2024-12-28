@@ -864,21 +864,20 @@ async function summarize_text(text) {
     prompt = substituteParamsExtended(prompt);  // substitute any macro parameters in the prompt
 
     let ignore_instruct_template = false;
-    if (!get_settings('nest_messages_in_prompt')) {
-        // If you choose NOT to nest the message in the prompt, I have to ignore the instruct template and reconstruct it manually
-        ignore_instruct_template = true;
 
-        // wrap the main prompt in the instruct template as a system message
+    if (get_settings('nest_messages_in_prompt')) {
+        // Add the text to the prompt
+        text = `${prompt}\n${text}`
+
+        // then wrap it in the system prompt
+        text = formatInstructModeChat("", text, false, true, "", "", "", null)
+    } else {
+        // wrap the main prompt only as a system message
         prompt = formatInstructModeChat("", prompt, false, true, "", "", "", null)
 
-        // append the assistant starting message template to the text
-        let output_sequence = substituteParamsExtended(power_user.instruct.output_sequence, {name: "assistant"});
-        text = `${text}\n${output_sequence}`
+        // then add the text after it
+        text = `${prompt}\n${text}`
     }
-
-    // add the text to the prompt
-    text = `${prompt}\n${text}`;
-
 
     // get size of text
     let token_size = count_tokens(text);
@@ -900,7 +899,7 @@ async function summarize_text(text) {
          * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
          * @returns
          */
-        return await generateQuietPrompt(text, false, false, '', '', get_settings('summary_maximum_length'));
+        return await generateQuietPrompt(text, false, false, '', "assistant", get_settings('summary_maximum_length'));
     } else {
         /**
          * Generates a message using the provided prompt.
@@ -912,8 +911,12 @@ async function summarize_text(text) {
          * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
          * @returns {Promise<string>} Generated message
          */
-        return await generateRaw(text, '', ignore_instruct_template, false, '', get_settings('summary_maximum_length'));
 
+        // append the assistant starting message template to the text, replacing the name with "assistant" if needed
+        let output_sequence = substituteParamsExtended(power_user.instruct.output_sequence, {name: "assistant"});
+        text = `${text}\n${output_sequence}`
+
+        return await generateRaw(text, '', true, false, '', get_settings('summary_maximum_length'));
     }
 }
 
