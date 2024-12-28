@@ -42,6 +42,7 @@ Cons, with attempted solutions:
 - ~~ability to stop summarization at any time~~
 - ~~Support stepped thoughts extension~~
 - ~~Added ability to provide global macros in summarization prompt~~
+- ~~Added the ability to choose whether to nest the messages in the summarization prompt or not~~
 - Fix issue that is sometimes inadvertently changing the completion config for some reason.
 - Fix issue causing the popout to be destroyed when pressing escape.
 - ~~Ability to edit summaries.~~
@@ -65,8 +66,29 @@ This could aid in consistency and avoid duplicate info. Might also have to oppos
 Make sure you are using the correct template for your model, and make sure that system messages are properly distinct from user messages (the summaries use a system prompt). 
 This can be caused by the "System same as user" checkbox in your instruct template settings, which will cause all system messages to be treated like a user - uncheck that.
 
-- My jailbreak isn't working: You'll need to put the jailbreak in the summarization prompt as well.
+- My jailbreak isn't working: You'll need to put the jailbreak in the summarization prompt if you want it to be included.
 
 If it's something else, please turn on "Debug Mode" in the settings and send me the output logs from your browser console and raise an issue or message on discord.
+
+
+### Recommended Summarization Prompts
+The default prompt works for me, but others have needed to tweak it for their use-case or model.
+Try them out and see what works best.
+
+- Default: "You are a summarization assistant. Summarize the given fictional narrative in a single, very short and concise statement of fact.
+State only events that will need to be remembered in the future.
+Include names when possible.
+Response must be in the past tense.
+Maintain the same point of view as the text (i.e. if the text uses "you", use "your" in the response). If an observer is unspecified, assume it is "you".
+Your response must ONLY contain the summary. If there is nothing worth summarizing, do not respond.
+Text to Summarize:"
+
+Other Options:
+"[SYSTEM INFO: You are a summary assistant. Summarize the chat history in a single, very short and concise statement of fact. Include names and state only events or decisions that characters will need to remember in the future. Do not include background information. Limit the summary to 50 words or less. Your response should contain only the summary.]
+Background Information (informational only):
+{{scenario}}
+{{description}}
+{{scenario}}"
+
 
 

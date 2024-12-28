@@ -1278,7 +1278,6 @@ jQuery(async function () {
 
     // Read version from manifest.json
     const manifest = await get_manifest();
-    log("Manifest: " + manifest);
     const VERSION = manifest.version;
     log(`Version: ${VERSION}`)
 
