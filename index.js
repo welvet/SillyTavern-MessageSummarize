@@ -867,7 +867,6 @@ async function summarize_text(text) {
     if (!get_settings('nest_messages_in_prompt')) {
         // If you choose NOT to nest the message in the prompt, I have to ignore the instruct template and reconstruct it manually
         ignore_instruct_template = true;
-        let ctx = getContext()
 
         // wrap the main prompt in the instruct template as a system message
         prompt = formatInstructModeChat("", prompt, false, true, "", "", "", null)
