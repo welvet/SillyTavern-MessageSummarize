@@ -43,15 +43,18 @@ Cons, with attempted solutions:
 - ~~Support stepped thoughts extension~~
 - ~~Added ability to provide global macros in summarization prompt~~
 - ~~Added the ability to choose whether to nest the messages in the summarization prompt or not~~
-- Fix issue that is sometimes inadvertently changing the completion config for some reason.
+- Fix issue that is sometimes inadvertently changing the completion config max tokens for some reason.
 - Fix issue causing the popout to be destroyed when pressing escape.
 - ~~Ability to edit summaries.~~
 - Figure out how to limit the number of regular chat messages injected into the prompt so they can be replaced by the summaries.
-- Custom exclusion criteria for messages?
+- support group chats
+- Add a slider for the requested number of words in a summary, and use a macro in the prompt.
+- Set the frequency at which summarizations occur (ever X messages)
+- Allow disabling extension in individual chats
 - Maybe include a few previous messages (or summaries) in the summary prompt, and specify that it should only include NEW events? 
 This could aid in consistency and avoid duplicate info. Might also have to opposite effect though.
 - Add a button to transfer all summaries marked for long-term memory into a lorebook entry
-- group support??
+- Custom exclusion criteria for messages?
 
 
 ### Troubleshooting:
