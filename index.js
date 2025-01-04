@@ -1378,4 +1378,5 @@ jQuery(async function () {
     // Macros
     MacrosParser.registerMacro(short_memory_macro, () => get_short_memory());
     MacrosParser.registerMacro(long_memory_macro, () => get_long_memory());
+    MacrosParser.registerMacro("words", () => get_settings('summary_maximum_length'));
 });
