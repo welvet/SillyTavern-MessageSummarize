@@ -52,11 +52,10 @@ const short_memory_macro = `${MODULE_NAME}_short_memory`;
 
 // Settings
 const default_prompt = `You are a summarization assistant. Summarize the given fictional narrative in a single, very short and concise statement of fact.
-State only events that will need to be remembered in the future.
+Responses should be no more than {{words}} words.
 Include names when possible.
 Response must be in the past tense.
-Maintain the same point of view as the text (i.e. if the text uses "you", use "your" in the response). If an observer is unspecified, assume it is "you".
-Your response must ONLY contain the summary. If there is nothing worth summarizing, do not respond.
+Your response must ONLY contain the summary.
 Text to Summarize:
 `
 const default_long_template = `[Following is a list of events that occurred in the past]:\n{{${long_memory_macro}}}`
