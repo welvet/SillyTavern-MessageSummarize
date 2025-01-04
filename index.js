@@ -1123,7 +1123,7 @@ async function on_chat_event(event=null) {
             break;
         case 'message_edited':  // Message has been edited
             debug("Message edited, summarizing")
-            await summarize_chat(false);  // summarize the chat, but don't replace existing summaries UNLESS they changed since last summarization
+            summarize_chat(false);  // summarize the chat, but don't replace existing summaries UNLESS they changed since last summarization
             break;
         case 'message_swiped':  // when this event occurs, don't do anything (a new_message event will follow)
             debug("Message swiped, reloading memory")
