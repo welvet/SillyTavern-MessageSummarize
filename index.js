@@ -592,7 +592,7 @@ function edit_memory(index) {
     let message_div = get_message_div(index);
 
     // get the current memory text
-    let memory = get_memory(message, 'memory').trim() ?? '';
+    let memory = get_memory(message, 'memory')?.trim() ?? '';
 
     // find the div holding the memory text
     let memory_div = message_div.find(`div.${summary_div_class}`);
@@ -656,7 +656,7 @@ function initialize_message_buttons() {
     $(document).on("click", `.${summarize_button_class}`, async function () {
         const message_block = $(this).closest(".mes");
         const message_id = Number(message_block.attr("mesid"));
-        await summarize_message(message_id, true);  // summarize the message, replacing the existing summary
+        await summarize_message(message_id, true, true);  // summarize the message, replacing the existing summary and forcing it to summarize
         refresh_memory();
     });
     $(document).on("click", `.${edit_button_class}`, async function () {
@@ -706,7 +706,7 @@ async function remember_message_toggle(index=null) {
     debug(`Set message ${index} remembered status: ${new_status}`);
 
     if (new_status) {  // if it was marked as remembered, summarize if it there is no summary
-        await summarize_message(index, false);
+        await summarize_message(index, false, true);
     }
     refresh_memory();
 }
@@ -928,7 +928,7 @@ async function summarize_text(text) {
  * @param index {number|null} Index of the message to summarize (default last message)
  * @param replace {boolean} Whether to replace existing summaries (default false)
  */
-async function summarize_message(index=null, replace=false) {
+async function summarize_message(index=null, replace=false, force=false) {
     let context = getContext();
     let chat = context.chat;
 
@@ -937,8 +937,8 @@ async function summarize_message(index=null, replace=false) {
     let message = chat[index]
     let message_hash = getStringHash(message.mes);
 
-    // check message exclusion criteria first
-    if (!check_message_exclusion(message)) {
+    // check message exclusion criteria first (if not forcing)
+    if (!force && !check_message_exclusion(message)) {
         return;
     }
 
@@ -1214,6 +1214,17 @@ function setupListeners() {
     // trigger the change event once to update the display at start
     $('#long_term_context_limit').trigger('change');
     $('#short_term_context_limit').trigger('change');
+
+    // add a listener to the "show_more_messages" button that updates the messages displayed
+    let show_more_messages_button = $('#show_more_messages');
+    log("SHOW MORE MESSAGES: ")
+    log(show_more_messages_button)
+    if (show_more_messages_button.length === 1) {
+        $('#show_more_messages').on('click', function () {
+            debug("Clicked \"show more messages\" button, updating message visuals.")
+            update_message_visuals();
+        });
+    }
 
     refresh_settings()
 }
