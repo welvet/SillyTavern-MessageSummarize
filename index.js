@@ -515,7 +515,6 @@ function get_message_div(index) {
     // given a message index, get the div element for that message
     let div = $(`div[mesid="${index}"]`);
     if (div.length === 0) {
-        error(`Could not find message div for message ${index}`);
         return null;
     }
     return div;
@@ -534,6 +533,11 @@ function update_message_visuals(i, style=true, text=null) {
 
     // it will have an attribute "mesid" that is the message index
     let div_element = get_message_div(i);
+
+    // div not found (message may not be loaded)
+    if (!div_element) {
+        return;
+    }
 
     // remove any existing added divs
     div_element.find(`div.${summary_div_class}`).remove();
@@ -1024,7 +1028,7 @@ function refresh_memory() {
     let long_template = get_settings('long_template')
     let short_template = get_settings('short_template')
 
-    let long_injection = substituteParamsExtended(long_template, { [long_memory_macro]: long_memory });
+    let long_injection = substituteParamsExtended(long_template, {[long_memory_macro]: long_memory});
     let short_injection = substituteParamsExtended(short_template, {[short_memory_macro]: short_memory});
 
     // inject the memories into the templates, if they exist

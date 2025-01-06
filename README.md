@@ -48,8 +48,8 @@ Cons, with attempted solutions:
 - ~~Ability to edit summaries.~~
 - Figure out how to limit the number of regular chat messages injected into the prompt so they can be replaced by the summaries.
 - support group chats
-- Add a slider for the requested number of words in a summary, and use a macro in the prompt.
-- Set the frequency at which summarizations occur (ever X messages)
+- ~~add macro for max words to use in the summary prompt~~
+- Set the frequency at which summarizations occur (every X messages)
 - Allow disabling extension in individual chats
 - Maybe include a few previous messages (or summaries) in the summary prompt, and specify that it should only include NEW events? 
 This could aid in consistency and avoid duplicate info. Might also have to opposite effect though.
@@ -63,11 +63,12 @@ This could aid in consistency and avoid duplicate info. Might also have to oppos
 
 - "Syntax Error: No number after minus sign in JSON at position X": update your koboldcpp, or try disabling "Request token probabilities".
 
-- Just updated and things are broken: try reloading the page. If that fails, you can try using the "/hard_reset" command, but it WILL DELETE YOUR PROFILES.
+- Just updated and things are broken: try reloading the page. If that fails, you can try using the "/hard_reset" command, but it WILL DELETE YOUR CONFIG PROFILES.
 
 - Summaries seem to be continuing the conversation rather than summarizing: probably an issue with your instruct template.
 Make sure you are using the correct template for your model, and make sure that system messages are properly distinct from user messages (the summaries use a system prompt). 
 This can be caused by the "System same as user" checkbox in your instruct template settings, which will cause all system messages to be treated like a user - uncheck that.
+You can also try unchecking "Nest Message in Summary Prompt" in the settings - some models behave better with this off.
 
 - My jailbreak isn't working: You'll need to put the jailbreak in the summarization prompt if you want it to be included.
 
