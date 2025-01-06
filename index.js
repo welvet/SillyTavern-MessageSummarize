@@ -155,6 +155,9 @@ function initialize_settings() {
         log("Extension settings not found. Initializing...")
         hard_reset_settings();
     }
+
+    // load default profile
+    load_profile();
 }
 function hard_reset_settings() {
     // Set the settings to the completely fresh values, deleting all profiles too
@@ -1220,17 +1223,6 @@ function setupListeners() {
     // trigger the change event once to update the display at start
     $('#long_term_context_limit').trigger('change');
     $('#short_term_context_limit').trigger('change');
-
-    // add a listener to the "show_more_messages" button that updates the messages displayed
-    let show_more_messages_button = $('#show_more_messages');
-    log("SHOW MORE MESSAGES: ")
-    log(show_more_messages_button)
-    if (show_more_messages_button.length === 1) {
-        $('#show_more_messages').on('click', function () {
-            debug("Clicked \"show more messages\" button, updating message visuals.")
-            update_message_visuals();
-        });
-    }
 
     refresh_settings()
 }
