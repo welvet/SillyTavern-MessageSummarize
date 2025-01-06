@@ -37,9 +37,12 @@
                     </div>
                 </div>
 
-                <!-- Injection settings -->
+                <!-- Short-term memory -->
                 <hr>
-                <h4 class="textAlignCenter">Inclusion Criteria  <i class="fa-solid fa-info-circle" title="Determines which messages are included in the memory injection. Changing these may require re-summarization, since excluded messages aren't summarized automatically."></i></h4>
+                <h4 class="textAlignCenter">Short-term Memory Injection <i class="fa-solid fa-info-circle" title="Determines which short-term messages are included in the memory injection, and where. If you change this and include messages that weren't summarized previously, you can either re-summarize by clicking 'Regenerate All Memories' or just wait until automatic summarization triggers."></i></h4>
+                <div class="template">
+                    <textarea id="short_template" class="text_pole textarea_compact" rows="2" placeholder="Use &lcub;&lcub;qvink_short_memory&rcub;&rcub;"></textarea>
+                </div>
                 <label for="include_user_messages" title="Include user message summaries in memory." class="checkbox_label">
                     <input id="include_user_messages" type="checkbox" />
                     <span>Include User Messages</span>
@@ -59,13 +62,7 @@
                     <input id="message_length_threshold" class="text_pole widthUnset" type="number" min="0" max="999" />
                     <span>Message Length Threshold</span>
                 </label>
-
-                <!-- Short-term memory -->
-                <hr>
-                <h4 class="textAlignCenter">Short-Term Memory Injection</h4>
-                <div class="template">
-                    <textarea id="short_template" class="text_pole textarea_compact" rows="2"  placeholder="Use &lcub;&lcub;qvink_short_memory&rcub;&rcub;"></textarea>
-                </div>
+                <br>
                 <label for="short_term_context_limit" title="The max percent of the context that short-term memory can take up.">
                     <input id="short_term_context_limit" class="text_pole widthUnset" type="number" min="0" max="100" />
                     <span>Short-Term Context % (<span id="short_term_context_limit_display"></span> tk)</span>
@@ -102,7 +99,7 @@
 
                 <!-- Long-term memory -->
                 <hr>
-                <h4 class="textAlignCenter">Long-Term Memory Injection</h4>
+                <h4 class="textAlignCenter">Long-Term Memory Injection <i class="fa-solid fa-info-circle" title="Determines where long-term messages are injected."></i></h4>
                 <div class="template">
                     <textarea id="long_template" class="text_pole textarea_compact" rows="2"  placeholder="Use &lcub;&lcub;qvink_long_memory&rcub;&rcub;"></textarea>
                 </div>
