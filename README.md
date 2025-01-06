@@ -49,12 +49,13 @@ Cons, with attempted solutions:
 - Figure out how to limit the number of regular chat messages injected into the prompt so they can be replaced by the summaries.
 - support group chats
 - ~~add macro for max words to use in the summary prompt~~
-- Set the frequency at which summarizations occur (every X messages)
-- Allow disabling extension in individual chats
+- Set the frequency at which automatic summarizations occur (every X messages)
+- Allow disabling extension in individual chats without giving it a profile.
 - Maybe include a few previous messages (or summaries) in the summary prompt, and specify that it should only include NEW events? 
 This could aid in consistency and avoid duplicate info. Might also have to opposite effect though.
 - Add a button to transfer all summaries marked for long-term memory into a lorebook entry
 - Custom exclusion criteria for messages?
+- Need to detect when more messages are loaded into the chat via the "load more message" button, and update the message visuals to display any memories on them. Annoyingly, no event seems to be fired when the chat updates this way (that I could find).
 
 
 ### Troubleshooting:
