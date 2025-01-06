@@ -1091,6 +1091,14 @@ async function on_chat_event(event=null) {
     // When the chat is updated, check if the summarization should be triggered
     debug("Chat updated, checking if summarization should be triggered... "+event)
 
+    // if the chat or character was changed, load the character profile and refresh the memory state
+    if (event === 'chat_changed') {
+        debug('Chat or character changed');
+        load_character_profile();  // load the profile for the current character
+        refresh_memory();  // refresh the memory state
+        scroll_to_bottom_of_chat();  // scroll to the bottom of the chat (area was added due to memories)
+    }
+
     // if auto-summarize is not enabled, skip
     if (!get_settings('auto_summarize')) {
         debug("Automatic summarization is disabled.");
@@ -1110,12 +1118,6 @@ async function on_chat_event(event=null) {
     }
 
     switch (event) {
-        case 'chat_changed':  // Chat or character changed
-            debug('Chat or character changed');
-            load_character_profile();  // load the profile for the current character
-            refresh_memory();  // refresh the memory state
-            scroll_to_bottom_of_chat();  // scroll to the bottom of the chat (area was added due to memories)
-            break;
         case 'message_deleted':  // message was deleted
             debug("Message deleted, refreshing memory")
             refresh_memory();
