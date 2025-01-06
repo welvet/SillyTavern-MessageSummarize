@@ -956,13 +956,12 @@ async function summarize_message(index=null, replace=false, force=false) {
     // A full visual update with style should be done on the whole chat after inclusion criteria have been recalculated
     update_message_visuals(index, false, "Summarizing...")
 
-
     let messages_to_include = []
 
     // Add the last user message to the prompt if enabled
     if (get_settings('include_last_user_message')) {
         let last_message = chat[index-1]
-        if (last_message.is_user) {
+        if (last_message && last_message.is_user) {
             messages_to_include.push(last_message)
         }
     }
