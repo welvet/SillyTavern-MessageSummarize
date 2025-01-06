@@ -64,6 +64,7 @@ const default_settings = {
     // inclusion criteria
     message_length_threshold: 10,  // minimum message token length for summarization
     include_user_messages: false,  // include user messages in summarization
+    include_system_messages: false,  // include system messages in summarization
     include_thought_messages: false,  // include thought messages in summarization (Stepped Thinking extension)
 
     // summarization settings
@@ -721,18 +722,18 @@ function check_message_exclusion(message) {
         return true;
     }
 
-    // check if it's a user message
+    // check if it's a user message and exclude if the setting is disabled
     if (!get_settings('include_user_messages') && message.is_user) {
         return false
     }
 
-    // check if it's a thought message
+    // check if it's a thought message and exclude if the setting is disabled (Stepped Thinking extension)
     if (!get_settings('include_thought_messages') && message.is_thoughts) {
         return false
     }
 
-    // check if it's a system (hidden) message
-    if (message.is_system) {
+    // check if it's a system (hidden) message and exclude if the setting is disabled
+    if (!get_settings('include_system_messages') && message.is_system) {
         return false;
     }
 
@@ -1187,6 +1188,9 @@ function setupListeners() {
     bind_setting('#block_chat', 'block_chat', 'boolean');
     bind_setting('#prompt', 'prompt');
     bind_setting('#include_user_messages', 'include_user_messages', 'boolean');
+    bind_setting('#include_system_messages', 'include_system_messages', 'boolean');
+    bind_setting('#include_thought_messages', 'include_thought_messages', 'boolean');
+
     bind_setting('#message_length_threshold', 'message_length_threshold', 'number');
     bind_setting('#summary_maximum_length', 'summary_maximum_length', 'number');
     bind_setting('#debug_mode', 'debug_mode', 'boolean');
