@@ -1030,6 +1030,7 @@ async function summarize_message(index=null, replace=false, force=false) {
 
     // update the message summary text again, still no styling
     update_message_visuals(index, false)
+    return true
 }
 
 function refresh_memory() {
@@ -1082,7 +1083,17 @@ async function summarize_chat(replace=false) {
             log('Summarization stopped');
             break;
         }
-        await summarize_message(i, replace);
+        let summarized = await summarize_message(i, replace);
+
+        if (summarized) {  // if we summarized a message, check the context inclusion flags
+            update_message_inclusion_flags()  // update message inclusion based on context lengths
+            if (get_memory(context.chat[i], 'include') === null) {
+                // If the message we just summarized is not included in short-term memory, stop summarizing the rest of the chat.
+                debug(`Message ${i} is not included in short-term memory, stopping summarization.`)
+                break
+            }
+        }
+
     }
 
     if (get_settings('stop_summarization')) {  // check if summarization was stopped
