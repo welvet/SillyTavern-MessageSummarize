@@ -956,8 +956,9 @@ async function summarize_message(index=null, replace=false, force=false) {
     }
 
 
-    // If we aren't forcing replacement, check if the message already has a summary and the hash hasn't changed since last summarization
-    if (!replace && get_memory(message, 'memory') && get_memory(message, 'hash') === message_hash) {
+    // If we aren't forcing replacement, skip if the message already has a summary
+    let memory = get_memory(message, 'memory');
+    if (!replace && memory) {
         return;
     }
 
