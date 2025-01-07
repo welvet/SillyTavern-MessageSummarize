@@ -1,11 +1,11 @@
 ### Improved Summarization
-- This extension reworks how memory is stored by summarizing each message individually.
+- This extension reworks how memory is stored by summarizing each message individually, rather than all at once.
 - Summaries are injected into the prompt at two levels: short-term memory and long-term memory.
 - Short term memory rotates out the most recent message summaries automatically.
 - Long-term memory stores summaries of manually-marked messages beyond the short-term memory.
 
 Pros:
-- Summarizing message individually gets more accurate summaries, less likely to miss details.
+- Summarizing messages individually gets more accurate summaries, less likely to miss details.
 - Short-term memory guarantees that relevant info is always available from the most recent messages, but goes away once reaching the desired limit.
 - Long-term memory allows you to choose which details are important to remember, keeping them available for longer, up to a separate limit.
 - Summarization occurs automatically after a message is generated, so if your model generates faster than you read you'll never have to wait.
@@ -13,26 +13,26 @@ Pros:
 Cons, with attempted solutions:
 - If you use Context Shifting, performing the summarizations each time breaks it unless you include your static World Info in the summarization prompt. I've added this as a configuration option.
 - If a message is too small, it is still summarized for short-term memory even if it isn't relevant. I've added a config setting to exclude messages under a given token length.
-- If a summarization is wrong, it can affect subsequent messages. I've added a menu button to regenerate a summary if needed.
-- If you want to add the extension to an existing chat, summarization might take awhile. The extension will only summarize messages until it reaches the desired limits, and you can stop it at any time.
+- If a summarization is wrong, it can affect subsequent messages. I've added the ability to regenerate a summary or manually edit it if needed.
+- If you want to add the extension to an existing chat, initial summarization of the chat might take a while. You can stop summarization at any time by clicking the "stop" button in the config. Summarization of the chat will resume when a new message is summarized.
 
 
 ### Usage
-- Install the extension
-- Any new assistant message will be automatically summarized.
+- Install the extension in ST using the github link.
 - To mark a memory for long-term memory, click the "brain" icon in the message button menu.
-- To re-summarize a message, click the "quill" icon in the message button menu.
-- To edit a summary, click on the summary text or click the "pencil" icon in the message button menu.
+- To re-summarize a message, click the "Quote" icon in the message button menu.
+- To edit a summary, click on the summary text directly or click the "pen" icon in the message button menu.
 
 
 ### Notable Features
-- Automatically handles swiping, editing, and deleting messages.
+- Handles swiping, editing, and deleting messages.
 - Popout config menu - customize summarization settings, injection settings, and message inclusion criteria
 - Configuration profiles - save and load different configurations profiles and set one to be auto-loaded for each character.
 - Summaries are optionally displayed in small text below each message, colored according to their status:
   - Green: Included in short-term memory
   - Blue: Marked for long-term memory (included in short-term or long-term memory)
   - Red: Marked for long-term memory, but now out of context.
+  - Grey: Excluded
 
 ### Todo
 - ~~Handle swiping, editing, and deleting summaries~~
@@ -43,8 +43,9 @@ Cons, with attempted solutions:
 - ~~Support stepped thoughts extension~~
 - ~~Added ability to provide global macros in summarization prompt~~
 - ~~Added the ability to choose whether to nest the messages in the summarization prompt or not~~
+- ~~Added the ability to toggle automatic summarization on message edit and swipe/regenerate~~
 - Fix issue that is sometimes inadvertently changing the completion config max tokens for some reason.
-- Fix issue causing the popout to be destroyed when pressing escape.
+- Fix issue causing the popout to bug out when pressing escape.
 - ~~Ability to edit summaries.~~
 - Figure out how to limit the number of regular chat messages injected into the prompt so they can be replaced by the summaries.
 - support group chats

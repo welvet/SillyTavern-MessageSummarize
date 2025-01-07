@@ -157,9 +157,19 @@
                 </label>
                 <textarea id="prompt" class="text_pole textarea_compact" rows="6" placeholder="You are a summarization assistant..." title="The prompt for generating summaries of individual messages. When this changes, only new summaries made will use it. To re-generate summaries, click 'Regenerate All Memories'. You can use global macros to insert additional info, like {{description}}, {{persona}}, and {{scenario}}. The maximum summary length defined below can be inserted with {{words}}."></textarea>
 
-                <label for="auto_summarize" title="Enable automatic summarization. New assistant messages will be summarized after being sent, edited, or swiped." class="checkbox_label">
+                <label for="auto_summarize" title="New messages will be summarized after being sent." class="checkbox_label">
                     <input id="auto_summarize" type="checkbox" />
-                    <span>Automatic Summarization</span>
+                    <span>Automatically Summarize New Messages</span>
+                </label>
+
+                <label for="auto_summarize_on_edit" title="Editing a message will automatically trigger a re-summarization." class="checkbox_label">
+                    <input id="auto_summarize_on_edit" type="checkbox" />
+                    <span>Automatically Re-summarize on Edit</span>
+                </label>
+
+                <label for="auto_summarize_on_swipe" title="Swiping or regenerating a message will automatically trigger a re-summarization" class="checkbox_label">
+                    <input id="auto_summarize_on_swipe" type="checkbox" />
+                    <span>Automatically Re-summarize on Swipe/Regenerate</span>
                 </label>
 
                 <label for="nest_messages_in_prompt" title="The message to summarize will be inside the summarization prompt itself. In unchecked, the message will instead be added separately after the prompt." class="checkbox_label">
