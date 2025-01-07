@@ -188,7 +188,7 @@ function soft_reset_settings() {
         set_settings('profiles', profiles);
     } else { // for each existing profile, add any missing default settings
         for (let [profile, settings] of Object.entries(profiles)) {
-            Object.assign(settings, default_settings);
+            Object.assign({}, default_settings, settings);  // add any missing default settings, but don't overwrite existing ones
         }
         set_settings('profiles', profiles);
     }
