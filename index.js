@@ -100,10 +100,11 @@ const default_settings = {
     lorebook_entry: null,  // lorebook entry to dump memories to
     display_memories: true,  // display memories in the chat below each message
 };
-const profile_settings = {
+const global_settings = {
     profiles: {},  // dict of profiles by name
     character_profiles: {},  // dict of character IDs to profiles
     profile: 'Default', // Current profile
+    chats_enabled: {}  // dict of chat IDs to whether memory is enabled
 }
 const settings_ui_map = {}  // map of settings to UI elements
 
@@ -164,36 +165,30 @@ function initialize_settings() {
 }
 function hard_reset_settings() {
     // Set the settings to the completely fresh values, deleting all profiles too
-    if (profile_settings['profiles']['Default'] === undefined) {  // if the default profile doesn't exist, create it
-        profile_settings['profiles']['Default'] = structuredClone(default_settings);
+    if (global_settings['profiles']['Default'] === undefined) {  // if the default profile doesn't exist, create it
+        global_settings['profiles']['Default'] = structuredClone(default_settings);
     }
     extension_settings[MODULE_NAME] = structuredClone({
         ...default_settings,
-        ...profile_settings
+        ...global_settings
     });
 }
 function soft_reset_settings() {
     // fix any missing settings without destroying profiles
-    Object.assign(extension_settings[MODULE_NAME], structuredClone(default_settings));
+    extension_settings[MODULE_NAME] = Object.assign(
+        structuredClone(default_settings),
+        structuredClone(global_settings),
+        extension_settings[MODULE_NAME]);
 
     // check for any missing profiles
     let profiles = get_settings('profiles');
-    if (!profiles) {  // no profiles found, create the default profile
-        Object.assign(extension_settings[MODULE_NAME], structuredClone(profile_settings));
-        profiles = get_settings('profiles');
-    }
-
     if (Object.keys(profiles).length === 0) {
         log("No profiles found, creating default profile.")
         profiles['Default'] = structuredClone(default_settings);
         set_settings('profiles', profiles);
     } else { // for each existing profile, add any missing default settings without overwriting existing settings
         for (let [profile, settings] of Object.entries(profiles)) {
-            for (let [key, value] of Object.entries(default_settings)) {
-                if (settings[key] === undefined) {
-                    settings[key] = value;
-                }
-            }
+            profiles[profile] = Object.assign(structuredClone(default_settings), settings);
         }
         set_settings('profiles', profiles);
     }
@@ -222,6 +217,35 @@ async function get_manifest() {
     })
 }
 
+function chat_enabled() {
+    // check if the current chat is enabled
+    let context = getContext();
+    return get_settings('chats_enabled')?.[context.chatId] ?? true;
+}
+function toggle_chat_enabled(id=null) {
+    let context = getContext();
+    if (id === null) {
+        id = context.chatId;
+    }
+
+    // Toggle whether to enable or disable memory for the current character
+    let enabled = get_settings('chats_enabled')
+    let current = enabled[id] ?? true;
+    enabled[id] = !current;
+    set_settings('chats_enabled', enabled);
+
+    if (enabled[id]) {
+        toastr.info(`Memory is now enabled for this chat`);
+    } else {
+        toastr.warning(`Memory is now disabled for this chat`);
+    }
+    refresh_memory()
+
+    // update the message visuals
+    for (let i=context.chat.length - 1 ; i >= 0; i--) {
+        update_message_visuals(i);
+    }
+}
 
 /**
  * Bind a UI element to a setting.
@@ -380,8 +404,8 @@ function copy_settings(profile=null) {
         settings = structuredClone(profiles[profile]);
     }
 
-    // remove profile settings from the copied settings
-    for (let key of Object.keys(profile_settings)) {
+    // remove global settings from the copied settings
+    for (let key of Object.keys(global_settings)) {
         delete settings[key];
     }
     return settings;
@@ -567,8 +591,8 @@ function update_message_visuals(i, style=true, text=null) {
     div_element.find(`div.${summary_div_class}`).remove();
 
     // If setting isn't enabled, don't display memories
-    if (!get_settings('display_memories')) {
-        return
+    if (!get_settings('display_memories') || !chat_enabled()) {
+        return;
     }
 
     // get the div holding the main message text
@@ -1043,6 +1067,13 @@ async function summarize_message(index=null, replace=false) {
 }
 
 function refresh_memory() {
+    if (!chat_enabled()) { // if chat not enabled, remove the injections
+        setExtensionPrompt(`${MODULE_NAME}_long`, "");
+        setExtensionPrompt(`${MODULE_NAME}_short`, "");
+        set_memory_display("Memory is disabled for this chat. Use /toggle_memory to enable.")  // update the memory display
+        return;
+    }
+
     // Update the UI according to the current state of the chat memories, and update the injection prompts accordingly
     update_message_inclusion_flags()  // update the inclusion flags for all messages
     let long_memory = get_long_memory();
@@ -1137,69 +1168,82 @@ async function summarize_chat(replace=false) {
 
 
 // Event handling
-var last_message_id = null;
+var last_message_swiped = false;  // flag for whether the last message was swiped
 async function on_chat_event(event=null, id=null) {
     // When the chat is updated, check if the summarization should be triggered
-    debug("Chat updated, checking if summarization should be triggered... " + event + " ID: " + id)
+    debug("Chat updated: " + event + " ID: " + id)
 
     const context = getContext();
 
     switch (event) {
         case 'chat_changed':  // chat was changed
-            debug('Chat or character changed');
             load_character_profile();  // load the profile for the current character
             refresh_memory();  // refresh the memory state
             if (context?.chat?.length) {
                 scroll_to_bottom_of_chat();  // scroll to the bottom of the chat (area is added due to memories)
-                last_message_id = context?.chat?.length - 1;  // set the last message ID to the current message ID
             }
-            debug("Last message ID: " + last_message_id)
             break;
+
         case 'message_deleted':   // message was deleted
+            if (!chat_enabled()) break;  // if chat is disabled, do nothing
             debug("Message deleted, refreshing memory")
             refresh_memory();
+            last_message_swiped = false;
             break;
+
         case 'message_sent':  // user sent a message
+            if (!chat_enabled()) break;  // if chat is disabled, do nothing
             debug("user message")
-            break
+            break;
+
         case 'new_message':  // New message detected
+            if (!chat_enabled()) break;  // if chat is disabled, do nothing
             if (!context.groupId && context.characterId === undefined) break; // no characters or group selected
             if (streamingProcessor && !streamingProcessor.isFinished) break;  // Streaming in-progress
 
-            // if the ID is the same as the last message, it was a swipe event
-            log(id + " " + last_message_id + " " + get_settings('auto_summarize_on_swipe'))
-            if (id === last_message_id) {  // this is a swipe
-                if (get_settings('auto_summarize_on_swipe')) {
-                    debug("Summarizing on swipe")
-                    await summarize_message(id, true);  // summarize that message, replacing existing summary
-                    refresh_memory()
-                    break;
-                } else {
-                    break;
-                }
+            if (last_message_swiped) {  // this is a swipe
+                if (!get_settings('auto_summarize_on_swipe')) break;  // if auto-summarize on swipe is disabled, do nothing
+                debug("Summarizing on swipe")
+                await summarize_message(id, true);  // summarize that message, replacing existing summary
+                refresh_memory()
+                break;
+            } else { // not a swipe
+                if (!get_settings('auto_summarize')) break;  // if regular auto-summarize is disabled, do nothing
+                debug("New message detected, summarizing")
+                await summarize_chat(false);  // summarize the chat, but don't replace existing summaries
+                break;
             }
 
-            // if a different message ID, then it's a new message.
-            // if regular auto-summarize is disabled, skip
-            if (id !== last_message_id && !get_settings('auto_summarize')) break;
 
-            debug("New message detected, summarizing")
-            await summarize_chat(false);  // summarize the chat, but don't replace existing summaries
-            last_message_id = id;
-            break;
         case 'message_edited':  // Message has been edited
+            if (!chat_enabled()) break;  // if chat is disabled, do nothing
             if (!get_settings('auto_summarize_on_edit')) break;  // if auto-summarize on edit is disabled, skip
             debug("Message edited, summarizing")
             summarize_message(i, true);  // summarize that message, replacing existing summary
             break;
+
         case 'message_swiped':  // when this event occurs, don't do anything (a new_message event will follow)
+            if (!chat_enabled()) break;  // if chat is disabled, do nothing
             debug("Message swiped, reloading memory")
             refresh_memory()
+            last_message_swiped = true;
             break;
+
+        case 'message_received':
+            if (!chat_enabled()) break;  // if chat is disabled, do nothing
+            break;
+
         default:
+            if (!chat_enabled()) break;  // if chat is disabled, do nothing
             debug(`Unknown event: "${event}", refreshing memory`)
             refresh_memory();
     }
+
+    // reset the swipe flag if the event is not a message_swiped event
+    if (event !== 'message_swiped') {
+        last_message_swiped = false;
+    }
+
 }
 
 // todo: temporary hack to fix the popout
@@ -1421,36 +1465,19 @@ jQuery(async function () {
         callback: (args) => {
             log("SETTINGS: ")
             log(extension_settings[MODULE_NAME])
+            log(getContext())
         },
         helpString: 'Log current settings',
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'qvink_test',
+        name: 'toggle_memory',
         callback: (args) => {
-
-            /**
-             * Formats instruct mode chat message.
-             * @param {string} name Character name.
-             * @param {string} mes Message text.
-             * @param {boolean} isUser Is the message from the user.
-             * @param {boolean} isNarrator Is the message from the narrator.
-             * @param {string} forceAvatar Force avatar string.
-             * @param {string} name1 User name.
-             * @param {string} name2 Character name.
-             * @param {boolean|number} forceOutputSequence Force to use first/last output sequence (if configured).
-             * @returns {string} Formatted instruct mode chat message.
-             */
-            let is_user = false
-            let is_narrator = false
-            let force_avatar = ""
-
-            let val = formatInstructModeChat("NAME", "MESSAGE CONTENTS", is_user, is_narrator, force_avatar, "NAME 1", "NAME 2", 2)
-            log(val)
-
+            toggle_chat_enabled();  // toggle the memory for the current chat
         },
-        helpString: 'Log current settings',
+        helpString: 'Toggle memory for the current chat.',
     }));
+
 
 
 

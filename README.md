@@ -11,7 +11,7 @@ Pros:
 - Summarization occurs automatically after a message is generated, so if your model generates faster than you read you'll never have to wait.
 
 Cons, with attempted solutions:
-- If you use Context Shifting, performing the summarizations each time breaks it unless you include your static World Info in the summarization prompt. I've added this as a configuration option.
+- If you use Context Shifting, performing the summarizations each time breaks it unless you include your static World Info in the summarization prompt. I've added this as a configuration option. Whether it actually helps summarization itself is unclear.
 - If a message is too small, it is still summarized for short-term memory even if it isn't relevant. I've added a config setting to exclude messages under a given token length.
 - If a summarization is wrong, it can affect subsequent messages. I've added the ability to regenerate a summary or manually edit it if needed.
 - If you want to add the extension to an existing chat, initial summarization of the chat might take a while. You can stop summarization at any time by clicking the "stop" button in the config. Summarization of the chat will resume when a new message is summarized.
@@ -22,6 +22,7 @@ Cons, with attempted solutions:
 - To mark a memory for long-term memory, click the "brain" icon in the message button menu.
 - To re-summarize a message, click the "Quote" icon in the message button menu.
 - To edit a summary, click on the summary text directly or click the "pen" icon in the message button menu.
+- To disable the extension in a given chat, use the command /toggle_memory
 
 
 ### Notable Features
@@ -50,9 +51,9 @@ Cons, with attempted solutions:
 - ~~Ability to edit summaries.~~
 - Figure out how to limit the number of regular chat messages injected into the prompt so they can be replaced by the summaries.
 - support group chats
-- ~~add macro for max words to use in the summary prompt~~
+- ~~Add macro for max words to use in the summary prompt~~
 - Set the frequency at which automatic summarizations occur (every X messages)
-- Allow disabling extension in individual chats without giving it a profile.
+- ~~Allow disabling extension in individual chats without giving it a profile.~~
 - Maybe include a few previous messages (or summaries) in the summary prompt, and specify that it should only include NEW events? 
 This could aid in consistency and avoid duplicate info. Might also have to opposite effect though.
 - Add a button to transfer all summaries marked for long-term memory into a lorebook entry
