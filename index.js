@@ -69,6 +69,7 @@ const default_settings = {
 
     // summarization settings
     auto_summarize: true,   // whether to automatically summarize new chat messages
+    summarization_delay: 0,  // delay auto-summarization by this many messages (0 summarizes immediately after sending, 1 waits for one message, etc)
     auto_summarize_on_edit: true,  // whether to automatically re-summarize edited chat messages
     auto_summarize_on_swipe: true,  // whether to automatically summarize new message swipes
     include_world_info: false,  // include world info in context when summarizing
@@ -186,9 +187,13 @@ function soft_reset_settings() {
         log("No profiles found, creating default profile.")
         profiles['Default'] = structuredClone(default_settings);
         set_settings('profiles', profiles);
-    } else { // for each existing profile, add any missing default settings
+    } else { // for each existing profile, add any missing default settings without overwriting existing settings
         for (let [profile, settings] of Object.entries(profiles)) {
-            Object.assign({}, default_settings, settings);  // add any missing default settings, but don't overwrite existing ones
+            for (let [key, value] of Object.entries(default_settings)) {
+                if (settings[key] === undefined) {
+                    settings[key] = value;
+                }
+            }
         }
         set_settings('profiles', profiles);
     }
@@ -388,7 +393,15 @@ function detect_settings_difference(profile=null) {
     }
     let current_settings = copy_settings();
     let profile_settings = copy_settings(profile);
-    return JSON.stringify(current_settings) !== JSON.stringify(profile_settings);
+
+    let different = false;
+    for (let key of Object.keys(profile_settings)) {
+        if (profile_settings[key] !== current_settings[key]) {
+            different = true;
+            break;
+        }
+    }
+    return different;
 }
 function save_profile(profile=null) {
     // Save the current settings to the given profile
@@ -667,7 +680,7 @@ function initialize_message_buttons() {
     $(document).on("click", `.${summarize_button_class}`, async function () {
         const message_block = $(this).closest(".mes");
         const message_id = Number(message_block.attr("mesid"));
-        await summarize_message(message_id, true, true);  // summarize the message, replacing the existing summary and forcing it to summarize
+        await summarize_message(message_id, true);  // summarize the message, replacing the existing summary
         refresh_memory();
     });
     $(document).on("click", `.${edit_button_class}`, async function () {
@@ -696,6 +709,13 @@ function store_memory(message, key, value) {
     }
 
     message.extra[MODULE_NAME][key] = value;
+
+    // Also save on the current swipe info if present
+    let swipe_index = message.swipe_id
+    if (swipe_index) {
+        message.swipe_info[swipe_index].extra[MODULE_NAME] = message.extra[MODULE_NAME];
+    }
+
     saveChatDebounced();
 }
 function get_memory(message, key) {
@@ -717,7 +737,7 @@ async function remember_message_toggle(index=null) {
     debug(`Set message ${index} remembered status: ${new_status}`);
 
     if (new_status) {  // if it was marked as remembered, summarize if it there is no summary
-        await summarize_message(index, false, true);
+        await summarize_message(index, false);
     }
     refresh_memory();
 }
@@ -773,12 +793,6 @@ function update_message_inclusion_flags() {
         // check for any of the exclusion criteria
         let include = check_message_exclusion(message)
         if (!include) {
-            store_memory(message, 'include', null);
-            continue;
-        }
-
-        // if it doesn't have a memory on it, don't include it
-        if (!get_memory(message, 'memory')) {
             store_memory(message, 'include', null);
             continue;
         }
@@ -855,6 +869,9 @@ function concatenate_summaries(start=null, end=null, include=null, remember=null
         }
 
         let summary = get_memory(message, 'memory');
+        if (!summary) {  // if there's no summary, skip it
+            continue;
+        }
         summaries.push(summary)
     }
 
@@ -939,9 +956,8 @@ async function summarize_text(text) {
  * Summarize a message and save the summary to the message object.
  * @param index {number|null} Index of the message to summarize (default last message)
  * @param replace {boolean} Whether to replace existing summaries (default false)
- * @param force {boolean} Whether to force summarization even if the message doesn't meet the inclusion criteria (default false)
  */
-async function summarize_message(index=null, replace=false, force=false) {
+async function summarize_message(index=null, replace=false) {
     let context = getContext();
     let chat = context.chat;
 
@@ -949,12 +965,6 @@ async function summarize_message(index=null, replace=false, force=false) {
     index = Math.max(index ?? chat.length - 1, 0)
     let message = chat[index]
     let message_hash = getStringHash(message.mes);
-
-    // check message exclusion criteria first (if not forcing)
-    if (!force && !check_message_exclusion(message)) {
-        return;
-    }
-
 
     // If we aren't forcing replacement, skip if the message already has a summary
     let memory = get_memory(message, 'memory');
@@ -1030,7 +1040,6 @@ async function summarize_message(index=null, replace=false, force=false) {
 
     // update the message summary text again, still no styling
     update_message_visuals(index, false)
-    return true
 }
 
 function refresh_memory() {
@@ -1078,22 +1087,39 @@ async function summarize_chat(replace=false) {
         deactivateSendButtons();
     }
 
+    // iterate through the chat in reverse order and summarize each message
+    let messages_to_delay = get_settings('summarization_delay');  // number of messages to delay summarization for
     for (let i = context.chat.length-1; i >= 0; i--) {
         if (get_settings('stop_summarization')) {  // check if summarization should be stopped
             log('Summarization stopped');
             break;
         }
-        let summarized = await summarize_message(i, replace);
 
-        if (summarized) {  // if we summarized a message, check the context inclusion flags
-            update_message_inclusion_flags()  // update message inclusion based on context lengths
-            if (get_memory(context.chat[i], 'include') === null) {
-                // If the message we just summarized is not included in short-term memory, stop summarizing the rest of the chat.
-                debug(`Message ${i} is not included in short-term memory, stopping summarization.`)
-                break
-            }
+        // get current message
+        let message = context.chat[i];
+
+        // check message exclusion criteria
+        let include = check_message_exclusion(message);  // check if the message should be included due to the inclusion criteria (not context limits)
+        if (!include) {
+            continue;
         }
 
+        // If the message is not yet ready to be summarized, skip it and decrement the delay counter
+        if (messages_to_delay > 0) {
+            messages_to_delay--;
+            continue;
+        }
+
+        update_message_inclusion_flags()  // NOW update message inclusion based on context lengths
+        if (get_memory(message, 'include') === null) {   // excluded due to context limits?
+            // If the message is not included in memory due to the context limits, stop summarizing the rest of the chat.
+            debug(`Message ${i} is not included in memory, stopping summarization.`)
+            break
+        }
+
+
+        // summarize the message
+        await summarize_message(i, replace);
     }
 
     if (get_settings('stop_summarization')) {  // check if summarization was stopped
@@ -1116,57 +1142,64 @@ async function on_chat_event(event=null, id=null) {
     // When the chat is updated, check if the summarization should be triggered
     debug("Chat updated, checking if summarization should be triggered... " + event + " ID: " + id)
 
-    // if the chat or character was changed, load the character profile and refresh the memory state
-    if (event === 'chat_changed') {
-        debug('Chat or character changed');
-        load_character_profile();  // load the profile for the current character
-        refresh_memory();  // refresh the memory state
-        scroll_to_bottom_of_chat();  // scroll to the bottom of the chat (area is added due to memories)
-    }
-
     const context = getContext();
 
-    // no characters or group selected
-    if (!context.groupId && context.characterId === undefined) {
-        return;
-    }
-
-    // Streaming in-progress
-    if (streamingProcessor && !streamingProcessor.isFinished) {
-        return;
-    }
-
     switch (event) {
+        case 'chat_changed':  // chat was changed
+            debug('Chat or character changed');
+            load_character_profile();  // load the profile for the current character
+            refresh_memory();  // refresh the memory state
+            if (context?.chat?.length) {
+                scroll_to_bottom_of_chat();  // scroll to the bottom of the chat (area is added due to memories)
+                last_message_id = context?.chat?.length - 1;  // set the last message ID to the current message ID
+            }
+            debug("Last message ID: " + last_message_id)
+            break;
         case 'message_deleted':   // message was deleted
             debug("Message deleted, refreshing memory")
             refresh_memory();
             break;
+        case 'message_sent':  // user sent a message
+            debug("user message")
+            break
         case 'new_message':  // New message detected
+            if (!context.groupId && context.characterId === undefined) break; // no characters or group selected
+            if (streamingProcessor && !streamingProcessor.isFinished) break;  // Streaming in-progress
+
             // if the ID is the same as the last message, it was a swipe event
-            if (id === last_message_id && !get_settings('auto_summarize_on_swipe')) break;  // if auto-summarize on swipe is disabled, skip
+            log(id + " " + last_message_id + " " + get_settings('auto_summarize_on_swipe'))
+            if (id === last_message_id) {  // this is a swipe
+                if (get_settings('auto_summarize_on_swipe')) {
+                    debug("Summarizing on swipe")
+                    await summarize_message(id, true);  // summarize that message, replacing existing summary
+                    refresh_memory()
+                    break;
+                } else {
+                    break;
+                }
+            }
 
             // if a different message ID, then it's a new message.
-            if (id !== last_message_id && !get_settings('auto_summarize')) return;  // if regular auto-summarize is disabled, skip
+            // if regular auto-summarize is disabled, skip
+            if (id !== last_message_id && !get_settings('auto_summarize')) break;
 
             debug("New message detected, summarizing")
             await summarize_chat(false);  // summarize the chat, but don't replace existing summaries
+            last_message_id = id;
             break;
         case 'message_edited':  // Message has been edited
             if (!get_settings('auto_summarize_on_edit')) break;  // if auto-summarize on edit is disabled, skip
             debug("Message edited, summarizing")
-            summarize_chat(false);  // summarize the chat, but don't replace existing summaries UNLESS they changed since last summarization
+            summarize_message(i, true);  // summarize that message, replacing existing summary
             break;
         case 'message_swiped':  // when this event occurs, don't do anything (a new_message event will follow)
             debug("Message swiped, reloading memory")
             refresh_memory()
             break;
         default:
-            debug("Unknown event, refreshing memory")
+            debug(`Unknown event: "${event}", refreshing memory`)
             refresh_memory();
     }
-
-    // update the last message index
-    last_message_id = id;
 }
 
 // todo: temporary hack to fix the popout
@@ -1211,9 +1244,14 @@ function setupListeners() {
 
     bind_setting('#profile', 'profile', 'text', load_profile);
 
-    bind_setting('#auto_summarize', 'auto_summarize', 'boolean');
+    bind_setting('#auto_summarize', 'auto_summarize', 'boolean', (val) => {
+        // when disabled, summarize_before_generation and summarization_delay get disabled
+        $('#summarization_delay').prop('disabled', !val);
+        $('#summarize_before_generation').prop('disabled', !val);
+    });
     bind_setting('#auto_summarize_on_edit', 'auto_summarize_on_edit', 'boolean');
     bind_setting('#auto_summarize_on_swipe', 'auto_summarize_on_swipe', 'boolean');
+    bind_setting('#summarization_delay', 'summarization_delay', 'number');
     bind_setting('#include_world_info', 'include_world_info', 'boolean');
     bind_setting('#block_chat', 'block_chat', 'boolean');
     bind_setting('#prompt', 'prompt');
@@ -1335,6 +1373,8 @@ jQuery(async function () {
 
     // Event listeners
     eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, (id) => on_chat_event('new_message', id));
+    eventSource.on(event_types.MESSAGE_SENT, (id) => on_chat_event('message_sent', id));
+    eventSource.on(event_types.MESSAGE_RECEIVED, (id) => on_chat_event('message_received', id));
     eventSource.on(event_types.MESSAGE_DELETED, (id) => on_chat_event('message_deleted', id));
     eventSource.on(event_types.MESSAGE_EDITED, (id) => on_chat_event('message_edited', id));
     eventSource.on(event_types.MESSAGE_SWIPED, (id) => on_chat_event('message_swiped', id));

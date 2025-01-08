@@ -44,6 +44,7 @@ Cons, with attempted solutions:
 - ~~Added ability to provide global macros in summarization prompt~~
 - ~~Added the ability to choose whether to nest the messages in the summarization prompt or not~~
 - ~~Added the ability to toggle automatic summarization on message edit and swipe/regenerate~~
+- ~~Added summarization delay option~~
 - Fix issue that is sometimes inadvertently changing the completion config max tokens for some reason.
 - Fix issue causing the popout to bug out when pressing escape.
 - ~~Ability to edit summaries.~~

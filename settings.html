@@ -162,6 +162,11 @@
                     <span>Automatically Summarize New Messages</span>
                 </label>
 
+                <label for="summarization_delay" title="Number of messages to delay summarization (0 summarizes immediately after sending, 1 waits for one message, etc.)">
+                    <input id="summarization_delay" class="text_pole widthUnset" type="number" min="0" max="99" />
+                    <span> Auto-Summarization Delay</span>
+                </label>
+
                 <label for="auto_summarize_on_edit" title="Editing a message will automatically trigger a re-summarization." class="checkbox_label">
                     <input id="auto_summarize_on_edit" type="checkbox" />
                     <span>Automatically Re-summarize on Edit</span>
