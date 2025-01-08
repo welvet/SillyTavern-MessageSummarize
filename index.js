@@ -520,25 +520,26 @@ function delete_profile() {
     load_profile('Default');
 }
 function set_character_profile(profile) {
-    // Make the current profile the default for the current character
+    // Make the current profile the default for the current character (or group)
     let context = getContext();
-    let characterId = context.characterId;
-    if (!characterId) {  // no character selected
+    let id = context.characterId || context.groupId;
+    if (!id) {  // no character or group selected
         return;
     }
 
     let character_profiles = get_settings('character_profiles');
-    character_profiles[characterId] = profile;
-    log(`Set character [${characterId}] to use profile [${profile}]`);
+    character_profiles[id] = profile;
+    log(`Set character [${id}] to use profile [${profile}]`);
     set_settings('character_profiles', character_profiles);
 }
-function get_character_profile(characterId) {
+function get_character_profile(id) {
     // Get the profile for a given character
-    if (!characterId) {  // if none given, assume the current character
-        characterId = getContext().characterId;
+    if (!id) {  // if none given, assume the current character
+        let context = getContext();
+        id = context.characterId || context.groupId;
     }
     let character_profiles = get_settings('character_profiles');
-    return character_profiles[characterId] ?? 'Default';
+    return character_profiles[id] ?? 'Default';
 }
 function load_character_profile() {
     // Load the settings profile for the current character
