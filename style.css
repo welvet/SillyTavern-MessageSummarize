@@ -98,7 +98,6 @@ By default, text is greyed to indicate that is it not injected.
 
 /* make the ST extra button divs flex-wrap */
 .extraMesButtons {
-    display: flex;
     flex-wrap: wrap;
 }
 
