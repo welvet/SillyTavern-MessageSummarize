@@ -789,7 +789,10 @@ function store_memory(message, key, value) {
 
     // Also save on the current swipe info if present
     let swipe_index = message.swipe_id
-    if (swipe_index) {
+    if (swipe_index && message.swipe_info?.[swipe_index]) {
+        if (!message.swipe_info[swipe_index].extra) {
+            message.swipe_info[swipe_index].extra = {};
+        }
         message.swipe_info[swipe_index].extra[MODULE_NAME] = message.extra[MODULE_NAME];
     }
 
@@ -1478,6 +1481,9 @@ function dump_memories_to_lorebook() {
 jQuery(async function () {
     log(`Loading extension...`)
 
+    delete extension_settings[MODULE_NAME]['chats_enabled']
+    saveSettingsDebounced();
+
     // Read version from manifest.json
     const manifest = await get_manifest();
     const VERSION = manifest.version;
@@ -1512,7 +1518,6 @@ jQuery(async function () {
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'log_chat',
         callback: (args) => {
-            log("CHAT: ")
             log(getContext().chat)
         },
         helpString: 'log chat',
@@ -1547,9 +1552,7 @@ jQuery(async function () {
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'log_settings',
         callback: (args) => {
-            log("SETTINGS: ")
             log(extension_settings[MODULE_NAME])
-            log(getContext())
         },
         helpString: 'Log current settings',
     }));
@@ -1561,9 +1564,6 @@ jQuery(async function () {
         },
         helpString: 'Toggle memory for the current chat.',
     }));
-
-
-
 
     // Macros
     MacrosParser.registerMacro(short_memory_macro, () => get_short_memory());
