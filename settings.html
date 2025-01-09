@@ -221,6 +221,11 @@
                     <span>Enable Memory in New Chats</span>
                 </label>
 
+                <label for="limit_injected_messages" title="Limit the number of messages to send in regular prompts to this number (-1 for no limit). Message memories will still be sent.">
+                    <input id="limit_injected_messages" class="text_pole widthUnset" type="number" min="0" max="999" />
+                    <span>Limit Message History</span>
+                </label>
+
                 <div class="flex-container justifyspacebetween alignitemscenter">
                     <button id="revert_settings" class="menu_button flex1 margin0" title="Revert all settings to default (not the default profile, just the default that comes with the extension). Your other profiles won't be affected.">
                         <span>Revert Settings</span>

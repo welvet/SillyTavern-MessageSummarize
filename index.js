@@ -100,6 +100,7 @@ const default_settings = {
     lorebook_entry: null,  // lorebook entry to dump memories to
     display_memories: true,  // display memories in the chat below each message
     default_chat_enabled: true,  // whether memory is enabled by default for new chats
+    limit_injected_messages: -1,  // limit the number of injected messages (-1 for no limit)
 };
 const global_settings = {
     profiles: {},  // dict of profiles by name
@@ -965,6 +966,18 @@ function get_short_memory() {
 }
 
 
+// Add an interception function to reduce the number of messages injected normally
+// This has to match the manifest.json "generate_interceptor" key
+globalThis.memory_intercept_messages = function (chat, _contextSize, _abort, type) {
+    if (!chat_enabled()) return;   // if chat is disabled, do nothing
+    let limit = get_settings('limit_injected_messages');  // message limit from settings
+    if (limit === -1) return;  // if limit is -1, do nothing
+
+    // truncate the chat up to the limit
+    while (chat.length > limit) {
+        chat.shift();
+    }
+};
 
 // Summarization
 async function summarize_text(text) {
@@ -1370,6 +1383,7 @@ function setup_settings_listeners() {
     bind_setting('#debug_mode', 'debug_mode', 'boolean');
     bind_setting('#display_memories', 'display_memories', 'boolean')
     bind_setting('#default_chat_enabled', 'default_chat_enabled', 'boolean');
+    bind_setting('#limit_injected_messages', 'limit_injected_messages', 'number');
 
     // trigger the change event once to update the display at start
     $('#long_term_context_limit').trigger('change');

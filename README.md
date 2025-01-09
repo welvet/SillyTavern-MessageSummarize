@@ -48,7 +48,7 @@ Cons, with attempted solutions:
 - Fix issue that is sometimes inadvertently changing the completion config max tokens for some reason.
 - ~~Fix issue causing the popout to bug out when pressing escape.~~
 - ~~Ability to edit summaries.~~
-- Figure out how to limit the number of regular chat messages injected into the prompt so they can be replaced by the summaries.
+- ~~Figure out how to limit the number of regular chat messages injected into the prompt so they can be replaced by the summaries.~~
 - support group chats
 - ~~Add macro for max words to use in the summary prompt~~
 - Set the frequency at which automatic summarizations occur (every X messages)
