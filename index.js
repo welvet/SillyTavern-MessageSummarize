@@ -362,7 +362,6 @@ function refresh_settings() {
     for (let profile of profile_options) {
 
         // if the current character has a default profile, set the "locked" icon to show it
-        debug(profile + " " + current_character_profile)
         if (profile === current_character_profile) {
             choose_profile_dropdown.append(`<option value="${profile}">${profile} (locked)</option>`);
         } else {
@@ -386,10 +385,10 @@ function refresh_settings() {
     // update the save icon highlight
     update_save_icon_highlight();
 }
-function bind_function(id, func, disable=true) {
+function bind_function(selector, func, disable=true) {
     // bind a function to an element (typically a button or input)
     // if disable is true, disable the element if chat is disabled
-    let element = $(id);
+    let element = $(selector);
     if (element.length === 0) {
         error(`No element found for selector [${id}] when binding function`);
         return;
@@ -1299,11 +1298,9 @@ async function on_chat_event(event=null, id=null) {
 
 }
 
-// todo: temporary hack to fix the popout
-var popout_button_bound = false;
 
 // UI handling
-function setupListeners() {
+function setup_settings_listeners() {
     debug("Setting up listeners...")
 
     bind_function('#toggle_chat_memory', () => toggle_chat_enabled(), false);
@@ -1325,14 +1322,6 @@ function setupListeners() {
     bind_function('#refresh_memory', refresh_memory);
     bind_function('#stop_summarization', stop_summarization);
     bind_function('#revert_settings', reset_settings);
-
-    if (!popout_button_bound) {
-        popout_button_bound = true;
-        bind_function('#popout_button', (e) => {
-            do_popout(e);
-            e.stopPropagation();
-        })
-    }
 
     // todo
     //bind_function('#dump_to_lorebook', dump_memories_to_lorebook);
@@ -1393,52 +1382,74 @@ function setupListeners() {
 }
 
 
-function do_popout(e) {
-    // popout the memory display
-    const target = e.target;
+// The HTML for all settings
+let original_settings_element = null;
+let settings_content = null;
+function setup_popout() {
+    // Get the settings element and store it
+    original_settings_element = $('#qvink_memory_settings').find('.inline-drawer-content')
+    settings_content = original_settings_element.html();
 
+    // set up the popout button
+    bind_function('#qvink_popout_button', (e) => {
+        toggle_popout(e);
+        e.stopPropagation();
+    })
+}
+function toggle_popout(e) {
+    // toggle the popout window
 
-    if ($('#qmExtensionPopout').length === 1) {  // Already open - close it
-        debug('saw existing popout, removing');
+    // If already open, close it (trigger the close button)
+    if ($('#qmExtensionPopout').length === 1) {
+        debug('Saw existing popout, removing');
         $('#qmExtensionPopout').fadeOut(animation_duration, () => { $('#qmExtensionPopoutClose').trigger('click'); });
-        return
+        return;
     }
 
-    // repurposes the zoomed avatar template to server as a floating div
-    debug('did not see popout yet, creating');
-    const originalHTMLClone = $(target).parent().parent().parent().find('.inline-drawer-content').html();
-    const originalElement = $(target).parent().parent().parent().find('.inline-drawer-content');
-    const template = $('#zoomed_avatar_template').html();
+    // Otherwise, create it
+    debug('Creating popout window...');
+
+    // create the control bar with the close button
     const controlBarHtml = `<div class="panelControlBar flex-container">
     <div id="qmExtensionPopoutheader" class="fa-solid fa-grip drag-grabber hoverglow"></div>
     <div id="qmExtensionPopoutClose" class="fa-solid fa-circle-xmark hoverglow dragClose"></div>
     </div>`;
-    const newElement = $(template);
-    newElement.attr('id', 'qmExtensionPopout')
-        .removeClass('zoomed_avatar')
-        .addClass('draggable')
-        .empty();
-    originalElement.empty();
-    originalElement.html('<div class="flex-container alignitemscenter justifyCenter wide100p"><small>Currently popped out</small></div>');
-    newElement.append(controlBarHtml).append(originalHTMLClone);
-    $('body').append(newElement);
-    $('#drawer_content').addClass('scrollableInnerFull');
-    setupListeners();
-    loadMovingUIState();
 
+    // repurposes the zoomed avatar template (it's a floating div to the left of the chat)
+    const newElement = $($('#zoomed_avatar_template').html());
+    newElement.attr('id', 'qmExtensionPopout').removeClass('zoomed_avatar').addClass('draggable').empty();
+
+    // replace the original settings content with a placeholder
+    original_settings_element.empty();
+    original_settings_element.html('<div class="flex-container alignitemscenter justifyCenter wide100p"><small>Currently popped out</small></div>');
+
+    // add the settings content to the new popout
+    newElement.append(controlBarHtml).append(settings_content);
+    $('body').append(newElement);  // add the popout to the body
+    $('#drawer_content').addClass('scrollableInnerFull')
+
+    loadMovingUIState();
     $('#qmExtensionPopout').fadeIn(animation_duration);
     dragElement(newElement);
 
-    //setup listener for close button to restore extensions menu
+    // set up all UI listeners and set all settings to the current values
+    setup_settings_listeners();
+    refresh_settings()
+
+    // setup listener for close button to remove the popout
     $('#qmExtensionPopoutClose').off('click').on('click', function () {
         $('#drawer_content').removeClass('scrollableInnerFull');
-        const summaryPopoutHTML = $('#drawer_content');
         $('#qmExtensionPopout').fadeOut(animation_duration, () => {
-            originalElement.empty();
-            originalElement.html(summaryPopoutHTML);
-            $('#qmExtensionPopout').remove();
+            original_settings_element.empty();  // clear the placeholder from the original settings element
+            original_settings_element.html(settings_content);  // restore the original settings content
+            $('#qmExtensionPopout').remove();  // remove the popout
+
+            // set up all UI listeners and set all settings to the current values
+            setup_settings_listeners();
+            refresh_settings()
         });
     });
+
 }
 
 function dump_memories_to_lorebook() {
@@ -1465,8 +1476,11 @@ jQuery(async function () {
     $("#extensions_settings2").append(await $.get(`${MODULE_DIR}/settings.html`));  // load html
     $("h4").append(`<span class="version_id">v${VERSION}</span>`)   // add version number to each header
 
-    // setup UI listeners
-    setupListeners();
+    // setup UI listeners for settings UI
+    setup_settings_listeners();
+
+    // setup popout button
+    setup_popout()
 
     // message buttons
     initialize_message_buttons();

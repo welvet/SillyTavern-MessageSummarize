@@ -22,7 +22,6 @@ Cons, with attempted solutions:
 - To mark a memory for long-term memory, click the "brain" icon in the message button menu.
 - To re-summarize a message, click the "Quote" icon in the message button menu.
 - To edit a summary, click on the summary text directly or click the "pen" icon in the message button menu.
-- To disable the extension in a given chat, use the command /toggle_memory
 
 
 ### Notable Features
@@ -47,7 +46,7 @@ Cons, with attempted solutions:
 - ~~Added the ability to toggle automatic summarization on message edit and swipe/regenerate~~
 - ~~Added summarization delay option~~
 - Fix issue that is sometimes inadvertently changing the completion config max tokens for some reason.
-- Fix issue causing the popout to bug out when pressing escape.
+- ~~Fix issue causing the popout to bug out when pressing escape.~~
 - ~~Ability to edit summaries.~~
 - Figure out how to limit the number of regular chat messages injected into the prompt so they can be replaced by the summaries.
 - support group chats
