@@ -19,6 +19,13 @@
     margin-left: 2px;
 }
 
+/* disabled buttons aren't properly styled by default */
+.settings_input:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
 /* add a scrollbar to the popout */
 #qmExtensionPopout {
     overflow: auto;

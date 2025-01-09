@@ -99,12 +99,13 @@ const default_settings = {
     stop_summarization: false,  // toggled to stop summarization, then toggled back to false.
     lorebook_entry: null,  // lorebook entry to dump memories to
     display_memories: true,  // display memories in the chat below each message
+    default_chat_enabled: true,  // whether memory is enabled by default for new chats
 };
 const global_settings = {
     profiles: {},  // dict of profiles by name
     character_profiles: {},  // dict of character IDs to profiles
     profile: 'Default', // Current profile
-    chats_enabled: {}  // dict of chat IDs to whether memory is enabled
+    chats_enabled: {},  // dict of chat IDs to whether memory is enabled
 }
 const settings_ui_map = {}  // map of settings to UI elements
 
@@ -220,7 +221,7 @@ async function get_manifest() {
 function chat_enabled() {
     // check if the current chat is enabled
     let context = getContext();
-    return get_settings('chats_enabled')?.[context.chatId] ?? true;
+    return get_settings('chats_enabled')?.[context.chatId] ?? get_settings('default_chat_enabled')
 }
 function toggle_chat_enabled(id=null) {
     let context = getContext();
@@ -230,7 +231,7 @@ function toggle_chat_enabled(id=null) {
 
     // Toggle whether to enable or disable memory for the current character
     let enabled = get_settings('chats_enabled')
-    let current = enabled[id] ?? true;
+    let current = enabled[id] ?? get_settings('default_chat_enabled');
     enabled[id] = !current;
     set_settings('chats_enabled', enabled);
 
@@ -245,7 +246,11 @@ function toggle_chat_enabled(id=null) {
     for (let i=context.chat.length - 1 ; i >= 0; i--) {
         update_message_visuals(i);
     }
+
+    // refresh settings UI
+    refresh_settings()
 }
+
 
 /**
  * Bind a UI element to a setting.
@@ -253,8 +258,9 @@ function toggle_chat_enabled(id=null) {
  * @param key {string} Key of the setting
  * @param type {string} Type of the setting (number, boolean)
  * @param callback {function} Callback function to run when the setting is updated
+ * @param disable {boolean} Whether to disable the element when chat is disabled
  */
-function bind_setting(selector, key, type=null, callback=null) {
+function bind_setting(selector, key, type=null, callback=null, disable=true) {
     // Bind a UI element to a setting, so if the UI element changes, the setting is updated
     let element = $(selector);
     settings_ui_map[key] = [element, type]
@@ -263,6 +269,11 @@ function bind_setting(selector, key, type=null, callback=null) {
     if (element.length === 0) {
         error(`No element found for selector [${selector}] for setting [${key}]`);
         return;
+    }
+
+    // mark as a settings UI function
+    if (disable) {
+        element.addClass('settings_input');
     }
 
     // default trigger for a settings update is on a "change" event
@@ -344,13 +355,24 @@ function refresh_settings() {
     // Refresh all settings UI elements according to the current settings
     debug("Refreshing settings...")
 
-    // Set the UI profile dropdowns to reflect the available profiles
+    // Set the UI profile dropdowns to reflect the available profiles and the currently chosen one
     let profile_options = Object.keys(get_settings('profiles'));
     let choose_profile_dropdown = $('#profile').empty();
-    let character_profiles_dropdown = $('#character_profile').empty();
+    let current_character_profile = get_character_profile();
     for (let profile of profile_options) {
-        choose_profile_dropdown.append(`<option value="${profile}">${profile}</option>`);
-        character_profiles_dropdown.append(`<option value="${profile}">${profile}</option>`);
+
+        // if the current character has a default profile, set the "locked" icon to show it
+        debug(profile + " " + current_character_profile)
+        if (profile === current_character_profile) {
+            choose_profile_dropdown.append(`<option value="${profile}">${profile} (locked)</option>`);
+        } else {
+            choose_profile_dropdown.append(`<option value="${profile}">${profile}</option>`);
+        }
+
+    }
+
+    if (current_character_profile) {
+        choose_profile_dropdown.val(current_character_profile);
     }
 
     // iterate through the settings map and set each element to the current setting value
@@ -358,18 +380,24 @@ function refresh_settings() {
         set_setting_ui_element(key, element, type);
     }
 
-    // set the character profile dropdown to the current character's profile
-    character_profiles_dropdown.val(get_character_profile());
+    // iterate through all settings UI items and disable them if chat is disabled
+    $('.settings_input').prop('disabled', !chat_enabled());
 
     // update the save icon highlight
     update_save_icon_highlight();
 }
-function bind_function(id, func) {
+function bind_function(id, func, disable=true) {
     // bind a function to an element (typically a button or input)
+    // if disable is true, disable the element if chat is disabled
     let element = $(id);
     if (element.length === 0) {
         error(`No element found for selector [${id}] when binding function`);
         return;
+    }
+
+    // mark as a settings UI element
+    if (disable) {
+        element.addClass('settings_input');
     }
 
     // check if it's an input element, and bind a "change" event if so
@@ -519,18 +547,20 @@ function delete_profile() {
     set_settings('profiles', profiles);
     load_profile('Default');
 }
-function set_character_profile(profile) {
-    // Make the current profile the default for the current character (or group)
+function toggle_character_profile() {
+    // Toggle whether the current profile is set to the default for the current character (or group)
     let context = getContext();
     let id = context.characterId || context.groupId;
     if (!id) {  // no character or group selected
         return;
     }
 
-    let character_profiles = get_settings('character_profiles');
-    character_profiles[id] = profile;
-    log(`Set character [${id}] to use profile [${profile}]`);
-    set_settings('character_profiles', character_profiles);
+    // current profile
+    let profile = get_settings('profile');
+
+    // if the character profile is already set to the current profile, unset it.
+    // otherwise, set it to the current profile.
+    set_character_profile(id, profile === get_character_profile() ? null : profile);
 }
 function get_character_profile(id) {
     // Get the profile for a given character
@@ -539,12 +569,34 @@ function get_character_profile(id) {
         id = context.characterId || context.groupId;
     }
     let character_profiles = get_settings('character_profiles');
-    return character_profiles[id] ?? 'Default';
+    return character_profiles[id]
+}
+function set_character_profile(id, profile=null) {
+    // Set the profile for a given character (or unset it if no profile provided)
+    let character_profiles = get_settings('character_profiles');
+
+    if (profile) {
+        character_profiles[id] = profile;
+        log(`Set character [${id}] to use profile [${profile}]`);
+    } else {
+        delete character_profiles[id];
+        log(`Unset character [${id}] default profile`);
+    }
+
+    set_settings('character_profiles', character_profiles);
+    refresh_settings()
 }
 function load_character_profile() {
     // Load the settings profile for the current character
     let profile = get_character_profile();
-    load_profile(profile);
+    load_profile(profile || 'Default');
+
+    // this is to keep the current profile when switching characters
+    //    if (profile) {  // if a default profile is set, load it
+    //         load_profile(profile);
+    //     }
+
+    refresh_settings()
 }
 
 
@@ -1071,7 +1123,7 @@ function refresh_memory() {
     if (!chat_enabled()) { // if chat not enabled, remove the injections
         setExtensionPrompt(`${MODULE_NAME}_long`, "");
         setExtensionPrompt(`${MODULE_NAME}_short`, "");
-        set_memory_display("Memory is disabled for this chat. Use /toggle_memory to enable.")  // update the memory display
+        set_memory_display("Memory is disabled for this chat.")  // update the memory display
         return;
     }
 
@@ -1254,16 +1306,15 @@ var popout_button_bound = false;
 function setupListeners() {
     debug("Setting up listeners...")
 
+    bind_function('#toggle_chat_memory', () => toggle_chat_enabled(), false);
+
     // Trigger profile changes
-    bind_function('#save_profile', () => save_profile());
-    bind_function('#restore_profile', () => load_profile());
-    bind_function('#rename_profile', () => rename_profile())
-    bind_function('#new_profile', new_profile);
-    bind_function('#delete_profile', delete_profile);
-    bind_function('#character_profile', (e) => {
-        let profile = $(e.target).val();
-        set_character_profile(profile);
-    });
+    bind_function('#save_profile', () => save_profile(), false);
+    bind_function('#restore_profile', () => load_profile(), false);
+    bind_function('#rename_profile', () => rename_profile(), false)
+    bind_function('#new_profile', new_profile, false);
+    bind_function('#delete_profile', delete_profile, false);
+    bind_function('#character_profile', () => toggle_character_profile(), false);
 
     bind_function('#prompt_restore', on_restore_prompt_click);
     bind_function('#rerun_memory', async (e) => {
@@ -1287,7 +1338,7 @@ function setupListeners() {
     //bind_function('#dump_to_lorebook', dump_memories_to_lorebook);
     //bind_setting('#lorebook_entry', 'lorebook_entry')
 
-    bind_setting('#profile', 'profile', 'text', load_profile);
+    bind_setting('#profile', 'profile', 'text', () => load_profile(), false);
 
     bind_setting('#auto_summarize', 'auto_summarize', 'boolean', (val) => {
         // when disabled, summarize_before_generation and summarization_delay get disabled
@@ -1306,8 +1357,6 @@ function setupListeners() {
 
     bind_setting('#message_length_threshold', 'message_length_threshold', 'number');
     bind_setting('#summary_maximum_length', 'summary_maximum_length', 'number');
-    bind_setting('#debug_mode', 'debug_mode', 'boolean');
-    bind_setting('#display_memories', 'display_memories', 'boolean')
     bind_setting('#include_last_user_message', 'include_last_user_message', 'boolean')
     bind_setting('#nest_messages_in_prompt', 'nest_messages_in_prompt', 'boolean')
 
@@ -1329,10 +1378,16 @@ function setupListeners() {
         $('#long_term_context_limit_display').text(get_long_token_limit());  // update the displayed token limit
     });
 
+    bind_setting('#debug_mode', 'debug_mode', 'boolean');
+    bind_setting('#display_memories', 'display_memories', 'boolean')
+    bind_setting('#default_chat_enabled', 'default_chat_enabled', 'boolean');
 
     // trigger the change event once to update the display at start
     $('#long_term_context_limit').trigger('change');
     $('#short_term_context_limit').trigger('change');
+
+    // set current memory state as a ui element
+    $('#memory_display').addClass('settings_input');
 
     refresh_settings()
 }
