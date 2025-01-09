@@ -152,7 +152,7 @@
                 </div>
                 <label for="prompt" class="title_restorable">
                     <span>Summary Prompt</span>
-                    <button id="prompt_restore" title="Restore default prompt" class="right_menu_button">
+                    <button id="prompt_restore" title="Restore default prompt" class="menu_button">
                         <div class="fa-solid fa-clock-rotate-left"></div>
                     </button>
                 </label>
@@ -183,9 +183,9 @@
                     <span>Nest Message in Summary Prompt</span>
                 </label>
 
-                <label for="include_world_info" title="Include World Info as context when summarizing. If your world info is static, this can allow Context Shifting to work between summarizations, but may decrease the accuracy of summarizations. Also note that inserted macros in the summary prompt may be duplicated." class="checkbox_label">
+                <label for="include_world_info" title="WARNING: doesn't work great. Attempts to preserve context-shifting by including all the content that is sent in regular prompts (world info, description, personas, example messages, message history, etc). If your regular prompts are static, this can allow Context Shifting to work between summarizations, but it decreases the accuracy of summarization due to all the extra stuff in the prompt." class="checkbox_label">
                     <input id="include_world_info" type="checkbox" />
-                    <span>Include World Info</span>
+                    <span>Include All Context Content</span>
                 </label>
 
                 <label for="include_last_user_message" title="Include the previous user message when summarizing assistant messages." class="checkbox_label">
