@@ -1481,9 +1481,6 @@ function dump_memories_to_lorebook() {
 jQuery(async function () {
     log(`Loading extension...`)
 
-    delete extension_settings[MODULE_NAME]['chats_enabled']
-    saveSettingsDebounced();
-
     // Read version from manifest.json
     const manifest = await get_manifest();
     const VERSION = manifest.version;
