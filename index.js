@@ -1565,6 +1565,14 @@ jQuery(async function () {
         helpString: 'Toggle memory for the current chat.',
     }));
 
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'toggle_memory_display',
+        callback: (args) => {
+            $('#display_memories').click();  // toggle the memory display
+        },
+        helpString: 'Toggle the "displat memories" setting.',
+    }));
+
     // Macros
     MacrosParser.registerMacro(short_memory_macro, () => get_short_memory());
     MacrosParser.registerMacro(long_memory_macro, () => get_long_memory());
