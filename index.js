@@ -21,7 +21,7 @@ import {
     callPopup
 } from '../../../../script.js';
 import { formatInstructModeChat } from '../../../instruct-mode.js';
-import { Popup } from '../../../popup.js';
+import { Popup, POPUP_TYPE } from '../../../popup.js';
 import { is_group_generating, selected_group } from '../../../group-chats.js';
 import { loadMovingUIState, renderStoryString, power_user } from '../../../power-user.js';
 import { dragElement } from '../../../RossAscends-mods.js';
@@ -86,8 +86,8 @@ const default_settings = {
     block_chat: true,  // block input when summarizing
     summary_maximum_length: 30,  // maximum token length of the summary
     nest_messages_in_prompt: false,  // nest messages to summarize in the prompt for summarization
-    include_message_history: 0,  // include a number of previous messages in the prompt for summarization
-    include_message_history_mode: 'messages_and_summaries',  // mode for including message history in the prompt
+    include_message_history: 3,  // include a number of previous messages in the prompt for summarization
+    include_message_history_mode: 'none',  // mode for including message history in the prompt
     include_user_messages_in_history: false,  // include previous user message in the summarization prompt when including message history
     include_system_messages_in_history: false,  // include previous system messages in the summarization prompt when including message history
     include_thought_messages_in_history: false,  // include previous thought messages in the summarization prompt when including message history
@@ -642,9 +642,6 @@ function load_character_profile() {
 
 
 // UI functions
-function on_restore_prompt_click() {
-    $('#prompt').val(default_prompt).trigger('input').trigger('change');
-}
 function get_message_div(index) {
     // given a message index, get the div element for that message
     let div = $(`div[mesid="${index}"]`);
@@ -805,13 +802,37 @@ function initialize_message_buttons() {
 
 
 }
-async function display_text_modal(title, text) {
+async function display_text_modal(title, text="") {
     // Display a modal with the given title and text
-
     // replace newlines in text with <br> for HTML
     text = text.replace(/\n/g, '<br>');
     let html = `<h2>${title}</h2><div style="text-align: left; overflow: auto;">${text}</div>`
     const popupResult = await callPopup(html, 'text', undefined, { okButton: `Close` });
+}
+async function get_user_setting_text_input(key, title) {
+    // Display a modal with a text area input, populated with a given setting value
+    let value = get_settings(key) ?? '';
+
+    title = `<h3>${title}</h3>`//<button id="restore" title="Restore default" class="menu_button fa-solid fa-clock-rotate-left"></button>`
+
+    let restore_button = {  // don't specify "result" key do not close the popup
+        text: 'Restore Default',
+        appendAtEnd: true,
+        action: () => { // fill the input with the default value
+            popup.mainInput.value = default_settings[key] ?? '';
+        }
+    }
+
+    let popup = new Popup(title, POPUP_TYPE.INPUT, value, {rows: 20, customButtons: [restore_button]});
+
+    // Now remove the ".result-control" class to prevent it from submitting when you hit enter.
+    // This should have been a configuration option for the popup.
+    popup.mainInput.classList.remove('result-control');
+
+    let input = await popup.show();
+    if (input) {
+        set_settings(key, input);
+    }
 }
 
 
@@ -1002,11 +1023,29 @@ function concatenate_summaries(start=null, end=null, include=null, remember=null
 }
 function get_long_memory() {
     // get the injection text for long-term memory
-    return concatenate_summaries(null, null, "long");
+    let text = concatenate_summaries(null, null, "long");
+    let template = get_settings('long_template')
+
+    // first replace any global macros
+    template = substituteParamsExtended(template);
+
+    // handle the #if macros using our custom function because ST DOESN'T EXPOSE THEIRS FOR SOME REASON
+    template = substitute_conditionals(template, {[long_memory_macro]: text});
+    template = substitute_params(template, {[long_memory_macro]: text});
+    return template
 }
 function get_short_memory() {
     // get the injection text for short-term memory
-    return concatenate_summaries(null, null, "short");
+    let text = concatenate_summaries(null, null, "short");
+    let template = get_settings('short_template')
+
+    // first replace any global macros
+    template = substituteParamsExtended(template);
+
+    // handle the #if macros using our custom function because ST DOESN'T EXPOSE THEIRS FOR SOME REASON
+    template = substitute_conditionals(template, {[short_memory_macro]: text});
+    template = substitute_params(template, {[short_memory_macro]: text});
+    return template
 }
 
 
@@ -1277,28 +1316,17 @@ function refresh_memory() {
 
     // Update the UI according to the current state of the chat memories, and update the injection prompts accordingly
     update_message_inclusion_flags()  // update the inclusion flags for all messages
-    let long_memory = get_long_memory();
-    let short_memory = get_short_memory();
 
-    let long_template = get_settings('long_template')
-    let short_template = get_settings('short_template')
-
-    // substitute any global macros
-    let long_injection = substituteParamsExtended(long_template);
-    let short_injection = substituteParamsExtended(short_template);
-
-    // handle the #if macros using our custom function because ST DOESN'T EXPOSE THEIRS FOR SOME REASON
-    long_injection = substitute_conditionals(long_injection, {[long_memory_macro]: long_memory});
-    long_injection = substitute_params(long_injection, {[long_memory_macro]: long_memory});
-    short_injection = substitute_conditionals(short_injection, {[short_memory_macro]: short_memory});
-    short_injection = substitute_params(short_injection, {[short_memory_macro]: short_memory});
+    // get the filled out templates
+    let long_injection = get_long_memory();
+    let short_injection = get_short_memory();
 
     // inject the memories into the templates, if they exist
-    if (long_memory) {
+    if (long_injection) {
         setExtensionPrompt(`${MODULE_NAME}_long`,  long_injection,  get_settings('long_term_position'), get_settings('long_term_depth'), get_settings('long_term_scan'), get_settings('long_term_role'));
     }
 
-    if (short_memory) {
+    if (short_injection) {
         setExtensionPrompt(`${MODULE_NAME}_short`, short_injection, get_settings('short_term_position'), get_settings('short_term_depth'), get_settings('short_term_scan'), get_settings('short_term_role'));
     }
 
@@ -1468,7 +1496,6 @@ function setup_settings_listeners() {
     bind_function('#delete_profile', delete_profile, false);
     bind_function('#character_profile', () => toggle_character_profile(), false);
 
-    bind_function('#prompt_restore', on_restore_prompt_click);
     bind_function('#rerun_memory', async (e) => {
         await summarize_chat(true);  // rerun summarization, replacing existing summaries
         refresh_memory();  // refresh the memory (and the display) when finished
@@ -1478,12 +1505,24 @@ function setup_settings_listeners() {
 
     bind_function('#preview_memory_state', async () => {
         let text = refresh_memory()
+        text = `...\n\n${text}\n\n...`
         display_text_modal("Memory State Preview", text);
+    })
+    bind_function('#edit_summary_prompt', async () => {
+        get_user_setting_text_input('prompt', 'Edit Summary Prompt')
     })
     bind_function('#preview_summary_prompt', async () => {
         let text = create_summary_prompt(getContext().chat.length-1)
         display_text_modal("Summary Prompt Preview (Last Message)", text);
     })
+    bind_function('#edit_long_term_memory_prompt', async () => {
+        get_user_setting_text_input('long_template', 'Edit Long-Term Memory Prompt')
+    })
+    //bind_function('#preview_long_term_memory', async () => {display_text_modal("Long-Term Memory Preview", get_long_memory())})
+    bind_function('#edit_short_term_memory_prompt', async () => {
+        get_user_setting_text_input('short_template', 'Edit Short-Term Memory Prompt')
+    })
+    //bind_function('#preview_short_term_memory', async () => {display_text_modal("Short-Term Memory Preview", get_short_memory())})
     bind_function('#preview_message_history', async () => {
         let chat = getContext().chat;
         let history = get_message_history(chat.length-1);
@@ -1502,7 +1541,6 @@ function setup_settings_listeners() {
     bind_setting('#summarization_delay', 'summarization_delay', 'number');
     bind_setting('#include_world_info', 'include_world_info', 'boolean');
     bind_setting('#block_chat', 'block_chat', 'boolean');
-    bind_setting('#prompt', 'prompt');
     bind_setting('#include_user_messages', 'include_user_messages', 'boolean');
     bind_setting('#include_system_messages', 'include_system_messages', 'boolean');
     bind_setting('#include_thought_messages', 'include_thought_messages', 'boolean');
@@ -1515,7 +1553,6 @@ function setup_settings_listeners() {
     bind_setting('#include_message_history_mode', 'include_message_history_mode', 'text');
     bind_setting('#include_user_messages_in_history', 'include_user_messages_in_history', 'boolean');
 
-    bind_setting('#short_template', 'short_template');
     bind_setting('input[name="short_term_position"]', 'short_term_position', 'number');
     bind_setting('#short_term_depth', 'short_term_depth', 'number');
     bind_setting('#short_term_role', 'short_term_role');
@@ -1524,7 +1561,6 @@ function setup_settings_listeners() {
         $('#short_term_context_limit_display').text(get_short_token_limit());
     });
 
-    bind_setting('#long_template', 'long_template');
     bind_setting('input[name="long_term_position"]', 'long_term_position', 'number');
     bind_setting('#long_term_depth', 'long_term_depth', 'number');
     bind_setting('#long_term_role', 'long_term_role');
@@ -1638,7 +1674,6 @@ jQuery(async function () {
 
     // Set up settings UI
     $("#extensions_settings2").append(await $.get(`${MODULE_DIR}/settings.html`));  // load html
-    $("h4").append(`<span class="version_id">v${VERSION}</span>`)   // add version number to each header
 
     // setup UI listeners for settings UI
     setup_settings_listeners();
@@ -1718,7 +1753,5 @@ jQuery(async function () {
     }));
 
     // Macros
-    MacrosParser.registerMacro(short_memory_macro, () => get_short_memory());
-    MacrosParser.registerMacro(long_memory_macro, () => get_long_memory());
     MacrosParser.registerMacro("words", () => get_settings('summary_maximum_length'));
 });

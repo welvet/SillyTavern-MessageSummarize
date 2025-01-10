@@ -49,7 +49,8 @@ Cons, with attempted solutions:
 - ~~Fix issue causing the popout to bug out when pressing escape.~~
 - ~~Ability to edit summaries.~~
 - ~~Figure out how to limit the number of regular chat messages injected into the prompt so they can be replaced by the summaries.~~
-- support group chats
+- ~~Move the prompt editing text areas to separate modals~~
+- ~~support group chats~~
 - ~~Add macro for max words to use in the summary prompt~~
 - Set the frequency at which automatic summarizations occur (every X messages)
 - ~~Allow disabling extension in individual chats without giving it a profile.~~
