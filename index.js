@@ -11,12 +11,14 @@ import {
     generateQuietPrompt,
     is_send_press,
     saveSettingsDebounced,
+    substituteParams,
     substituteParamsExtended,
     generateRaw,
     getMaxContextSize,
     setExtensionPrompt,
     streamingProcessor,
-    stopGeneration
+    stopGeneration,
+    callPopup
 } from '../../../../script.js';
 import { formatInstructModeChat } from '../../../instruct-mode.js';
 import { Popup } from '../../../popup.js';
@@ -56,10 +58,17 @@ Responses should be no more than {{words}} words.
 Include names when possible.
 Response must be in the past tense.
 Your response must ONLY contain the summary.
-Text to Summarize:
+
+{{#if history}}
+Following is a history of messages:
+{{history}}
+{{/if}}
+
+Following is the message to summarize:
+{{message}}
 `
-const default_long_template = `[Following is a list of events that occurred in the past]:\n{{${long_memory_macro}}}`
-const default_short_template = `[Following is a list of recent events]:\n{{${short_memory_macro}}}`
+const default_long_template = `{{#if ${long_memory_macro}}}\n[Following is a list of events that occurred in the past]:\n{{${long_memory_macro}}}\n{{/if}}`
+const default_short_template = `{{#if ${short_memory_macro}}}\n[Following is a list of recent events]:\n{{${short_memory_macro}}}\n{{/if}}`
 const default_settings = {
     // inclusion criteria
     message_length_threshold: 10,  // minimum message token length for summarization
@@ -76,8 +85,12 @@ const default_settings = {
     prompt: default_prompt,
     block_chat: true,  // block input when summarizing
     summary_maximum_length: 30,  // maximum token length of the summary
-    include_last_user_message: false,  // include the last user message in the summarization prompt
-    nest_messages_in_prompt: true,  // nest messages to summarize in the prompt for summarization
+    nest_messages_in_prompt: false,  // nest messages to summarize in the prompt for summarization
+    include_message_history: 0,  // include a number of previous messages in the prompt for summarization
+    include_message_history_mode: 'messages_and_summaries',  // mode for including message history in the prompt
+    include_user_messages_in_history: false,  // include previous user message in the summarization prompt when including message history
+    include_system_messages_in_history: false,  // include previous system messages in the summarization prompt when including message history
+    include_thought_messages_in_history: false,  // include previous thought messages in the summarization prompt when including message history
 
     // injection settings
     long_template: default_long_template,
@@ -124,7 +137,7 @@ function debug(message) {
     }
 }
 function error(message) {
-    log("[ERROR] "+message);
+    console.error(`[${MODULE_NAME_FANCY}]`, message);
 }
 
 const saveChatDebounced = debounce(() => getContext().saveChat(), debounce_timeout.relaxed);
@@ -280,11 +293,6 @@ function bind_setting(selector, key, type=null, callback=null, disable=true) {
     // default trigger for a settings update is on a "change" event
     let trigger = 'change';
 
-    // If a textarea, instead make every keypress triggers an update
-    if (element.is('textarea')) {
-        trigger = 'input';
-    }
-
     // Set the UI element to the current setting value
     set_setting_ui_element(key, element, type);
 
@@ -307,8 +315,8 @@ function bind_setting(selector, key, type=null, callback=null, disable=true) {
             callback(value);
         }
 
-        // update the save icon highlight
-        update_save_icon_highlight();
+        // update all other settings UI elements
+        refresh_settings()
 
         // refresh memory state (update message inclusion criteria, etc)
         if (trigger === 'change') {
@@ -375,16 +383,46 @@ function refresh_settings() {
         choose_profile_dropdown.val(current_character_profile);
     }
 
+    // if prompt doesn't have {{message}}, insert it
+    if (!get_settings('prompt').includes("{{message}}")) {
+        set_settings('prompt', get_settings('prompt') + "\n{{message}}")
+        //toastr.warning("You did not have the {{message}} macro in your summary prompt. It has been added automatically.")
+    }
+
+    // enable or disable settings based
+    if (chat_enabled()) {
+        $('.settings_input').prop('disabled', false);  // enable all settings
+
+        // when auto-summarize is disabled, summarize_before_generation and summarization_delay get disabled
+        let auto_summarize = get_settings('auto_summarize');
+        $('#summarization_delay').prop('disabled', !auto_summarize);
+        $('#summarize_before_generation').prop('disabled', !auto_summarize);
+
+        // If message history is disabled, disable the relevant settings
+        let history_disabled = get_settings('include_message_history_mode') === "none";
+        $('#include_message_history').prop('disabled', history_disabled);
+        $('#include_user_messages_in_history').prop('disabled', history_disabled);
+        $('#preview_message_history').prop('disabled', history_disabled);
+        //$('#include_system_messages_in_history').prop('disabled', disabled);
+        //$('#include_thought_messages_in_history').prop('disabled', disabled);
+        if (!history_disabled && !get_settings('prompt').includes("{{history}}")) {
+            toastr.warning("To include message history, you must use the {{history}} macro in the prompt.")
+        }
+
+        // If auto-summarization delay is above zero, disable auto-resummarization after swipe/regenerate
+        // $('#auto_summarize_on_swipe').prop('disabled', get_settings('summarization_delay') > 0);
+
+    } else {  // memory is disabled for this chat
+        $('.settings_input').prop('disabled', true);  // disable all settings
+    }
+
+    // update the save icon highlight
+    update_save_icon_highlight();
+
     // iterate through the settings map and set each element to the current setting value
     for (let [key, [element, type]] of Object.entries(settings_ui_map)) {
         set_setting_ui_element(key, element, type);
     }
-
-    // iterate through all settings UI items and disable them if chat is disabled
-    $('.settings_input').prop('disabled', !chat_enabled());
-
-    // update the save icon highlight
-    update_save_icon_highlight();
 }
 function bind_function(selector, func, disable=true) {
     // bind a function to an element (typically a button or input)
@@ -604,13 +642,8 @@ function load_character_profile() {
 
 
 // UI functions
-function set_memory_display(text='') {
-    let display = $('#memory_display');
-    display.val(text);
-    display.scrollTop(display[0].scrollHeight);
-}
 function on_restore_prompt_click() {
-    $('#prompt').val(default_prompt).trigger('input');
+    $('#prompt').val(default_prompt).trigger('input').trigger('change');
 }
 function get_message_div(index) {
     // given a message index, get the div element for that message
@@ -771,6 +804,14 @@ function initialize_message_buttons() {
     $(document).on("click", ".mes_unhide", refresh_memory);
 
 
+}
+async function display_text_modal(title, text) {
+    // Display a modal with the given title and text
+
+    // replace newlines in text with <br> for HTML
+    text = text.replace(/\n/g, '<br>');
+    let html = `<h2>${title}</h2><div style="text-align: left; overflow: auto;">${text}</div>`
+    const popupResult = await callPopup(html, 'text', undefined, { okButton: `Close` });
 }
 
 
@@ -982,67 +1023,9 @@ globalThis.memory_intercept_messages = function (chat, _contextSize, _abort, typ
     }
 };
 
+
+
 // Summarization
-async function summarize_text(text) {
-    let prompt = get_settings('prompt');
-    prompt = substituteParamsExtended(prompt);  // substitute any macro parameters in the prompt
-
-    let ignore_instruct_template = false;
-
-    if (get_settings('nest_messages_in_prompt')) {
-        // Add the text to the prompt
-        text = `${prompt}\n${text}`
-
-        // then wrap it in the system prompt
-        text = formatInstructModeChat("", text, false, true, "", "", "", null)
-    } else {
-        // wrap the main prompt only as a system message
-        prompt = formatInstructModeChat("", prompt, false, true, "", "", "", null)
-
-        // then add the text after it
-        text = `${prompt}\n${text}`
-    }
-
-    // get size of text
-    let token_size = count_tokens(text);
-
-    let context_size = get_context_size();
-    if (token_size > context_size) {
-        error(`Text ${token_size} exceeds context size ${context_size}.`);
-    }
-
-    let include_world_info = get_settings('include_world_info');
-    if (include_world_info) {
-        /**
-         * Background generation based on the provided prompt.
-         * @param {string} quiet_prompt Instruction prompt for the AI
-         * @param {boolean} quietToLoud Whether the message should be sent in a foreground (loud) or background (quiet) mode
-         * @param {boolean} skipWIAN whether to skip addition of World Info and Author's Note into the prompt
-         * @param {string} quietImage Image to use for the quiet prompt
-         * @param {string} quietName Name to use for the quiet prompt (defaults to "System:")
-         * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
-         * @returns
-         */
-        return await generateQuietPrompt(text, false, false, '', "assistant", get_settings('summary_maximum_length'));
-    } else {
-        /**
-         * Generates a message using the provided prompt.
-         * @param {string} prompt Prompt to generate a message from
-         * @param {string} api API to use. Main API is used if not specified.
-         * @param {boolean} instructOverride true to override instruct mode, false to use the default value
-         * @param {boolean} quietToLoud true to generate a message in system mode, false to generate a message in character mode
-         * @param {string} [systemPrompt] System prompt to use. Only Instruct mode or OpenAI.
-         * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
-         * @returns {Promise<string>} Generated message
-         */
-
-        // append the assistant starting message template to the text, replacing the name with "assistant" if needed
-        let output_sequence = substituteParamsExtended(power_user.instruct.output_sequence, {name: "assistant"});
-        text = `${text}\n${output_sequence}`
-
-        return await generateRaw(text, '', true, false, '', get_settings('summary_maximum_length'));
-    }
-}
 
 /**
  * Summarize a message and save the summary to the message object.
@@ -1068,49 +1051,15 @@ async function summarize_message(index=null, replace=false) {
     // A full visual update with style should be done on the whole chat after inclusion criteria have been recalculated
     update_message_visuals(index, false, "Summarizing...")
 
-    let messages_to_include = []
-
-    // Add the last user message to the prompt if enabled
-    if (get_settings('include_last_user_message')) {
-        let last_message = chat[index-1]
-        if (last_message && last_message.is_user) {
-            messages_to_include.push(last_message)
-        }
-    }
-
-    messages_to_include.push(message)
-
-    // Create the text to summarize
-    let texts = []
-    for (let m of messages_to_include) {
-        /**
-         * [FROM ST REPO]
-         * Formats instruct mode chat message.
-         * @param {string} name Character name.
-         * @param {string} mes Message text.
-         * @param {boolean} isUser Is the message from the user.
-         * @param {boolean} isNarrator Is the message from the narrator.
-         * @param {string} forceAvatar Force avatar string.
-         * @param {string} name1 User name.
-         * @param {string} name2 Character name.
-         * @param {boolean|number} forceOutputSequence Force to use first/last output sequence (if configured).
-         * @returns {string} Formatted instruct mode chat message.
-         */
-        let ctx = getContext()
-        let text = formatInstructModeChat(m.name, m.mes, m.is_user, false, "", ctx.name1, ctx.name2, null)
-        texts.push(text)
-    }
-
-    // join the messages with newlines
-    let text = texts.join('\n\n')
+    // construct the full summary prompt for the message
+    let prompt = create_summary_prompt(index)
 
     // summarize it
-    debug(`Summarizing message ${index}...`)
-
     let summary;
     let err = null;
     try {
-        summary = await summarize_text(text)
+        debug(`Summarizing message ${index}...`)
+        summary = await summarize_text(prompt)
     } catch (e) {
         if (e === "Clicked stop button") {  // summarization was aborted
             err = "Summarization aborted"
@@ -1130,15 +1079,199 @@ async function summarize_message(index=null, replace=false) {
         store_memory(message, 'memory', null);  // clear the memory if generation failed
     }
 
-    // update the message summary text again, still no styling
+    // update the message summary text again now with the memory, still no styling
     update_message_visuals(index, false)
 }
+async function summarize_text(prompt) {
+    // get size of text
+    let token_size = count_tokens(prompt);
+
+    let context_size = get_context_size();
+    if (token_size > context_size) {
+        error(`Text ${token_size} exceeds context size ${context_size}.`);
+    }
+
+    let include_world_info = get_settings('include_world_info');
+    if (include_world_info) {
+        /**
+         * Background generation based on the provided prompt.
+         * @param {string} quiet_prompt Instruction prompt for the AI
+         * @param {boolean} quietToLoud Whether the message should be sent in a foreground (loud) or background (quiet) mode
+         * @param {boolean} skipWIAN whether to skip addition of World Info and Author's Note into the prompt
+         * @param {string} quietImage Image to use for the quiet prompt
+         * @param {string} quietName Name to use for the quiet prompt (defaults to "System:")
+         * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
+         * @returns
+         */
+        return await generateQuietPrompt(prompt, false, false, '', "assistant", get_settings('summary_maximum_length'));
+    } else {
+        /**
+         * Generates a message using the provided prompt.
+         * @param {string} prompt Prompt to generate a message from
+         * @param {string} api API to use. Main API is used if not specified.
+         * @param {boolean} instructOverride true to override instruct mode, false to use the default value
+         * @param {boolean} quietToLoud true to generate a message in system mode, false to generate a message in character mode
+         * @param {string} [systemPrompt] System prompt to use. Only Instruct mode or OpenAI.
+         * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
+         * @returns {Promise<string>} Generated message
+         */
+        return await generateRaw(prompt, '', true, false, '', get_settings('summary_maximum_length'));
+    }
+}
+function get_message_history(index) {
+    // Get a history of messages leading up to the given index (excluding the message at the index)
+    // If the include_message_history setting is 0, returns null
+    let num_history_messages = get_settings('include_message_history');
+    let mode = get_settings('include_message_history_mode');
+    if (num_history_messages === 0 || mode === "none") {
+        return;
+    }
+
+    let ctx = getContext()
+    let chat = ctx.chat
+
+    let num_included = 0;
+    let history = []
+    for (let i = index-1; num_included < num_history_messages && i>=0; i--) {
+        let m = chat[i];
+        let include = true
+        if (m.is_user && !get_settings('include_user_messages_in_history')) {
+            include = false;
+        } else if (m.is_system && !get_settings('include_system_messages_in_history')) {
+            include = false;
+        } else if (m.is_thoughts && !get_settings('include_thought_messages_in_history')) {
+            include = false;
+        }
+
+        if (!include) continue;
+
+        let included = false
+        if (mode === "summaries_only" || mode === "messages_and_summaries") {
+            let summary = get_memory(m, 'memory')
+            if (summary) {
+                summary = `Summary: ${summary}`
+                history.push(formatInstructModeChat("assistant", summary, false, false, "", "", "", null))
+                included = true
+            }
+        }
+        if (mode === "messages_only" || mode === "messages_and_summaries") {
+            history.push(formatInstructModeChat(m.name, m.mes, m.is_user, false, "", ctx.name1, ctx.name2, null))
+            included = true
+        }
+
+        if (included) {
+            num_included++
+        }
+    }
+
+    // reverse the history so that the most recent message is first
+    history.reverse()
+
+    // join with newlines
+    return history.join('\n')
+}
+function format_system_prompt(text) {
+    // Given text with some number of {{macro}} items, split the text by these items and format the rest as system messages surrounding the macros
+    // It is assumed that the parts will be later replaced with appropriate text
+
+    // split on either {{...}} or {{#if ... /if}}.
+    // /g flag is for global, /s flag makes . match newlines so the {{#if ... /if}} can span multiple lines
+    let parts = text.split(/(\{\{#if.*?\/if}})|(\{\{.*?}})/gs);
+
+    let formatted = parts.map((part) => {
+        if (!part) return ""
+        part = part.trim()  // trim whitespace
+        if (part.startsWith('{{') && part.endsWith('}}')) {
+            return part  // don't format macros
+        }
+        let formatted = formatInstructModeChat("assistant", part, false, true, "", "", "", null)
+        return `${formatted}`
+    })
+    return formatted.join('')
+}
+function substitute_conditionals(text, params) {
+    // substitute any {{#if macro}} ... {{/if}} blocks in the text with the corresponding content if the macro is present in the params object.
+    // Does NOT replace the actual macros, that is done in substitute_params()
+
+    let parts = text.split(/(\{\{#if.*?\/if}})/gs);
+    let formatted = parts.map((part) => {
+        if (!part) return ""
+        if (!part.startsWith('{{#if')) return part
+        part = part.trim()  // clean whitespace
+        let macro_name = part.match(/\{\{#if (.*?)}}/)[1]
+        let macro_present = Boolean(params[macro_name]?.trim())
+        let conditional_content = part.match(/\{\{#if.*?}}(.*?)\{\{\/if}}/s)[1] ?? ""
+        return macro_present ? conditional_content : ""
+    })
+    return formatted.join('')
+}
+function substitute_params(text, params) {
+    // custom function to parse macros because I literally cannot find where ST does it in their code.
+    // Does NOT take into account {{#if macro}} ... {{/if}} blocks, that is done in substitute_conditionals()
+    // If the macro is not found in the params object, it is replaced with an empty string
+
+    let parts = text.split(/(\{\{.*?}})/g);
+    let formatted = parts.map((part) => {
+        if (!part) return ""
+        if (!part.startsWith('{{') || !part.endsWith('}}')) return part
+        part = part.trim()  // clean whitespace
+        let macro = part.slice(2, -2)
+        return params[macro] ?? ""
+    })
+    return formatted.join('')
+}
+function create_summary_prompt(index) {
+    // create the full summary prompt for the message at the given index
+
+    let context = getContext()
+    let chat = context.chat
+    let message = chat[index];
+
+    // get history of messages (formatted as system messages) leading up to the message
+    let history_text = get_message_history(index);
+
+    // format the message itself
+    let message_text = formatInstructModeChat(message.name, message.mes, message.is_user, false, "", context.name1, context.name2, null)
+
+    // get the full prompt template from settings
+    let prompt = get_settings('prompt');
+
+    // first substitute any global macros like {{words}}, {{persona}}, {{char}}, etc...
+    prompt = substituteParamsExtended(prompt)
+
+    // then substitute any {{#if macro}} ... {{/if}} blocks
+    prompt = substitute_conditionals(prompt, {"message": message_text, "history": history_text})
+
+    // The conditional substitutions have to be done before splitting and making each section a system prompt, because the conditional content may contain regular text
+    //  that should be included in the system prompt.
+
+    // if nesting
+    if (get_settings('nest_messages_in_prompt')) {
+        // substitute custom macros
+        prompt = substitute_params(prompt, {"message": message_text, "history": history_text});  // substitute "message" and "history" macros
+
+        // then wrap it in the system prompt
+        prompt = formatInstructModeChat("", prompt, false, true, "", "", "", null)
+    } else {  // otherwise
+        // first make each prompt section its own system prompt
+        prompt = format_system_prompt(prompt)
+
+        // now substitute the custom macros
+        prompt = substitute_params(prompt, {"message": message_text, "history": history_text});  // substitute "message" and "history" macros
+    }
+
+    // append the assistant starting message template to the text, replacing the name with "assistant" if needed
+    let output_sequence = substituteParamsExtended(power_user.instruct.output_sequence, {name: "assistant"});
+    prompt = `${prompt}\n${output_sequence}\nSummary:`
+
+    return prompt
+}
+
 
 function refresh_memory() {
     if (!chat_enabled()) { // if chat not enabled, remove the injections
         setExtensionPrompt(`${MODULE_NAME}_long`, "");
         setExtensionPrompt(`${MODULE_NAME}_short`, "");
-        set_memory_display("Memory is disabled for this chat.")  // update the memory display
         return;
     }
 
@@ -1150,8 +1283,15 @@ function refresh_memory() {
     let long_template = get_settings('long_template')
     let short_template = get_settings('short_template')
 
-    let long_injection = substituteParamsExtended(long_template, {[long_memory_macro]: long_memory});
-    let short_injection = substituteParamsExtended(short_template, {[short_memory_macro]: short_memory});
+    // substitute any global macros
+    let long_injection = substituteParamsExtended(long_template);
+    let short_injection = substituteParamsExtended(short_template);
+
+    // handle the #if macros using our custom function because ST DOESN'T EXPOSE THEIRS FOR SOME REASON
+    long_injection = substitute_conditionals(long_injection, {[long_memory_macro]: long_memory});
+    long_injection = substitute_params(long_injection, {[long_memory_macro]: long_memory});
+    short_injection = substitute_conditionals(short_injection, {[short_memory_macro]: short_memory});
+    short_injection = substitute_params(short_injection, {[short_memory_macro]: short_memory});
 
     // inject the memories into the templates, if they exist
     if (long_memory) {
@@ -1162,7 +1302,7 @@ function refresh_memory() {
         setExtensionPrompt(`${MODULE_NAME}_short`, short_injection, get_settings('short_term_position'), get_settings('short_term_depth'), get_settings('short_term_scan'), get_settings('short_term_role'));
     }
 
-    set_memory_display(`${long_injection}\n\n${short_injection}`)  // update the memory display
+    return `${long_injection}\n${short_injection}`  // return the concatenated memory text
 }
 const refresh_memory_debounced = debounce(refresh_memory, debounce_timeout.relaxed);
 
@@ -1172,7 +1312,6 @@ function stop_summarization() {
     stopGeneration();  // stop generation on current message
     log("Aborted summarization.")
 }
-
 async function summarize_chat(replace=false) {
     // Perform summarization on the entire chat, optionally replacing existing summaries
     log('Summarizing chat...')
@@ -1287,7 +1426,7 @@ async function on_chat_event(event=null, id=null) {
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
             if (!get_settings('auto_summarize_on_edit')) break;  // if auto-summarize on edit is disabled, skip
             debug("Message edited, summarizing")
-            summarize_message(i, true);  // summarize that message, replacing existing summary
+            summarize_message(id, true);  // summarize that message, replacing existing summary
             break;
 
         case 'message_swiped':  // when this event occurs, don't do anything (a new_message event will follow)
@@ -1331,13 +1470,25 @@ function setup_settings_listeners() {
 
     bind_function('#prompt_restore', on_restore_prompt_click);
     bind_function('#rerun_memory', async (e) => {
-        set_memory_display("Summarizing...");  // clear the memory display
         await summarize_chat(true);  // rerun summarization, replacing existing summaries
         refresh_memory();  // refresh the memory (and the display) when finished
     })
-    bind_function('#refresh_memory', refresh_memory);
     bind_function('#stop_summarization', stop_summarization);
     bind_function('#revert_settings', reset_settings);
+
+    bind_function('#preview_memory_state', async () => {
+        let text = refresh_memory()
+        display_text_modal("Memory State Preview", text);
+    })
+    bind_function('#preview_summary_prompt', async () => {
+        let text = create_summary_prompt(getContext().chat.length-1)
+        display_text_modal("Summary Prompt Preview (Last Message)", text);
+    })
+    bind_function('#preview_message_history', async () => {
+        let chat = getContext().chat;
+        let history = get_message_history(chat.length-1);
+        display_text_modal("{{history}} Macro Preview (Last Message)", history);
+    })
 
     // todo
     //bind_function('#dump_to_lorebook', dump_memories_to_lorebook);
@@ -1345,11 +1496,7 @@ function setup_settings_listeners() {
 
     bind_setting('#profile', 'profile', 'text', () => load_profile(), false);
 
-    bind_setting('#auto_summarize', 'auto_summarize', 'boolean', (val) => {
-        // when disabled, summarize_before_generation and summarization_delay get disabled
-        $('#summarization_delay').prop('disabled', !val);
-        $('#summarize_before_generation').prop('disabled', !val);
-    });
+    bind_setting('#auto_summarize', 'auto_summarize', 'boolean');
     bind_setting('#auto_summarize_on_edit', 'auto_summarize_on_edit', 'boolean');
     bind_setting('#auto_summarize_on_swipe', 'auto_summarize_on_swipe', 'boolean');
     bind_setting('#summarization_delay', 'summarization_delay', 'number');
@@ -1362,8 +1509,11 @@ function setup_settings_listeners() {
 
     bind_setting('#message_length_threshold', 'message_length_threshold', 'number');
     bind_setting('#summary_maximum_length', 'summary_maximum_length', 'number');
-    bind_setting('#include_last_user_message', 'include_last_user_message', 'boolean')
     bind_setting('#nest_messages_in_prompt', 'nest_messages_in_prompt', 'boolean')
+
+    bind_setting('#include_message_history', 'include_message_history', 'number');
+    bind_setting('#include_message_history_mode', 'include_message_history_mode', 'text');
+    bind_setting('#include_user_messages_in_history', 'include_user_messages_in_history', 'boolean');
 
     bind_setting('#short_template', 'short_template');
     bind_setting('input[name="short_term_position"]', 'short_term_position', 'number');
@@ -1391,9 +1541,6 @@ function setup_settings_listeners() {
     // trigger the change event once to update the display at start
     $('#long_term_context_limit').trigger('change');
     $('#short_term_context_limit').trigger('change');
-
-    // set current memory state as a ui element
-    $('#memory_display').addClass('settings_input');
 
     refresh_settings()
 }

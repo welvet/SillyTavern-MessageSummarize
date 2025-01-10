@@ -45,7 +45,7 @@ Cons, with attempted solutions:
 - ~~Added the ability to choose whether to nest the messages in the summarization prompt or not~~
 - ~~Added the ability to toggle automatic summarization on message edit and swipe/regenerate~~
 - ~~Added summarization delay option~~
-- Fix issue that is sometimes inadvertently changing the completion config max tokens for some reason.
+- Fix issue that is sometimes inadvertently changing the completion config max tokens when reloading for some reason???
 - ~~Fix issue causing the popout to bug out when pressing escape.~~
 - ~~Ability to edit summaries.~~
 - ~~Figure out how to limit the number of regular chat messages injected into the prompt so they can be replaced by the summaries.~~
@@ -53,8 +53,7 @@ Cons, with attempted solutions:
 - ~~Add macro for max words to use in the summary prompt~~
 - Set the frequency at which automatic summarizations occur (every X messages)
 - ~~Allow disabling extension in individual chats without giving it a profile.~~
-- Maybe include a few previous messages (or summaries) in the summary prompt, and specify that it should only include NEW events? 
-This could aid in consistency and avoid duplicate info. Might also have to opposite effect though.
+- ~~Add option to include a few previous messages/summaries in the summary prompt as context~~
 - Add a button to transfer all summaries marked for long-term memory into a lorebook entry
 - Custom exclusion criteria for messages?
 - Need to detect when more messages are loaded into the chat via the "load more message" button, and update the message visuals to display any memories on them. Annoyingly, no event seems to be fired when the chat updates this way (that I could find).
@@ -86,8 +85,8 @@ Try them out and see what works best.
 State only events that will need to be remembered in the future.
 Include names when possible.
 Response must be in the past tense.
-Maintain the same point of view as the text (i.e. if the text uses "you", use "your" in the response). If an observer is unspecified, assume it is "you".
-Your response must ONLY contain the summary. If there is nothing worth summarizing, do not respond.
+Limit responses to {{words}} words or less.
+Your response must ONLY contain the summary.
 Text to Summarize:"
 
 Other Options:

@@ -5,14 +5,8 @@
     margin: 0 5px;
 }
 
-#qvink_memory_settings {
-    display: flex;
-    flex-direction: column;
-}
-
-#qvink_memory_settings textarea {
-    font-size: calc(var(--mainFontSize) * 0.9);
-    line-height: 1.2;
+#drawer_content > hr {
+    margin-top: 10px;
 }
 
 .disabled_hint {

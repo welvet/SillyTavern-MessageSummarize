@@ -15,6 +15,10 @@
                 <div class="flex-container justifyspacebetween alignitemscenter">
                     <button id="toggle_chat_memory" class="menu_button flex1" title="Toggle whether memory is enabled for this chat specifically (overrides all settings)."><span>Toggle Chat Memory</span></button>
                 </div>
+                <div class="flex-container justifyspacebetween alignitemscenter">
+                    <button id="preview_memory_state" class="menu_button flex1 margin0">Preview Current Memory State</button>
+                </div>
+
                 <hr>
 
                 <h4 class="textAlignCenter">Active Settings Profile <i class="fa-solid fa-info-circle" title="Create, edit, and save configuration profiles for this extension."></i></h4>
@@ -28,15 +32,6 @@
                     <button id="character_profile" class="menu_button fa-solid fa-lock interactable" title="Set as default profile for current character" tabindex="0"></button>
                 </div>
 
-                <hr>
-                <h4 class="textAlignCenter">Current Memory State <i class="fa-solid fa-info-circle" title="The current state of memory for this chat. Updates automatically as additional memory is added."></i></h4>
-
-                <textarea id="memory_display" class="text_pole textarea_compact" rows="6" placeholder="Current memory injection will display here" readonly></textarea>
-                <div class="flex-container justifyspacebetween alignitemscenter">
-                    <button id="refresh_memory" class="menu_button flex1 margin0" title="Reload memory from current chat state (does NOT re-summarize, just refreshes which messages are included based on current inclusion criteria)">
-                        <span>Refresh</span>
-                    </button>
-                </div>
 
                 <!-- Short-term memory -->
                 <hr>
@@ -46,20 +41,20 @@
                 </div>
                 <label for="include_user_messages" title="Include user message summaries in memory." class="checkbox_label">
                     <input id="include_user_messages" type="checkbox" />
-                    <span>Include User Messages</span>
+                    <span>Summarize User Messages</span>
                 </label>
 
                 <label for="include_system_messages" title="Include system message summaries in memory." class="checkbox_label">
                     <input id="include_system_messages" type="checkbox" />
-                    <span>Include System Messages</span>
+                    <span>Summarize System Messages</span>
                 </label>
 
                 <label for="include_thought_messages" title="Include thought message summaries in memory (from the Stepped Thinking extension)." class="checkbox_label">
                     <input id="include_thought_messages" type="checkbox" />
-                    <span>Include Thought Message</span>
+                    <span>Summarize Thought Message</span>
                 </label>
 
-                <label for="message_length_threshold" title="The minimum token length a message has to be in order to get included.">
+                <label for="message_length_threshold" title="The minimum token length a message has to be in order to get summarized.">
                     <input id="message_length_threshold" class="text_pole widthUnset" type="number" min="0" max="999" />
                     <span>Message Length Threshold</span>
                 </label>
@@ -152,45 +147,32 @@
                 </div>
                 <label for="prompt" class="title_restorable">
                     <span>Summary Prompt</span>
+                    <button id="preview_summary_prompt" title="Preview the summary prompt as it is injected" class="menu_button">Preview</button>
                     <button id="prompt_restore" title="Restore default prompt" class="menu_button">
                         <div class="fa-solid fa-clock-rotate-left"></div>
                     </button>
                 </label>
                 <textarea id="prompt" class="text_pole textarea_compact" rows="6" placeholder="You are a summarization assistant..." title="The prompt for generating summaries of individual messages. When this changes, only new summaries made will use it. To re-generate summaries, click 'Regenerate All Memories'. You can use global macros to insert additional info, like {{description}}, {{persona}}, and {{scenario}}. The maximum summary length defined below can be inserted with {{words}}."></textarea>
 
-                <label for="auto_summarize" title="New messages will be summarized after being sent." class="checkbox_label">
-                    <input id="auto_summarize" type="checkbox" />
-                    <span>Automatically Summarize New Messages</span>
+                <label for="summary_maximum_length" title="The maximum token length a summary is allowed to be before cutting it off. Use the {{words}} macro in the summarization prompt to get this value.">
+                    <input id="summary_maximum_length" class="text_pole widthUnset" type="number" min="0" max="999" />
+                    <span>Summary Max Token Length</span>
                 </label>
 
-                <label for="summarization_delay" title="Number of messages to delay summarization (0 summarizes immediately after sending, 1 waits for one message, etc.)">
-                    <input id="summarization_delay" class="text_pole widthUnset" type="number" min="0" max="99" />
-                    <span> Auto-Summarization Delay</span>
+                <label for="auto_summarize" title="New messages will be automatically summarized after being sent." class="checkbox_label">
+                    <input id="auto_summarize" type="checkbox" />
+                    <span>Auto Summarize with delay</span>
+                    <input id="summarization_delay" class="text_pole widthUnset inline_setting" type="number" min="0" max="99" title="Number of messages to delay summarization (0 summarizes the message you just sent, 1 lags behind by one message, etc.)" />
                 </label>
 
                 <label for="auto_summarize_on_edit" title="Editing a message will automatically trigger a re-summarization." class="checkbox_label">
                     <input id="auto_summarize_on_edit" type="checkbox" />
-                    <span>Automatically Re-summarize on Edit</span>
+                    <span>Auto Re-summarize on Edit</span>
                 </label>
 
-                <label for="auto_summarize_on_swipe" title="Swiping or regenerating a message will automatically trigger a re-summarization" class="checkbox_label">
+                <label for="auto_summarize_on_swipe" title="Swiping or regenerating a message will automatically trigger a re-summarization. Not applicable if auto-summary delay is above 0." class="checkbox_label">
                     <input id="auto_summarize_on_swipe" type="checkbox" />
-                    <span>Automatically Re-summarize on Swipe/Regenerate</span>
-                </label>
-
-                <label for="nest_messages_in_prompt" title="The message to summarize will be inside the summarization prompt itself. In unchecked, the message will instead be added separately after the prompt." class="checkbox_label">
-                    <input id="nest_messages_in_prompt" type="checkbox" />
-                    <span>Nest Message in Summary Prompt</span>
-                </label>
-
-                <label for="include_world_info" title="WARNING: doesn't work great. Attempts to preserve context-shifting by including all the content that is sent in regular prompts (world info, description, personas, example messages, message history, etc). If your regular prompts are static, this can allow Context Shifting to work between summarizations, but it decreases the accuracy of summarization due to all the extra stuff in the prompt." class="checkbox_label">
-                    <input id="include_world_info" type="checkbox" />
-                    <span>Include All Context Content</span>
-                </label>
-
-                <label for="include_last_user_message" title="Include the previous user message when summarizing assistant messages." class="checkbox_label">
-                    <input id="include_last_user_message" type="checkbox" />
-                    <span>Include Last User Message</span>
+                    <span>Auto Re-summarize on Swipe/Regenerate</span>
                 </label>
 
                 <label for="block_chat" title="Block chat input while summarizing." class="checkbox_label">
@@ -198,9 +180,40 @@
                     <span>Block Chat</span>
                 </label>
 
-                <label for="summary_maximum_length" title="The maximum token length a summary is allowed to be before cutting it off. Use the {{words}} macro in the summarization prompt to get this value.">
-                    <input id="summary_maximum_length" class="text_pole widthUnset" type="number" min="0" max="999" />
-                    <span>Summary Max Length</span>
+                <br>
+
+                <div class="flex-container justifyspacebetween">
+                    <label for="include_message_history_mode" title="Whether to use messages and/or summaries as context for summarization. You must use {{history}} in the summary prompt." class="checkbox_label">
+                        <span>Message History </span>
+                        <select id="include_message_history_mode" class="text_pole flex2">
+                            <option value="none">None</option>
+                            <option value="messages_only">Messages</option>
+                            <option value="summaries_only">Summaries</option>
+                            <option value="messages_and_summaries">Both</option>
+                        </select>
+                    </label>
+                    <button id="preview_message_history" class="menu_button fa-solid fa-eye interactable" title="Preview what the message history will look like"></button>
+                </div>
+
+                <label for="include_message_history" title="How many previous messages to include in the summarization prompt as context.">
+                    <input id="include_message_history" class="text_pole widthUnset" type="number" min="0" max="99" />
+                    <span>Number of Previous Messages</span>
+                </label>
+
+                <label for="include_user_messages_in_history" title="When including previous messages, also include user messages." class="checkbox_label">
+                    <input id="include_user_messages_in_history" type="checkbox" />
+                    <span>Include Previous User Messages</span>
+                </label>
+
+
+                <label for="nest_messages_in_prompt" title="The message to summarize will be inside the system instruct template itself. In unchecked (default), the message will instead be added separately after the prompt. Some models benefit from this, but it is not recommended." class="checkbox_label">
+                    <input id="nest_messages_in_prompt" type="checkbox" />
+                    <span>Nest Message in Summary Prompt</span>
+                </label>
+
+                <label for="include_world_info" title="WARNING: doesn't work great. Attempts to preserve context-shifting by including all the content that is sent in regular prompts (world info, description, personas, example messages, message history, etc). If your regular prompts are static, this can allow Context Shifting to work between summarizations, but it decreases the accuracy of summarization due to all the extra stuff in the prompt. It also can't be previewed as this injection is handled by ST, not the extension." class="checkbox_label">
+                    <input id="include_world_info" type="checkbox" />
+                    <span>Include All Context Content</span>
                 </label>
 
                 <!-- Misc. -->
@@ -241,7 +254,7 @@
                 <textarea id="lorebook_entry" class="text_pole textarea_compact" rows="1" placeholder="Lorebook entry to dump to"></textarea>
                 -->
 
-            </div>
+            </>
         </div>
     </div>
 </div>
