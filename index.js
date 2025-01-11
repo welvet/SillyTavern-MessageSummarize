@@ -1627,7 +1627,7 @@ function collect_chat_messages(no_summary=false, short=false, long=false, edited
 
 
 // Event handling
-var last_message_swiped = false;  // flag for whether the last message was swiped
+var last_message_swiped = null  // if an index, that was the last message swiped
 async function on_chat_event(event=null, index=null) {
     // When the chat is updated, check if the summarization should be triggered
     debug("Chat updated: " + event + " ID: " + index)
@@ -1636,6 +1636,7 @@ async function on_chat_event(event=null, index=null) {
 
     switch (event) {
         case 'chat_changed':  // chat was changed
+            last_message_swiped = null;
             load_character_profile();  // load the profile for the current character
             refresh_memory();  // refresh the memory state
             if (context?.chat?.length) {
@@ -1645,13 +1646,14 @@ async function on_chat_event(event=null, index=null) {
 
         case 'message_deleted':   // message was deleted
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
+            last_message_swiped = null;
             debug("Message deleted, refreshing memory")
             refresh_memory();
-            last_message_swiped = false;
             break;
 
         case 'message_sent':  // user sent a message
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
+            last_message_swiped = null;
             debug("user message")
             break;
 
@@ -1660,23 +1662,29 @@ async function on_chat_event(event=null, index=null) {
             if (!context.groupId && context.characterId === undefined) break; // no characters or group selected
             if (streamingProcessor && !streamingProcessor.isFinished) break;  // Streaming in-progress
 
-            if (last_message_swiped) {  // this is a swipe
+            if (last_message_swiped === index) {  // this is a swipe
                 if (!get_settings('auto_summarize_on_swipe')) break;  // if auto-summarize on swipe is disabled, do nothing
-                debug("Summarizing on swipe")
+                if (!check_message_exclusion(context.chat[index])) break;  // if the message is excluded, skip
+                if (!get_memory(context.chat[index], 'memory')) break;  // if the message doesn't have a memory, skip
+                debug("re-summarizing on swipe")
                 await summarize_message(index);  // summarize the swiped message
                 refresh_memory()
                 break;
             } else { // not a swipe
                 if (!get_settings('auto_summarize')) break;  // if auto-summarize is disabled, do nothing
+                last_message_swiped = null;
                 debug("New message detected, summarizing")
-                await auto_summarize_chat();  // auto-summarize the chat
+                await auto_summarize_chat();  // auto-summarize the chat (checks for exclusion criteria and whatnot)
                 break;
             }
 
         case 'message_edited':  // Message has been edited
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
+            last_message_swiped = null;
             if (!get_settings('auto_summarize_on_edit')) break;  // if auto-summarize on edit is disabled, skip
-            debug("Message edited, summarizing")
+            if (!check_message_exclusion(context.chat[index])) break;  // if the message is excluded, skip
+            if (!get_memory(context.chat[index], 'memory')) break;  // if the message doesn't have a memory, skip
+            debug("Message with memory edited, summarizing")
             summarize_message(index);  // summarize that message (no await so the message edit goes through)
             break;
 
@@ -1684,11 +1692,7 @@ async function on_chat_event(event=null, index=null) {
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
             debug("Message swiped, reloading memory")
             refresh_memory()
-            last_message_swiped = true;
-            break;
-
-        case 'message_received':
-            if (!chat_enabled()) break;  // if chat is disabled, do nothing
+            last_message_swiped = index;
             break;
 
         default:
@@ -1696,12 +1700,6 @@ async function on_chat_event(event=null, index=null) {
             debug(`Unknown event: "${event}", refreshing memory`)
             refresh_memory();
     }
-
-    // reset the swipe flag if the event is not a message_swiped event
-    if (event !== 'message_swiped') {
-        last_message_swiped = false;
-    }
-
 }
 
 
@@ -1912,7 +1910,6 @@ jQuery(async function () {
     // Event listeners
     eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, (id) => on_chat_event('new_message', id));
     eventSource.on(event_types.MESSAGE_SENT, (id) => on_chat_event('message_sent', id));
-    eventSource.on(event_types.MESSAGE_RECEIVED, (id) => on_chat_event('message_received', id));
     eventSource.on(event_types.MESSAGE_DELETED, (id) => on_chat_event('message_deleted', id));
     eventSource.on(event_types.MESSAGE_EDITED, (id) => on_chat_event('message_edited', id));
     eventSource.on(event_types.MESSAGE_SWIPED, (id) => on_chat_event('message_swiped', id));

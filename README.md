@@ -35,6 +35,7 @@ Cons, with attempted solutions:
   - Grey: Excluded
 
 ### Todo
+- need to add option to cascade summary edits when previous summaries are included in the summary prompt.
 - ~~Handle swiping, editing, and deleting summaries~~
 - ~~button to resummarize a given message~~
 - ~~Display summaries below each message~~
