@@ -61,7 +61,7 @@ Response must be in the past tense.
 Your response must ONLY contain the summary.
 
 {{#if history}}
-Following is a history of messages:
+Following is a history of messages for context:
 {{history}}
 {{/if}}
 

@@ -11,10 +11,11 @@ Pros:
 - Summarization occurs automatically after a message is generated, so if your model generates faster than you read you'll never have to wait.
 
 Cons, with attempted solutions:
-- If you use Context Shifting, performing the summarizations each time breaks it unless you include your static World Info in the summarization prompt. I've added this as a configuration option. Whether it actually helps summarization itself is unclear.
-- If a message is too small, it is still summarized for short-term memory even if it isn't relevant. I've added a config setting to exclude messages under a given token length.
+- If you use Context Shifting, performing the summarizations on each message breaks it. To reduce this, have added a feature that allows you to define a batch size, summarizing multiple messages at once (still one at a time).
+- If a message is too small, it may not be relevant at all. I've added a config setting to exclude messages under a given token length.
 - If a summarization is wrong, it can affect subsequent messages. I've added the ability to regenerate a summary or manually edit it if needed.
-- If you want to add the extension to an existing chat, initial summarization of the chat might take a while. You can stop summarization at any time by clicking the "stop" button in the config. Summarization of the chat will resume when a new message is summarized.
+- Summarizing a single message can sometimes miss important context from previous messages. I've added the ability to include a few previous messages (and/or summaries) in the summarization prompt as context.
+- If you want to add the extension to an existing chat, initial summarization of the chat might take a while. You can stop summarization at any time by clicking the "stop" button next to the progress bar.
 
 
 ### Usage
@@ -22,11 +23,12 @@ Cons, with attempted solutions:
 - To mark a memory for long-term memory, click the "brain" icon in the message button menu.
 - To re-summarize a message, click the "Quote" icon in the message button menu.
 - To edit a summary, click on the summary text directly or click the "pen" icon in the message button menu.
+- To summarize an existing chat, go to the config and click the "Summarize Chat" button next to the "Summarization" section (two curved arrows).
 
 
 ### Notable Features
 - Handles swiping, editing, and deleting messages.
-- Popout config menu - customize summarization settings, injection settings, and message inclusion criteria
+- Popout config menu - customize summarization settings, injection settings, and auto-summarization message inclusion criteria.
 - Configuration profiles - save and load different configurations profiles and set one to be auto-loaded for each character.
 - Summaries are optionally displayed in small text below each message, colored according to their status:
   - Green: Included in short-term memory
@@ -35,7 +37,6 @@ Cons, with attempted solutions:
   - Grey: Excluded
 
 ### Todo
-- need to add option to cascade summary edits when previous summaries are included in the summary prompt.
 - ~~Handle swiping, editing, and deleting summaries~~
 - ~~button to resummarize a given message~~
 - ~~Display summaries below each message~~
@@ -59,7 +60,7 @@ Cons, with attempted solutions:
 - ~~Progress bar for summarization of chat history~~
 - Add a button to transfer all summaries marked for long-term memory into a lorebook entry
 - Need to detect when more messages are loaded into the chat via the "load more message" button, and update the message visuals to display any memories on them. Annoyingly, no event seems to be fired when the chat updates this way (that I could find).
-
+- option to cascade summary edits when previous summaries are included in the summary prompt?
 
 ### Troubleshooting:
 
@@ -77,26 +78,5 @@ You can also try unchecking "Nest Message in Summary Prompt" in the settings - s
 - My jailbreak isn't working: You'll need to put the jailbreak in the summarization prompt if you want it to be included.
 
 If it's something else, please turn on "Debug Mode" in the settings and send me the output logs from your browser console and raise an issue or message on discord.
-
-
-### Recommended Summarization Prompts
-The default prompt works for me, but others have needed to tweak it for their use-case or model.
-Try them out and see what works best.
-
-- Default: "You are a summarization assistant. Summarize the given fictional narrative in a single, very short and concise statement of fact.
-State only events that will need to be remembered in the future.
-Include names when possible.
-Response must be in the past tense.
-Limit responses to {{words}} words or less.
-Your response must ONLY contain the summary.
-Text to Summarize:"
-
-Other Options:
-"[SYSTEM INFO: You are a summary assistant. Summarize the chat history in a single, very short and concise statement of fact. Include names and state only events or decisions that characters will need to remember in the future. Do not include background information. Limit the summary to 50 words or less. Your response should contain only the summary.]
-Background Information (informational only):
-{{scenario}}
-{{description}}
-{{scenario}}"
-
 
 
