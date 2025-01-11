@@ -38,6 +38,7 @@ export { MODULE_NAME };
 const MODULE_NAME = 'qvink_memory';
 const MODULE_DIR = `scripts/extensions/third-party/${MODULE_NAME}`;
 const MODULE_NAME_FANCY = 'Qvink Memory';
+const PROGRESS_BAR_ID = `${MODULE_NAME}_progress_bar`;
 
 // CSS classes (must match the CSS file because I'm too stupid to figure out how to do this properly)
 const css_message_div = "qvink_memory_display"
@@ -77,15 +78,20 @@ const default_settings = {
     include_thought_messages: false,  // include thought messages in summarization (Stepped Thinking extension)
 
     // summarization settings
+    prompt: default_prompt,
     auto_summarize: true,   // whether to automatically summarize new chat messages
     summarization_delay: 0,  // delay auto-summarization by this many messages (0 summarizes immediately after sending, 1 waits for one message, etc)
+    auto_summarize_batch_size: 1,  // number of messages to summarize at once when auto-summarizing
+    auto_summarize_message_limit: 100,  // maximum number of messages to go back for auto-summarization.
     auto_summarize_on_edit: true,  // whether to automatically re-summarize edited chat messages
     auto_summarize_on_swipe: true,  // whether to automatically summarize new message swipes
+    auto_summarize_progress: true,  // display a progress bar for auto-summarization
+
     include_world_info: false,  // include world info in context when summarizing
-    prompt: default_prompt,
     block_chat: true,  // block input when summarizing
     summary_maximum_length: 30,  // maximum token length of the summary
     nest_messages_in_prompt: false,  // nest messages to summarize in the prompt for summarization
+
     include_message_history: 3,  // include a number of previous messages in the prompt for summarization
     include_message_history_mode: 'none',  // mode for including message history in the prompt
     include_user_messages_in_history: false,  // include previous user message in the summarization prompt when including message history
@@ -389,7 +395,13 @@ function refresh_settings() {
         //toastr.warning("You did not have the {{message}} macro in your summary prompt. It has been added automatically.")
     }
 
-    // enable or disable settings based
+    // auto_summarize_message_limit must be >= auto_summarize_batch_size
+    if (get_settings('auto_summarize_message_limit') < get_settings('auto_summarize_batch_size')) {
+        set_settings('auto_summarize_message_limit', get_settings('auto_summarize_batch_size'));
+        toastr.warning("The auto-summarize message limit must be greater than or equal to the batch size.")
+    }
+
+    // enable or disable settings based on others
     if (chat_enabled()) {
         $('.settings_input').prop('disabled', false);  // enable all settings
 
@@ -738,6 +750,11 @@ function edit_memory(index) {
 
     function confirm_edit() {
         let new_memory = textarea.val();
+        if (new_memory === memory) {  // no change
+            cancel_edit()
+            return;
+        }
+        store_memory(message, "edited", true)  // mark as edited
         store_memory(message, 'memory', new_memory);
         textarea.remove();  // remove the textarea
         memory_div.show();  // show the memory div
@@ -787,7 +804,7 @@ function initialize_message_buttons() {
     $(document).on("click", `.${summarize_button_class}`, async function () {
         const message_block = $(this).closest(".mes");
         const message_id = Number(message_block.attr("mesid"));
-        await summarize_message(message_id, true);  // summarize the message, replacing the existing summary
+        await summarize_message(message_id);  // summarize the message, replacing the existing summary
         refresh_memory();
     });
     $(document).on("click", `.${edit_button_class}`, async function () {
@@ -834,8 +851,123 @@ async function get_user_setting_text_input(key, title) {
         set_settings(key, input);
     }
 }
+async function summarize_chat_modal() {
+    // Let the user choose settings before summarizing the chat
+    let html = `
+<h2>Summarize Chat</h2>
+<p>Choose settings for the chat summarization. All message inclusion/exclusion settings from the main config profile are used, in addition to the following options.</p>
+<p>Currently preparing to summarize: <span id="number_to_summarize"></span></p>
+`
+
+    let custom_inputs = [
+        {
+            id: "include_no_summary",
+            label: "Summarize messages with no existing summary",
+            type: "checkbox",
+            defaultState: true,
+        },
+        {
+            id: "include_short",
+            label: "Re-summarize messages with existing short-term memories",
+            type: "checkbox",
+            defaultState: false,
+        },
+        {
+            id: "include_long",
+            label: "Re-summarize messages with existing long-term memories",
+            type: "checkbox",
+            defaultState: false,
+        },
+        {
+            id: "include_excluded",
+            label: "Re-summarize messages with existing memories, but which are currently excluded from short-term and long-term memory",
+            type: "checkbox",
+            defaultState: false,
+        },
+        {
+            id: "include_edited",
+            label: "Re-summarize messages with existing memories that have been manually edited.",
+            type: "checkbox",
+            defaultState: false,
+        },
+    ]
+
+    let popup = new Popup(html, POPUP_TYPE.CONFIRM, null, {rows: 20, okButton: 'Summarize', cancelButton: 'Cancel', customInputs: custom_inputs});
+
+    function get_messages_to_summarize() {
+        // get settings from the input
+        let settings = {};
+        for (let input of custom_inputs) {
+            settings[input.id] = $(popup.inputControls).find(`#${input.id}`).prop('checked');
+        }
+        log(settings)
+        return collect_chat_messages(settings.include_no_summary, settings.include_short, settings.include_long, settings.include_edited, settings.include_excluded, 0);
+    }
 
 
+    // remove the class "justifyCenter" from all inputs. Who thought that was a good idea?
+    let input_elements = popup.inputControls.children;
+    for (let child of input_elements) {
+        child.classList.remove('justifyCenter');
+    }
+
+    // shows the number of messages about to be summarized
+    let $number_to_summarize = $(popup.content).find('#number_to_summarize');
+
+    // set the number of messages to summarize whenever one of the inputs changes
+    for (let input of input_elements) {
+        $(input).on('change', function () {
+            let number = get_messages_to_summarize().length;
+            $number_to_summarize.text(number);
+        })
+    }
+    // set the initial number of messages to summarize
+    $number_to_summarize.text(get_messages_to_summarize().length);
+
+    let input = await popup.show();
+    if (input) {
+        let indexes = get_messages_to_summarize();
+        summarize_messages(indexes);
+    }
+}
+async function progress_bar(id, progress, total, title) {
+    // Display, update, or remove a progress bar
+    id = `${PROGRESS_BAR_ID}_${id}`
+    let $existing = $(`#${id}`);
+    if ($existing.length > 0) {  // update the progress bar
+        if (progress === undefined || progress === null || progress >= total) {  // remove the progress bar
+            $existing.remove();
+        } else {
+            if (title) $existing.find('div.title').text(title);
+            if (progress) {
+                $existing.find('span.progress').text(progress)
+                $existing.find('progress').val(progress)
+            }
+            if (total) {
+                $existing.find('span.total').text(total)
+                $existing.find('progress').attr('max', total)
+            }
+        }
+        return;
+    }
+
+    // create the progress bar
+    let bar = $(`
+<div id="${id}" class="qvink_progress_bar flex-container justifyspacebetween alignitemscenter">
+    <div class="title">${title}</div>
+    <div>(<span class="progress">${progress}</span> / <span class="total">${total}</span>)</div>
+    <progress value="${progress}" max="${total}" class="flex1"></progress>
+    <button class="menu_button fa-solid fa-stop" title="Abort summarization"></button>
+</div>`)
+
+    // add a click event to abort the summarization
+    bar.find('button').on('click', function () {
+        stop_summarization();
+    })
+
+    // append to the main chat area (#sheld)
+    $('#sheld').append(bar);
+}
 
 // Memory functions
 function store_memory(message, key, value) {
@@ -876,10 +1008,12 @@ async function remember_message_toggle(index=null) {
     store_memory(message, 'remember', !get_memory(message, 'remember'));
 
     let new_status = get_memory(message, 'remember')
+    let memory = get_memory(message, 'memory')
     debug(`Set message ${index} remembered status: ${new_status}`);
 
-    if (new_status) {  // if it was marked as remembered, summarize if it there is no summary
-        await summarize_message(index, false);
+    // if it was marked as remembered and no summary, summarize it
+    if (new_status && !memory) {
+        await summarize_message(index);
     }
     refresh_memory();
 }
@@ -889,6 +1023,11 @@ async function remember_message_toggle(index=null) {
 function check_message_exclusion(message) {
     // check for any exclusion criteria for a given message
     // (this does NOT take context lengths into account, only exclusion criteria based on the message itself).
+
+    // system messages sent by this extension are always ignored
+    if (get_memory(message, 'is_qvink_system_memory')) {
+        return false;
+    }
 
     // first check if it has been marked to be remembered by the user - if so, it bypasses all exclusion criteria
     if (get_memory(message, 'remember')) {
@@ -1065,13 +1204,57 @@ globalThis.memory_intercept_messages = function (chat, _contextSize, _abort, typ
 
 
 // Summarization
+async function summarize_messages(indexes, show_progress=true) {
+    // Summarize the given list of message indexes
+    if (!indexes.length) {
+        return;
+    }
 
-/**
- * Summarize a message and save the summary to the message object.
- * @param index {number|null} Index of the message to summarize (default last message)
- * @param replace {boolean} Whether to replace existing summaries (default false)
- */
-async function summarize_message(index=null, replace=false) {
+     // only show progress if there's more than one message to summarize
+    show_progress = show_progress && indexes.length > 1;
+
+    // set "stop summarization" to false
+    set_settings('stop_summarization', false);
+
+    // optionally block user from sending chat messages while summarization is in progress
+    if (get_settings('block_chat')) {
+        deactivateSendButtons();
+    }
+
+    if (show_progress) progress_bar('summarize', 0, indexes.length, 'Summarizing');
+
+    let n = 1;
+    for (let i of indexes) {
+
+        // check if summarization was stopped by the user
+        if (get_settings('stop_summarization')) {
+            log('Summarization stopped');
+            break;
+        }
+
+        await summarize_message(i);
+        if (show_progress) progress_bar('summarize', n);
+        n += 1;
+    }
+
+    if (show_progress) progress_bar('summarize')  // remove the progress bar
+
+
+    if (get_settings('stop_summarization')) {  // check if summarization was stopped
+        set_settings('stop_summarization', false);  // reset the flag
+    } else {
+        log(`Messages summarized: ${indexes.length}`)
+    }
+
+    if (get_settings('block_chat')) {
+        activateSendButtons();
+    }
+    refresh_memory()
+
+}
+async function summarize_message(index=null) {
+    // summarize a message given the chat index, replacing any existing memories
+
     let context = getContext();
     let chat = context.chat;
 
@@ -1079,12 +1262,6 @@ async function summarize_message(index=null, replace=false) {
     index = Math.max(index ?? chat.length - 1, 0)
     let message = chat[index]
     let message_hash = getStringHash(message.mes);
-
-    // If we aren't forcing replacement, skip if the message already has a summary
-    let memory = get_memory(message, 'memory');
-    if (!replace && memory) {
-        return;
-    }
 
     // Temporarily update the message summary text to indicate that it's being summarized (no styling based on inclusion criteria)
     // A full visual update with style should be done on the whole chat after inclusion criteria have been recalculated
@@ -1340,73 +1517,120 @@ function stop_summarization() {
     stopGeneration();  // stop generation on current message
     log("Aborted summarization.")
 }
-async function summarize_chat(replace=false) {
-    // Perform summarization on the entire chat, optionally replacing existing summaries
-    log('Summarizing chat...')
+async function auto_summarize_chat() {
+    // Perform automatic summarization on the chat
+    log('Auto-Summarizing chat...')
     let context = getContext();
 
-    // set "stop summarization" to false
-    set_settings('stop_summarization', false);
-
-    // optionally block user from sending chat messages while summarization is in progress
-    if (get_settings('block_chat')) {
-        deactivateSendButtons();
-    }
-
-    // iterate through the chat in reverse order and summarize each message
-    let messages_to_delay = get_settings('summarization_delay');  // number of messages to delay summarization for
-    for (let i = context.chat.length-1; i >= 0; i--) {
-        if (get_settings('stop_summarization')) {  // check if summarization should be stopped
-            log('Summarization stopped');
-            break;
-        }
-
+    // iterate through the chat in chronological order and check which messages need to be summarized.
+    let messages_to_summarize = []  // list of indexes of messages to summarize
+    for (let i = 0; i < context.chat.length; i++) {
         // get current message
         let message = context.chat[i];
 
         // check message exclusion criteria
-        let include = check_message_exclusion(message);  // check if the message should be included due to the inclusion criteria (not context limits)
+        let include = check_message_exclusion(message);  // check if the message should be included due to the inclusion criteria
         if (!include) {
             continue;
         }
 
-        // If the message is not yet ready to be summarized, skip it and decrement the delay counter
-        if (messages_to_delay > 0) {
-            messages_to_delay--;
+        // skip messages that already have a summary
+        if (get_memory(message, 'memory')) {
             continue;
         }
 
-        update_message_inclusion_flags()  // NOW update message inclusion based on context lengths
-        if (get_memory(message, 'include') === null) {   // excluded due to context limits?
-            // If the message is not included in memory due to the context limits, stop summarizing the rest of the chat.
-            debug(`Message ${i} is not included in memory, stopping summarization.`)
-            break
-        }
+        // this message can be summarized
+        messages_to_summarize.push(i)
+    }
+    debug(`Messages to summarize - inclusion (${messages_to_summarize.length}): ${messages_to_summarize}`)
 
+    // remove a number of messages from the end equal to the desired delay setting
+    let messages_to_delay = get_settings('summarization_delay');  // number of messages to delay summarization for
+    if (messages_to_delay > 0) {
+        messages_to_summarize = messages_to_summarize.slice(0, -messages_to_delay)
+    }
+    debug(`Messages to summarize - delay (${messages_to_summarize.length}): ${messages_to_summarize}`)
 
-        // summarize the message
-        await summarize_message(i, replace);
+    // account for the auto-summarization max message limit
+    let message_limit = get_settings('auto_summarize_message_limit');  // max number of messages to go back for auto-summarization
+    if (message_limit > 0) {
+        messages_to_summarize = messages_to_summarize.slice(-message_limit)
+    }
+    debug(`Messages to summarize - limit (${messages_to_summarize.length}): ${messages_to_summarize}`)
+
+    // If we don't have enough messages to batch, don't summarize
+    let messages_to_batch = get_settings('auto_summarize_batch_size');  // number of messages to summarize in a batch
+    if (messages_to_summarize.length < messages_to_batch) {
+        debug(`Not enough messages (${messages_to_summarize.length}) to summarize in a batch (${messages_to_batch})`)
+        messages_to_summarize = []
     }
 
-    if (get_settings('stop_summarization')) {  // check if summarization was stopped
-        set_settings('stop_summarization', false);  // reset the flag
-    } else {  // summarization completed normally
-        log('Chat summarized')
-    }
+    let show_progress = get_settings('auto_summarize_progress');
 
-    if (get_settings('block_chat')) {
-        activateSendButtons();
-    }
-    refresh_memory()
+    // summarize the messages
+    await summarize_messages(messages_to_summarize, show_progress);
 }
 
+function collect_chat_messages(no_summary=false, short=false, long=false, edited=false, excluded=false, limit=1) {
+    // Get a list of chat message indexes identified by the given criteria
+    let context = getContext();
+
+    let indexes = []  // list of indexes of messages
+    for (let i = 0; i < context.chat.length; i++) {
+        // get current message
+        let message = context.chat[i];
+
+        // check regular message exclusion criteria
+        let include = check_message_exclusion(message);  // check if the message should be included due to the inclusion criteria
+        if (!include) {
+            continue;
+        }
+
+        let existing_memory = get_memory(message, 'memory');
+        let edited_memory = get_memory(message, 'edited');
+        let include_type = get_memory(message, 'include');
+
+        // if we aren't summarizing messages with no summary and this message doesn't have a summary, skip it
+        if (!no_summary && !existing_memory) {
+            continue;
+        }
+
+        // if we aren't summarizing messages with existing short-term memories and this message has one, skip it
+        if (include_type === "short" && !short && existing_memory) {
+            continue;
+        }
+
+        // if we aren't summarizing messages with existing long-term memories and this message has one, skip it
+        if (include_type === "long" && !long && existing_memory) {
+            continue;
+        }
+
+        // if we aren't summarizing messages with existing memories that have been edited and this message has been edited, skip it
+        if (edited && !edited_memory && existing_memory) {
+            continue;
+        }
+
+        // if we aren't summarizing messages with existing memories that are excluded from short-term and long-term memory, skip it
+        if (include_type === null && !excluded && existing_memory) {
+            continue;
+        }
+
+        // this message can be summarized
+        indexes.push(i)
+    }
+
+    if (limit && limit > 0) {
+        indexes = indexes.slice(-limit)
+    }
+    return indexes
+}
 
 
 // Event handling
 var last_message_swiped = false;  // flag for whether the last message was swiped
-async function on_chat_event(event=null, id=null) {
+async function on_chat_event(event=null, index=null) {
     // When the chat is updated, check if the summarization should be triggered
-    debug("Chat updated: " + event + " ID: " + id)
+    debug("Chat updated: " + event + " ID: " + index)
 
     const context = getContext();
 
@@ -1439,22 +1663,21 @@ async function on_chat_event(event=null, id=null) {
             if (last_message_swiped) {  // this is a swipe
                 if (!get_settings('auto_summarize_on_swipe')) break;  // if auto-summarize on swipe is disabled, do nothing
                 debug("Summarizing on swipe")
-                await summarize_message(id, true);  // summarize that message, replacing existing summary
+                await summarize_message(index);  // summarize the swiped message
                 refresh_memory()
                 break;
             } else { // not a swipe
-                if (!get_settings('auto_summarize')) break;  // if regular auto-summarize is disabled, do nothing
+                if (!get_settings('auto_summarize')) break;  // if auto-summarize is disabled, do nothing
                 debug("New message detected, summarizing")
-                await summarize_chat(false);  // summarize the chat, but don't replace existing summaries
+                await auto_summarize_chat();  // auto-summarize the chat
                 break;
             }
-
 
         case 'message_edited':  // Message has been edited
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
             if (!get_settings('auto_summarize_on_edit')) break;  // if auto-summarize on edit is disabled, skip
             debug("Message edited, summarizing")
-            summarize_message(id, true);  // summarize that message, replacing existing summary
+            summarize_message(index);  // summarize that message (no await so the message edit goes through)
             break;
 
         case 'message_swiped':  // when this event occurs, don't do anything (a new_message event will follow)
@@ -1486,8 +1709,6 @@ async function on_chat_event(event=null, id=null) {
 function setup_settings_listeners() {
     debug("Setting up listeners...")
 
-    bind_function('#toggle_chat_memory', () => toggle_chat_enabled(), false);
-
     // Trigger profile changes
     bind_function('#save_profile', () => save_profile(), false);
     bind_function('#restore_profile', () => load_profile(), false);
@@ -1496,18 +1717,18 @@ function setup_settings_listeners() {
     bind_function('#delete_profile', delete_profile, false);
     bind_function('#character_profile', () => toggle_character_profile(), false);
 
-    bind_function('#rerun_memory', async (e) => {
-        await summarize_chat(true);  // rerun summarization, replacing existing summaries
-        refresh_memory();  // refresh the memory (and the display) when finished
-    })
+    bind_function('#rerun_memory', (e) => {summarize_chat_modal()})
     bind_function('#stop_summarization', stop_summarization);
     bind_function('#revert_settings', reset_settings);
 
+    bind_function('#toggle_chat_memory', () => toggle_chat_enabled(), false);
     bind_function('#preview_memory_state', async () => {
         let text = refresh_memory()
         text = `...\n\n${text}\n\n...`
         display_text_modal("Memory State Preview", text);
     })
+    bind_function("#refresh_memory", () => refresh_memory());
+
     bind_function('#edit_summary_prompt', async () => {
         get_user_setting_text_input('prompt', 'Edit Summary Prompt')
     })
@@ -1539,6 +1760,10 @@ function setup_settings_listeners() {
     bind_setting('#auto_summarize_on_edit', 'auto_summarize_on_edit', 'boolean');
     bind_setting('#auto_summarize_on_swipe', 'auto_summarize_on_swipe', 'boolean');
     bind_setting('#summarization_delay', 'summarization_delay', 'number');
+    bind_setting('#auto_summarize_batch_size', 'auto_summarize_batch_size', 'number');
+    bind_setting('#auto_summarize_message_limit', 'auto_summarize_message_limit', 'number');
+    bind_setting('#auto_summarize_progress', 'auto_summarize_progress', 'boolean');
+
     bind_setting('#include_world_info', 'include_world_info', 'boolean');
     bind_setting('#block_chat', 'block_chat', 'boolean');
     bind_setting('#include_user_messages', 'include_user_messages', 'boolean');
@@ -1695,7 +1920,7 @@ jQuery(async function () {
 
     // Slash commands
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'log_chat',
+        name: 'qvink_log_chat',
         callback: (args) => {
             log(getContext().chat)
         },
@@ -1703,11 +1928,19 @@ jQuery(async function () {
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'qvink_log_settings',
+        callback: (args) => {
+            log(extension_settings[MODULE_NAME])
+        },
+        helpString: 'Log current settings',
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'remember',
         callback: (args) => {
             remember_message_toggle(args.index);
         },
-        helpString: 'Toggle the remember status of a message',
+        helpString: 'Toggle the remember status of a message (default is the most recent message)',
         unnamedArgumentList: [
             SlashCommandArgument.fromProps({
                 name: 'index',
@@ -1725,15 +1958,7 @@ jQuery(async function () {
             refresh_settings()
             refresh_memory()
         },
-        helpString: 'Hard reset all setttings',
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'log_settings',
-        callback: (args) => {
-            log(extension_settings[MODULE_NAME])
-        },
-        helpString: 'Log current settings',
+        helpString: 'Hard reset all settings',
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
@@ -1749,7 +1974,53 @@ jQuery(async function () {
         callback: (args) => {
             $('#display_memories').click();  // toggle the memory display
         },
-        helpString: 'Toggle the "displat memories" setting.',
+        helpString: "Toggle the \"display memories\" setting on the current profile (doesn't save the profile).",
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'summarize_chat',
+        callback: (args) => {
+            let indexes = collect_chat_messages(args.limit, args.short, args.long, args.edited, args.excluded);
+            summarize_messages(indexes);
+        },
+        helpString: 'Summarize the chat',
+        argumentList: [
+            SlashCommandArgument.fromProps({
+                name: 'limit',
+                description: 'Limit the number of messages to summarize',
+                isRequired: false,
+                default: false,
+                typeList: ARGUMENT_TYPE.NUMBER,
+            }),
+            SlashCommandArgument.fromProps({
+                name: 'short',
+                description: 'Include messages with existing short-term memories',
+                isRequired: false,
+                default: false,
+                typeList: ARGUMENT_TYPE.BOOLEAN,
+            }),
+            SlashCommandArgument.fromProps({
+                name: 'long',
+                description: 'Include messages with existing long-term memories',
+                isRequired: false,
+                default: false,
+                typeList: ARGUMENT_TYPE.BOOLEAN,
+            }),
+            SlashCommandArgument.fromProps({
+                name: 'edited',
+                description: 'Include messages with manually edited memories',
+                isRequired: false,
+                default: false,
+                typeList: ARGUMENT_TYPE.BOOLEAN,
+            }),
+            SlashCommandArgument.fromProps({
+                name: 'excluded',
+                description: 'Include messages without existing memories',
+                isRequired: false,
+                default: true,
+                typeList: ARGUMENT_TYPE.BOOLEAN,
+            }),
+        ],
     }));
 
     // Macros

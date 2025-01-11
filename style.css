@@ -95,4 +95,11 @@ By default, text is greyed to indicate that is it not injected.
     flex-wrap: wrap;
 }
 
-
+/* the progress bar, mimicking the width of the main chat area */
+.qvink_progress_bar {
+    top: var(--topBarBlockSize);
+    width: var(--sheldWidth);
+    position: fixed;
+    z-index: 999999;
+    padding: 5px;
+}

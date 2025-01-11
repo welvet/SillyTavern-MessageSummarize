@@ -52,11 +52,11 @@ Cons, with attempted solutions:
 - ~~Move the prompt editing text areas to separate modals~~
 - ~~support group chats~~
 - ~~Add macro for max words to use in the summary prompt~~
-- Set the frequency at which automatic summarizations occur (every X messages)
+- ~~Set the frequency at which automatic summarizations occur (every X messages)~~
 - ~~Allow disabling extension in individual chats without giving it a profile.~~
 - ~~Add option to include a few previous messages/summaries in the summary prompt as context~~
+- ~~Progress bar for summarization of chat history~~
 - Add a button to transfer all summaries marked for long-term memory into a lorebook entry
-- Custom exclusion criteria for messages?
 - Need to detect when more messages are loaded into the chat via the "load more message" button, and update the message visuals to display any memories on them. Annoyingly, no event seems to be fired when the chat updates this way (that I could find).
 
 

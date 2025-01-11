@@ -16,6 +16,7 @@
                 <div class="flex-container justifyspacebetween alignitemscenter">
                     <button id="toggle_chat_memory" class="menu_button flex1" title="Toggle whether memory is enabled for this chat specifically (overrides all settings)."><span>Toggle Chat Memory</span></button>
                     <button id="preview_memory_state" class="menu_button fa-solid fa-eye margin0" title="Preview current memory state"></button>
+                    <button id="refresh_memory" class="menu_button fa-solid fa-sync margin0" title="Just refreshes which memories are included and re-renders the memories under each message, doesn't change summaries. This is done automatically all the time, the button is here just in case."></button>
                 </div>
 
                 <hr>
@@ -38,20 +39,31 @@
                 <div class="flex-container justifyspacebetween alignitemscenter">
                     <button id="edit_summary_prompt" class="menu_button flex1" title="Edit the summary prompt" >Edit</button>
                     <button id="preview_summary_prompt" class="menu_button fa-solid fa-eye" title="Preview the filled-in summary prompt, using the last message as an example." ></button>
-                    <button id="rerun_memory" class="menu_button fa-solid fa-rotate" title="Re-summarize ALL memories using current summarization settings."></button>
+                    <button id="rerun_memory" class="menu_button fa-solid fa-rotate" title="Mass re-summarization. Brings up dialog to choose subsets of messages to summarize or re-summarize."></button>
                     <button id="stop_summarization" class="menu_button fa-solid fa-stop" title="Stop all summarization immediately."></button>
                 </div>
 
-                <label for="summary_maximum_length" title="The maximum token length a summary is allowed to be before cutting it off. Use the {{words}} macro in the summarization prompt to get this value.">
-                    <input id="summary_maximum_length" class="text_pole widthUnset" type="number" min="0" max="999" />
-                    <span>Summary Max Token Length</span>
+                 <label for="auto_summarize" title="New messages will be automatically summarized." class="checkbox_label">
+                    <input id="auto_summarize" type="checkbox" />
+                    <span>Auto Summarize</span>
                 </label>
 
-                <label for="auto_summarize" title="New messages will be automatically summarized after being sent." class="checkbox_label">
-                    <input id="auto_summarize" type="checkbox" />
-                    <span>Auto Summarize with delay</span>
+                <label for="summarization_delay" title="Number of messages to delay summarization (0 = summarize up to the most recent message, 1 = lag behind by one message, etc.)" class="checkbox_label">
                     <input id="summarization_delay" class="text_pole widthUnset inline_setting" type="number" min="0" max="99" title="Number of messages to delay summarization (0 summarizes the message you just sent, 1 lags behind by one message, etc.)" />
+                    <span>Auto Summarize Message Lag</span>
                 </label>
+
+                <label for="auto_summarize_batch_size" title="Wait until this many messages before auto-summarizing them all in sequence (1 = summarize every message immediately, 2 = summarize when you have two ready, etc). Still summarizes one at a time. " class="checkbox_label">
+                    <input id="auto_summarize_batch_size" class="text_pole widthUnset inline_setting" type="number" min="1" max="99" />
+                    <span>Auto Summarize Batch Size</span>
+                </label>
+
+                <label for="auto_summarize_message_limit" title="The maximum number of messages back that auto-summarization will apply (-1 to disable).">
+                    <input id="auto_summarize_message_limit" class="text_pole widthUnset inline_setting" type="number" min="-1" max="999" />
+                    <span>Auto Summarize Message Limit</span>
+                </label>
+
+
 
                 <label for="auto_summarize_on_edit" title="Editing a message will automatically trigger a re-summarization." class="checkbox_label">
                     <input id="auto_summarize_on_edit" type="checkbox" />
@@ -60,12 +72,22 @@
 
                 <label for="auto_summarize_on_swipe" title="Swiping or regenerating a message will automatically trigger a re-summarization. Not applicable if auto-summary delay is above 0." class="checkbox_label">
                     <input id="auto_summarize_on_swipe" type="checkbox" />
-                    <span>Auto Re-summarize on Swipe/Regenerate</span>
+                    <span>Auto Re-summarize on Swipe</span>
+                </label>
+
+                <label for="auto_summarize_progress" title="Show the progress bar when auto-summarizing more than 1 message." class="checkbox_label">
+                    <input id="auto_summarize_progress" type="checkbox" />
+                    <span>Auto Summarize Progress Bar</span>
                 </label>
 
                 <label for="block_chat" title="Block chat input while summarizing." class="checkbox_label">
                     <input id="block_chat" type="checkbox" />
                     <span>Block Chat</span>
+                </label>
+
+                <label for="summary_maximum_length" title="The maximum token length a summary is allowed to be before cutting it off. Use the {{words}} macro in the summarization prompt to get this value.">
+                    <input id="summary_maximum_length" class="text_pole widthUnset" type="number" min="1" max="999" />
+                    <span>Summary Max Token Length</span>
                 </label>
 
                 <br>
@@ -84,7 +106,7 @@
                 </div>
 
                 <label for="include_message_history" title="How many previous messages to include in the summarization prompt as context.">
-                    <input id="include_message_history" class="text_pole widthUnset" type="number" min="0" max="99" />
+                    <input id="include_message_history" class="text_pole widthUnset" type="number" min="1" max="99" />
                     <span>Number of Previous Messages</span>
                 </label>
 
@@ -250,7 +272,7 @@
                 <textarea id="lorebook_entry" class="text_pole textarea_compact" rows="1" placeholder="Lorebook entry to dump to"></textarea>
                 -->
 
-            </>
+            </div>
         </div>
     </div>
 </div>
