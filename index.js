@@ -994,7 +994,7 @@ function store_memory(message, key, value) {
 }
 function get_memory(message, key) {
     // get information from the message object
-    return message.extra?.[MODULE_NAME]?.[key];
+    return message?.extra?.[MODULE_NAME]?.[key];
 }
 async function remember_message_toggle(index=null) {
     // Toggle the "remember" status of a message
@@ -1023,6 +1023,7 @@ async function remember_message_toggle(index=null) {
 function check_message_exclusion(message) {
     // check for any exclusion criteria for a given message
     // (this does NOT take context lengths into account, only exclusion criteria based on the message itself).
+    if (!message) return false;
 
     // system messages sent by this extension are always ignored
     if (get_memory(message, 'is_qvink_system_memory')) {
