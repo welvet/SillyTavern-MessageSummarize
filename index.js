@@ -144,6 +144,7 @@ function debug(message) {
 }
 function error(message) {
     console.error(`[${MODULE_NAME_FANCY}]`, message);
+    toastr.error(message, MODULE_NAME_FANCY);
 }
 
 const saveChatDebounced = debounce(() => getContext().saveChat(), debounce_timeout.relaxed);
