@@ -37,6 +37,7 @@ Cons, with attempted solutions:
   - Grey: Excluded
 
 ### Todo
+- Apparently character ID's are not consistent? Need another way to identify characters to map them to designated profiles.
 - ~~Handle swiping, editing, and deleting summaries~~
 - ~~button to resummarize a given message~~
 - ~~Display summaries below each message~~

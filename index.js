@@ -123,7 +123,7 @@ const default_settings = {
 };
 const global_settings = {
     profiles: {},  // dict of profiles by name
-    character_profiles: {},  // dict of character IDs to profiles
+    character_profiles: {},  // dict of character identifiers to profile names
     profile: 'Default', // Current profile
     chats_enabled: {},  // dict of chat IDs to whether memory is enabled
 }
@@ -167,6 +167,20 @@ function get_short_token_limit() {
     let short_term_context_limit = get_settings('short_term_context_limit');
     let context_size = get_context_size();
     return Math.floor(context_size * short_term_context_limit/100);
+}
+function get_current_character_identifier() {
+    // uniquely identify the current character
+    // So you know what's really stupid? The characterId is not a consistent identifier, it changes every time a new character is added.
+    // Instead, you have to use the character avatar file name to consistently and uniquely identify characters.
+    let context = getContext();
+    let key = context.characterId;
+    if (!key) {
+        return null;
+    }
+    if (context.groupId) {
+        return context.groupId;  // if a group is selected, use the group ID
+    }
+    return context.characters[key].avatar;
 }
 
 
@@ -564,9 +578,9 @@ async function rename_profile() {
 
     // if any characters are using the old profile, update it to the new name
     let character_profiles = get_settings('character_profiles');
-    for (let [characterId, character_profile] of Object.entries(character_profiles)) {
+    for (let [character_key, character_profile] of Object.entries(character_profiles)) {
         if (character_profile === old_name) {
-            character_profiles[characterId] = new_name;
+            character_profiles[character_key] = new_name;
         }
     }
 
@@ -600,9 +614,8 @@ function delete_profile() {
 }
 function toggle_character_profile() {
     // Toggle whether the current profile is set to the default for the current character (or group)
-    let context = getContext();
-    let id = context.characterId || context.groupId;
-    if (!id) {  // no character or group selected
+    let key = get_current_character_identifier();  // uniquely identify the current character or group chat
+    if (!key) {  // no character or group selected
         return;
     }
 
@@ -611,27 +624,26 @@ function toggle_character_profile() {
 
     // if the character profile is already set to the current profile, unset it.
     // otherwise, set it to the current profile.
-    set_character_profile(id, profile === get_character_profile() ? null : profile);
+    set_character_profile(key, profile === get_character_profile() ? null : profile);
 }
-function get_character_profile(id) {
+function get_character_profile(key) {
     // Get the profile for a given character
-    if (!id) {  // if none given, assume the current character
-        let context = getContext();
-        id = context.characterId || context.groupId;
+    if (!key) {  // if none given, assume the current character
+        key = get_current_character_identifier();
     }
     let character_profiles = get_settings('character_profiles');
-    return character_profiles[id]
+    return character_profiles[key]
 }
-function set_character_profile(id, profile=null) {
+function set_character_profile(key, profile=null) {
     // Set the profile for a given character (or unset it if no profile provided)
     let character_profiles = get_settings('character_profiles');
 
     if (profile) {
-        character_profiles[id] = profile;
-        log(`Set character [${id}] to use profile [${profile}]`);
+        character_profiles[key] = profile;
+        log(`Set character [${key}] to use profile [${profile}]`);
     } else {
-        delete character_profiles[id];
-        log(`Unset character [${id}] default profile`);
+        delete character_profiles[key];
+        log(`Unset character [${key}] default profile`);
     }
 
     set_settings('character_profiles', character_profiles);
