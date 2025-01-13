@@ -170,8 +170,7 @@ function get_short_token_limit() {
 }
 function get_current_character_identifier() {
     // uniquely identify the current character
-    // So you know what's really stupid? The characterId is not a consistent identifier, it changes every time a new character is added.
-    // Instead, you have to use the character avatar file name to consistently and uniquely identify characters.
+    // You have to use the character's avatar image path to uniquely identify them
     let context = getContext();
     let key = context.characterId;
     if (!key) {
@@ -181,6 +180,25 @@ function get_current_character_identifier() {
         return context.groupId;  // if a group is selected, use the group ID
     }
     return context.characters[key].avatar;
+}
+
+// Completion presets
+async function get_current_preset() {
+    // get the currently selected completion preset
+    return await executeSlashCommandsWithOptions(`/preset`)
+}
+async function set_preset(name) {
+    // Set the completion preset
+    if (get_settings('debug_mode')) {
+        toastr.info(`Setting completion preset to ${name}`);
+    }
+    await executeSlashCommandsWithOptions(`/preset ${name}`)
+}
+function get_presets() {
+    // get a list of the available presets
+    return $('#settings_preset_textgenerationwebui').children().map(function () {
+        return $(this).text();
+    }).get();
 }
 
 
