@@ -48,6 +48,7 @@ Cons, with attempted solutions:
 - ~~Added the ability to toggle automatic summarization on message edit and swipe/regenerate~~
 - ~~Added summarization delay option~~
 - Fix issue that is sometimes inadvertently changing the completion config max tokens when reloading for some reason???
+  - Turns out to be an issue with ST. Issue raised [here](https://github.com/SillyTavern/SillyTavern/issues/3297#issue-2782705578) and potential fix merged into staging branch [here](https://github.com/SillyTavern/SillyTavern/pull/3301).
 - ~~Fix issue causing the popout to bug out when pressing escape.~~
 - ~~Ability to edit summaries.~~
 - ~~Figure out how to limit the number of regular chat messages injected into the prompt so they can be replaced by the summaries.~~
