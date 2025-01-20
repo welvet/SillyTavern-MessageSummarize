@@ -37,8 +37,9 @@ Cons, with attempted solutions:
   - Grey: Excluded
 
 ### Todo
+- ~~Add a delay option to slow down summarization (to handle rate limits for external APIs)~~
 - ~~Handle swiping, editing, and deleting summaries~~
-- ~~button to resummarize a given message~~
+- ~~button to re-summarize a given message~~
 - ~~Display summaries below each message~~
 - ~~config profiles, and allow character-specific settings to be saved~~
 - ~~ability to stop summarization at any time~~
@@ -60,6 +61,8 @@ Cons, with attempted solutions:
 - ~~Add option to include a few previous messages/summaries in the summary prompt as context~~
 - ~~Progress bar for summarization of chat history~~
 - Maybe add an option to use different completion presets for the summarization.
+  - This would completely replace the max token limit, instead allowing the user to select a completion preset.
+  - Would need to find a way to retrieve the mak_tokens anyway for the {{words}} macro.
 - Add a button to transfer all summaries marked for long-term memory into a lorebook entry
 - Need to detect when more messages are loaded into the chat via the "load more message" button, and update the message visuals to display any memories on them. Annoyingly, no event seems to be fired when the chat updates this way (that I could find).
 - option to cascade summary edits when previous summaries are included in the summary prompt?

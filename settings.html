@@ -1,4 +1,4 @@
-<div id="qvink_memory_settings">
+<div id="qvink_memory_settings" class="qvink_memory_settings_content">
     <div class="inline-drawer">
 
         <div class="inline-drawer-toggle inline-drawer-header">
@@ -10,7 +10,9 @@
         </div>
 
         <div class="inline-drawer-content">
-            <div id="drawer_content">
+
+            <!-- transferred to popup -->
+            <div class="qvink_memory_settings_content">
                 <hr>
 
                 <div class="flex-container justifyspacebetween alignitemscenter">
@@ -43,49 +45,52 @@
                     <button id="stop_summarization" class="menu_button fa-solid fa-stop" title="Stop all summarization immediately."></button>
                 </div>
 
-                 <label for="auto_summarize" title="New messages will be automatically summarized." class="checkbox_label">
+                 <label class="checkbox_label" title="New messages will be automatically summarized.">
                     <input id="auto_summarize" type="checkbox" />
                     <span>Auto Summarize</span>
                 </label>
 
-                <label for="summarization_delay" title="Number of messages to delay summarization (0 = summarize up to the most recent message, 1 = lag behind by one message, etc.)" class="checkbox_label">
+                <label class="checkbox_label" title="Number of messages to delay summarization (0 = summarize up to the most recent message, 1 = lag behind by one message, etc.)">
                     <input id="summarization_delay" class="text_pole widthUnset inline_setting" type="number" min="0" max="999" title="Number of messages to delay summarization (0 summarizes the message you just sent, 1 lags behind by one message, etc.)" />
                     <span>Auto Summarize Message Lag</span>
                 </label>
 
-                <label for="auto_summarize_batch_size" title="Wait until this many messages before auto-summarizing them all in sequence (1 = summarize every message immediately, 2 = summarize when you have two ready, etc). Still summarizes one at a time. " class="checkbox_label">
+                <label class="checkbox_label" title="Wait until this many messages before auto-summarizing them all in sequence (1 = summarize every message immediately, 2 = summarize when you have two ready, etc). Still summarizes one at a time. ">
                     <input id="auto_summarize_batch_size" class="text_pole widthUnset inline_setting" type="number" min="1" max="999" />
                     <span>Auto Summarize Batch Size</span>
                 </label>
 
-                <label for="auto_summarize_message_limit" title="The maximum number of messages back that auto-summarization will apply (-1 to disable).">
+                <label class="checkbox_label" title="The maximum number of messages back that auto-summarization will apply (-1 to disable).">
                     <input id="auto_summarize_message_limit" class="text_pole widthUnset inline_setting" type="number" min="-1" max="999" />
                     <span>Auto Summarize Message Limit</span>
                 </label>
 
+                <label class="checkbox_label" title="Time in seconds to wait between summarizations. May be needed if you are using a external API with a rate limit.">
+                    <input id="summarization_time_delay" class="text_pole widthUnset inline_setting" type="number" min="0" max="999" />
+                    <span>Summarization Time Delay</span>
+                </label>
 
-
-                <label for="auto_summarize_on_edit" title="Editing a message will automatically trigger a re-summarization if it has already been summarized." class="checkbox_label">
+                <label title="Editing a message will automatically trigger a re-summarization if it has already been summarized." class="checkbox_label">
                     <input id="auto_summarize_on_edit" type="checkbox" />
                     <span>Auto Re-summarize on Edit</span>
                 </label>
 
-                <label for="auto_summarize_on_swipe" title="Swiping a message will automatically trigger a re-summarization if it has already been summarized." class="checkbox_label">
+                <label title="Swiping a message will automatically trigger a re-summarization if it has already been summarized." class="checkbox_label">
                     <input id="auto_summarize_on_swipe" type="checkbox" />
                     <span>Auto Re-summarize on Swipe</span>
                 </label>
 
-                <label for="auto_summarize_progress" title="Show the progress bar when auto-summarizing more than 1 message." class="checkbox_label">
+                <label title="Show the progress bar when auto-summarizing more than 1 message." class="checkbox_label">
                     <input id="auto_summarize_progress" type="checkbox" />
                     <span>Auto Summarize Progress Bar</span>
                 </label>
 
-                <label for="block_chat" title="Block chat input while summarizing." class="checkbox_label">
+                <label title="Block chat input while summarizing." class="checkbox_label">
                     <input id="block_chat" type="checkbox" />
                     <span>Block Chat</span>
                 </label>
 
-                <label for="summary_maximum_length" title="The maximum token length a summary is allowed to be before cutting it off. Use the {{words}} macro in the summarization prompt to get this value.">
+                <label title="The maximum token length a summary is allowed to be before cutting it off. Use the {{words}} macro in the summarization prompt to get this value.">
                     <input id="summary_maximum_length" class="text_pole widthUnset" type="number" min="1" max="999" />
                     <span>Summary Max Token Length</span>
                 </label>
@@ -93,7 +98,7 @@
                 <br>
 
                 <div class="flex-container justifyspacebetween">
-                    <label for="include_message_history_mode" title="Whether to use messages and/or summaries as context for summarization. You must use {{history}} in the summary prompt." class="checkbox_label">
+                    <label title="Whether to use messages and/or summaries as context for summarization. You must use {{history}} in the summary prompt." class="checkbox_label">
                         <span>Message History </span>
                         <select id="include_message_history_mode" class="text_pole flex2">
                             <option value="none">None</option>
@@ -105,23 +110,23 @@
                     <button id="preview_message_history" class="menu_button fa-solid fa-eye interactable" title="Preview what the message history will look like"></button>
                 </div>
 
-                <label for="include_message_history" title="How many previous messages to include in the summarization prompt as context.">
+                <label title="How many previous messages to include in the summarization prompt as context.">
                     <input id="include_message_history" class="text_pole widthUnset" type="number" min="1" max="99" />
                     <span>Number of Previous Messages</span>
                 </label>
 
-                <label for="include_user_messages_in_history" title="When including previous messages, also include user messages." class="checkbox_label">
+                <label title="When including previous messages, also include user messages." class="checkbox_label">
                     <input id="include_user_messages_in_history" type="checkbox" />
                     <span>Include Previous User Messages</span>
                 </label>
 
 
-                <label for="nest_messages_in_prompt" title="The message to summarize will be inside the system instruct template itself. In unchecked (default), the message will instead be added separately after the prompt. Some models benefit from this, but it is not recommended." class="checkbox_label">
+                <label title="The message to summarize will be inside the system instruct template itself. In unchecked (default), the message will instead be added separately after the prompt. Some models benefit from this, but it is not recommended." class="checkbox_label">
                     <input id="nest_messages_in_prompt" type="checkbox" />
                     <span>Nest Message in Summary Prompt</span>
                 </label>
 
-                <label for="include_world_info" title="WARNING: doesn't work great. Attempts to preserve context-shifting by including all the content that is sent in regular prompts (world info, description, personas, example messages, message history, etc). If your regular prompts are static, this can allow Context Shifting to work between summarizations, but it decreases the accuracy of summarization due to all the extra stuff in the prompt. It also can't be previewed as this injection is handled by ST, not the extension." class="checkbox_label">
+                <label title="WARNING: doesn't work great. Attempts to preserve context-shifting by including all the content that is sent in regular prompts (world info, description, personas, example messages, message history, etc). If your regular prompts are static, this can allow Context Shifting to work between summarizations, but it decreases the accuracy of summarization due to all the extra stuff in the prompt. It also can't be previewed as this injection is handled by ST, not the extension." class="checkbox_label">
                     <input id="include_world_info" type="checkbox" />
                     <span>Include All Context Content</span>
                 </label>
@@ -137,31 +142,31 @@
                     <!--<button id="preview_short_term_memory" class="menu_button fa-solid fa-eye interactable" title="Preview the short-term memory injection" tabindex="0"></button>-->
                 </div>
 
-                <label for="include_user_messages" title="Include user message summaries in memory." class="checkbox_label">
+                <label title="Include user message summaries in memory." class="checkbox_label">
                     <input id="include_user_messages" type="checkbox" />
                     <span>Include User Messages</span>
                 </label>
 
-                <label for="include_system_messages" title="Include system message summaries in memory." class="checkbox_label">
+                <label title="Include system message summaries in memory." class="checkbox_label">
                     <input id="include_system_messages" type="checkbox" />
                     <span>Include System Messages</span>
                 </label>
 
-                <label for="include_thought_messages" title="Include thought message summaries in memory (from the Stepped Thinking extension)." class="checkbox_label">
+                <label title="Include thought message summaries in memory (from the Stepped Thinking extension)." class="checkbox_label">
                     <input id="include_thought_messages" type="checkbox" />
                     <span>Include Thought Message</span>
                 </label>
 
-                <label for="message_length_threshold" title="The minimum token length a message has to be in order to get summarized.">
+                <label title="The minimum token length a message has to be in order to get summarized.">
                     <input id="message_length_threshold" class="text_pole widthUnset" type="number" min="0" max="999" />
                     <span>Message Length Threshold</span>
                 </label>
                 <br>
-                <label for="short_term_context_limit" title="The max percent of the context that short-term memory can take up.">
+                <label title="The max percent of the context that short-term memory can take up.">
                     <input id="short_term_context_limit" class="text_pole widthUnset" type="number" min="0" max="100" />
                     <span>Short-Term Context % (<span id="short_term_context_limit_display"></span> tk)</span>
                 </label>
-                <label class="checkbox_label" for="short_term_scan" title="Include short-term memory in the World Info Scan">
+                <label class="checkbox_label" title="Include short-term memory in the World Info Scan">
                     <input id="short_term_scan" type="checkbox" />
                     <span>Include in World Info Scanning</span>
                 </label>
@@ -199,11 +204,11 @@
                     <!--<button id="preview_long_term_memory" class="menu_button fa-solid fa-eye interactable" title="Preview the long-term memory injection" tabindex="0"></button>-->
                 </div>
 
-                <label for="long_term_context_limit" title="The max percent of the context that long-term memory can take up.">
+                <label title="The max percent of the context that long-term memory can take up.">
                     <input id="long_term_context_limit" class="text_pole widthUnset" type="number" min="0" max="100" />
                     <span>Long-Term Context % (<span id="long_term_context_limit_display"></span> tk)</span>
                 </label>
-                <label class="checkbox_label" for="long_term_scan" title="Include long-term memory in the World Info Scan">
+                <label class="checkbox_label" title="Include long-term memory in the World Info Scan">
                     <input id="long_term_scan" type="checkbox" />
                     <span>Include in World Info Scanning</span>
                 </label>
@@ -237,22 +242,22 @@
                 <!-- Misc. -->
                 <hr>
                 <h4 class="textAlignCenter">Misc.</h4>
-                <label for="debug_mode" title="Fill your console with debug messages" class="checkbox_label">
+                <label title="Fill your console with debug messages" class="checkbox_label">
                     <input id="debug_mode" type="checkbox" />
                     <span>Debug Mode</span>
                 </label>
 
-                <label for="display_memories" title="Display summarizations below each message" class="checkbox_label">
+                <label title="Display summarizations below each message" class="checkbox_label">
                     <input id="display_memories" type="checkbox" />
                     <span>Display Memories</span>
                 </label>
 
-                <label for="default_chat_enabled" title="Whether memory is enabled by default for new chats." class="checkbox_label">
+                <label title="Whether memory is enabled by default for new chats." class="checkbox_label">
                     <input id="default_chat_enabled" type="checkbox" />
                     <span>Enable Memory in New Chats</span>
                 </label>
 
-                <label for="limit_injected_messages" title="Limit the number of messages to send in regular prompts to this number (-1 for no limit). Message memories will still be sent.">
+                <label title="Limit the number of messages to send in regular prompts to this number (-1 for no limit). Message memories will still be sent.">
                     <input id="limit_injected_messages" class="text_pole widthUnset" type="number" min="0" max="999" />
                     <span>Limit Message History</span>
                 </label>

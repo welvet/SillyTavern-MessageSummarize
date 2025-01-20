@@ -48,10 +48,17 @@ const css_remember_memory = `qvink_remember_memory`
 const summary_div_class = `qvink_memory_text`  // class put on all added summary divs to identify them
 const css_button_separator = `qvink_memory_button_separator`
 const css_edit_textarea = `qvink_memory_edit_textarea`
+const settings_div_id = `qvink_memory_settings`  // ID of the main settings div.
+const settings_content_class = `qvink_memory_settings_content` // Class for the main settings content div which is transferred to the popup
 
 // Macros for long-term and short-term memory injection
 const long_memory_macro = `${MODULE_NAME}_long_memory`;
 const short_memory_macro = `${MODULE_NAME}_short_memory`;
+
+// global flags and whatnot
+var STOP_SUMMARIZATION = false  // flag toggled when stopping summarization
+var SUMMARIZATION_DELAY_TIMEOUT = null  // the set_timeout object for the summarization delay
+var SUMMARIZATION_DELAY_RESOLVE = null
 
 // Settings
 const default_prompt = `You are a summarization assistant. Summarize the given fictional narrative in a single, very short and concise statement of fact.
@@ -81,6 +88,7 @@ const default_settings = {
     prompt: default_prompt,
     auto_summarize: true,   // whether to automatically summarize new chat messages
     summarization_delay: 0,  // delay auto-summarization by this many messages (0 summarizes immediately after sending, 1 waits for one message, etc)
+    summarization_time_delay: 0, // time in seconds to delay between summarizations
     auto_summarize_batch_size: 1,  // number of messages to summarize at once when auto-summarizing
     auto_summarize_message_limit: 100,  // maximum number of messages to go back for auto-summarization.
     auto_summarize_on_edit: true,  // whether to automatically re-summarize edited chat messages
@@ -115,7 +123,6 @@ const default_settings = {
 
     // misc
     debug_mode: false,  // enable debug mode
-    stop_summarization: false,  // toggled to stop summarization, then toggled back to false.
     lorebook_entry: null,  // lorebook entry to dump memories to
     display_memories: true,  // display memories in the chat below each message
     default_chat_enabled: true,  // whether memory is enabled by default for new chats
@@ -315,7 +322,8 @@ function toggle_chat_enabled(id=null) {
  */
 function bind_setting(selector, key, type=null, callback=null, disable=true) {
     // Bind a UI element to a setting, so if the UI element changes, the setting is updated
-    let element = $(selector);
+    selector = `.${settings_content_class} ${selector}`  // add the settings div to the selector
+    let element = $(selector)
     settings_ui_map[key] = [element, type]
 
     // if no elements found, log error
@@ -438,7 +446,7 @@ function refresh_settings() {
     if (chat_enabled()) {
         $('.settings_input').prop('disabled', false);  // enable all settings
 
-        // when auto-summarize is disabled, summarize_before_generation and summarization_delay get disabled
+        // when auto-summarize is disabled, summarize_before_generation and summarization_lag get disabled
         let auto_summarize = get_settings('auto_summarize');
         $('#summarization_delay').prop('disabled', !auto_summarize);
         $('#summarize_before_generation').prop('disabled', !auto_summarize);
@@ -472,9 +480,10 @@ function refresh_settings() {
 function bind_function(selector, func, disable=true) {
     // bind a function to an element (typically a button or input)
     // if disable is true, disable the element if chat is disabled
+    selector = `.${settings_content_class} ${selector}`
     let element = $(selector);
     if (element.length === 0) {
-        error(`No element found for selector [${id}] when binding function`);
+        error(`No element found for selector [${selector}] when binding function`);
         return;
     }
 
@@ -961,23 +970,19 @@ async function summarize_chat_modal() {
         summarize_messages(indexes);
     }
 }
-async function progress_bar(id, progress, total, title) {
+function progress_bar(id, progress, total, title) {
     // Display, update, or remove a progress bar
     id = `${PROGRESS_BAR_ID}_${id}`
     let $existing = $(`#${id}`);
     if ($existing.length > 0) {  // update the progress bar
-        if (progress === undefined || progress === null || progress >= total) {  // remove the progress bar
-            $existing.remove();
-        } else {
-            if (title) $existing.find('div.title').text(title);
-            if (progress) {
-                $existing.find('span.progress').text(progress)
-                $existing.find('progress').val(progress)
-            }
-            if (total) {
-                $existing.find('span.total').text(total)
-                $existing.find('progress').attr('max', total)
-            }
+        if (title) $existing.find('div.title').text(title);
+        if (progress) {
+            $existing.find('span.progress').text(progress)
+            $existing.find('progress').val(progress)
+        }
+        if (total) {
+            $existing.find('span.total').text(total)
+            $existing.find('progress').attr('max', total)
         }
         return;
     }
@@ -998,6 +1003,14 @@ async function progress_bar(id, progress, total, title) {
 
     // append to the main chat area (#sheld)
     $('#sheld').append(bar);
+}
+function remove_progress_bar(id) {
+    id = `${PROGRESS_BAR_ID}_${id}`
+    let $existing = $(`#${id}`);
+    if ($existing.length > 0) {  // found
+        debug("Removing progress bar")
+        $existing.remove();
+    }
 }
 
 // Memory functions
@@ -1245,35 +1258,53 @@ async function summarize_messages(indexes, show_progress=true) {
      // only show progress if there's more than one message to summarize
     show_progress = show_progress && indexes.length > 1;
 
-    // set "stop summarization" to false
-    set_settings('stop_summarization', false);
+    // set stop flag to false just in case
+    STOP_SUMMARIZATION = false
 
     // optionally block user from sending chat messages while summarization is in progress
     if (get_settings('block_chat')) {
         deactivateSendButtons();
     }
 
-    if (show_progress) progress_bar('summarize', 0, indexes.length, 'Summarizing');
-
-    let n = 1;
+    let n = 0;
     for (let i of indexes) {
+        if (show_progress) progress_bar('summarize', n+1, indexes.length, "Summarizing");
 
         // check if summarization was stopped by the user
-        if (get_settings('stop_summarization')) {
+        if (STOP_SUMMARIZATION) {
             log('Summarization stopped');
             break;
         }
 
         await summarize_message(i);
-        if (show_progress) progress_bar('summarize', n);
+
+        // wait for time delay if set
+        let time_delay = get_settings('summarization_time_delay')
+        if (time_delay > 0 && n < indexes.length-1) {  // delay all except the last
+
+            // check if summarization was stopped by the user during summarization
+            if (STOP_SUMMARIZATION) {
+                log('Summarization stopped');
+                break;
+            }
+
+            debug(`Delaying generation by ${time_delay} seconds`)
+            if (show_progress) progress_bar('summarize', null, null, "Delaying")
+            await new Promise((resolve) => {
+                SUMMARIZATION_DELAY_TIMEOUT = setTimeout(resolve, time_delay * 1000)
+                SUMMARIZATION_DELAY_RESOLVE = resolve  // store the resolve function to call when cleared
+            });
+        }
+
+
         n += 1;
     }
 
-    if (show_progress) progress_bar('summarize')  // remove the progress bar
+    if (show_progress) remove_progress_bar('summarize')  // remove the progress bar
 
 
-    if (get_settings('stop_summarization')) {  // check if summarization was stopped
-        set_settings('stop_summarization', false);  // reset the flag
+    if (STOP_SUMMARIZATION) {  // check if summarization was stopped
+        STOP_SUMMARIZATION = false  // reset the flag
     } else {
         log(`Messages summarized: ${indexes.length}`)
     }
@@ -1545,8 +1576,10 @@ const refresh_memory_debounced = debounce(refresh_memory, debounce_timeout.relax
 
 function stop_summarization() {
     // Immediately stop summarization of the chat
-    set_settings('stop_summarization', true);  // set the flag to stop summarization of the chat
+    STOP_SUMMARIZATION = true  // set the flag
     stopGeneration();  // stop generation on current message
+    clearTimeout(SUMMARIZATION_DELAY_TIMEOUT)  // clear the summarization delay timeout
+    if (SUMMARIZATION_DELAY_RESOLVE !== null) SUMMARIZATION_DELAY_RESOLVE()  // resolve the delay promise so the await goes through
     log("Aborted summarization.")
 }
 async function auto_summarize_chat() {
@@ -1790,6 +1823,7 @@ function setup_settings_listeners() {
     bind_setting('#auto_summarize_on_edit', 'auto_summarize_on_edit', 'boolean');
     bind_setting('#auto_summarize_on_swipe', 'auto_summarize_on_swipe', 'boolean');
     bind_setting('#summarization_delay', 'summarization_delay', 'number');
+    bind_setting('#summarization_time_delay', 'summarization_time_delay', 'number')
     bind_setting('#auto_summarize_batch_size', 'auto_summarize_batch_size', 'number');
     bind_setting('#auto_summarize_message_limit', 'auto_summarize_message_limit', 'number');
     bind_setting('#auto_summarize_progress', 'auto_summarize_progress', 'boolean');
@@ -1842,7 +1876,7 @@ let original_settings_element = null;
 let settings_content = null;
 function setup_popout() {
     // Get the settings element and store it
-    original_settings_element = $('#qvink_memory_settings').find('.inline-drawer-content')
+    original_settings_element = $(`#${settings_div_id}`).find('.inline-drawer-content')
     settings_content = original_settings_element.html();
 
     // set up the popout button
