@@ -102,4 +102,6 @@ By default, text is greyed to indicate that is it not injected.
     position: fixed;
     z-index: 999999;
     padding: 5px;
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(5px);
 }
