@@ -1,4 +1,4 @@
-import { getStringHash, debounce, waitUntilCondition, extractAllWords, isTrueBoolean } from '../../../utils.js';
+import { getStringHash, debounce, waitUntilCondition, extractAllWords, isTrueBoolean, select2ChoiceClickSubscribe } from '../../../utils.js';
 import { getContext, getApiUrl, extension_settings, doExtrasFetch, modules, renderExtensionTemplateAsync } from '../../../extensions.js';
 import {
     activateSendButtons,
@@ -337,7 +337,7 @@ function bind_setting(selector, key, type=null, callback=null, disable=true) {
         element.addClass('settings_input');
     }
 
-    // default trigger for a settings update is on a "change" event
+    // default trigger for a settings update is on a "change" event (as opposed to an input event)
     let trigger = 'change';
 
     // Set the UI element to the current setting value
@@ -350,7 +350,7 @@ function bind_setting(selector, key, type=null, callback=null, disable=true) {
             value = Number($(this).val());
         } else if (type === 'boolean') {  // checkbox
             value = Boolean($(this).prop('checked'));
-        } else {  // text input or dropdown
+        } else {  // text input, dropdown, select2
             value = $(this).val();
         }
 
@@ -372,6 +372,32 @@ function bind_setting(selector, key, type=null, callback=null, disable=true) {
             refresh_memory_debounced();  // debounce the refresh for input elements
         }
     });
+}
+function bind_function(selector, func, disable=true) {
+    // bind a function to an element (typically a button or input)
+    // if disable is true, disable the element if chat is disabled
+    selector = `.${settings_content_class} ${selector}`
+    let element = $(selector);
+    if (element.length === 0) {
+        error(`No element found for selector [${selector}] when binding function`);
+        return;
+    }
+
+    // mark as a settings UI element
+    if (disable) {
+        element.addClass('settings_input');
+    }
+
+    // check if it's an input element, and bind a "change" event if so
+    if (element.is('input')) {
+        element.on('change', function (event) {
+            func(event);
+        });
+    } else {  // otherwise, bind a "click" event
+        element.on('click', function (event) {
+            func(event);
+        });
+    }
 }
 function set_setting_ui_element(key, element, type) {
     // Set a UI element to the current setting value
@@ -426,7 +452,7 @@ function refresh_settings() {
 
     }
 
-    if (current_character_profile) {
+    if (current_character_profile) {  // set the current chosen profile in the dropdown
         choose_profile_dropdown.val(current_character_profile);
     }
 
@@ -446,10 +472,9 @@ function refresh_settings() {
     if (chat_enabled()) {
         $('.settings_input').prop('disabled', false);  // enable all settings
 
-        // when auto-summarize is disabled, summarize_before_generation and summarization_lag get disabled
+        // when auto-summarize is disabled, summarization_lag get disabled
         let auto_summarize = get_settings('auto_summarize');
         $('#summarization_delay').prop('disabled', !auto_summarize);
-        $('#summarize_before_generation').prop('disabled', !auto_summarize);
 
         // If message history is disabled, disable the relevant settings
         let history_disabled = get_settings('include_message_history_mode') === "none";
@@ -461,9 +486,6 @@ function refresh_settings() {
         if (!history_disabled && !get_settings('prompt').includes("{{history}}")) {
             toastr.warning("To include message history, you must use the {{history}} macro in the prompt.")
         }
-
-        // If auto-summarization delay is above zero, disable auto-resummarization after swipe/regenerate
-        // $('#auto_summarize_on_swipe').prop('disabled', get_settings('summarization_delay') > 0);
 
     } else {  // memory is disabled for this chat
         $('.settings_input').prop('disabled', true);  // disable all settings
@@ -477,31 +499,88 @@ function refresh_settings() {
         set_setting_ui_element(key, element, type);
     }
 }
-function bind_function(selector, func, disable=true) {
-    // bind a function to an element (typically a button or input)
-    // if disable is true, disable the element if chat is disabled
-    selector = `.${settings_content_class} ${selector}`
-    let element = $(selector);
-    if (element.length === 0) {
-        error(`No element found for selector [${selector}] when binding function`);
-        return;
+
+// some unused function for a multiselect
+function refresh_character_select() {
+    // sets the select2 multiselect for choosing a list of characters
+    let context = getContext()
+
+    // get all characters present in the current chat
+    let char_id = context.characterId;
+    let group_id = context.groupId;
+    let character_options = []  // {id, name}
+    if (char_id !== undefined && char_id !== null) {  // we are in an individual chat, add the character
+        let id = context.characters[char_id].avatar
+        character_options.push({id: id, name: context.characters[char_id].name})
+    } else if (group_id) {   // we are in a group - add all members
+        let group = context.groups.find(g => g.id == group_id)  // find the group we are in by ID
+        for (let key of group.members) {
+            let char = context.characters.find(c => c.avatar == key)
+            character_options.push({id: key, name: char.name})  // add all group members to options
+        }
     }
 
-    // mark as a settings UI element
-    if (disable) {
-        element.addClass('settings_input');
+    // add the user to the list of options
+    character_options.push({id: "user", name: "User (you)"})
+
+    // set the current value (default if empty)
+    let current_selection = get_settings('characters_to_summarize')
+    log(current_selection)
+
+    // register the element as a select2 widget
+    refresh_select2_element('characters_to_summarize', current_selection, character_options,'No characters filtered - all will be summarized.')
+
+}
+
+/*
+Use like this:
+<div class="flex-container justifySpaceBetween alignItemsCenter">
+    <label title="description here">
+        <span>label here</span>
+        <select id="id_here" multiple="multiple" class="select2_multi_sameline"></select>
+    </label>
+</div>
+ */
+function refresh_select2_element(id, selected, options, placeholder="") {
+    // Refresh a select2 element with the given ID (a select element) and set the options
+
+    // check whether the dropdown is open. If so, don't update the options (it messes with the widget)
+    let $dropdown = $(`#select2-${id}-results`)
+    if ($dropdown.length > 0) {
+        return
     }
 
-    // check if it's an input element, and bind a "change" event if so
-    if (element.is('input')) {
-        element.on('change', function (event) {
-            func(event);
-        });
-    } else {  // otherwise, bind a "click" event
-        element.on('click', function (event) {
-            func(event);
-        });
+    let $select = $(`#${id}`)
+    $select.empty()  // clear current options
+
+    // add the options to the dropdown
+    for (let {id, name} of options) {
+        let option = $(`<option value="${id}">${name}</option>`)
+        $select.append(option);
     }
+
+    // If the select2 widget hasn't been created yet, create it
+    let $widget = $(`.${settings_content_class} ul#select2-${id}-container`)
+    if ($widget.length === 0) {
+        $select.select2({  // register as a select2 element
+            width: '100%',
+            placeholder: placeholder,
+            allowClear: true,
+            closeOnSelect: false,
+        });
+
+        // select2ChoiceClickSubscribe($select, () => {
+        //     log("CLICKED")
+        // }, {buttonStyle: true, closeDrawer: true});
+
+        //$select.on('select2:unselect', unselect_callback);
+        //$select.on('select2:select', select_callback);
+    }
+
+    // set current selection.
+    // change.select2 lets the widget update itself, but doesn't trigger the change event (which would cause infinite recursion).
+    $select.val(selected)
+    $select.trigger('change.select2')
 }
 
 
@@ -688,8 +767,6 @@ function load_character_profile() {
 
     refresh_settings()
 }
-
-
 
 
 
@@ -1013,7 +1090,7 @@ function remove_progress_bar(id) {
     }
 }
 
-// Memory functions
+// Message functions
 function store_memory(message, key, value) {
     // store information on the message object
     if (!message.extra) {
@@ -1061,6 +1138,10 @@ async function remember_message_toggle(index=null) {
     }
     refresh_memory();
 }
+function get_character_key(message) {
+    // get the unique identifier of the character that sent a message
+    return message.original_avatar
+}
 
 
 // Inclusion / Exclusion criteria
@@ -1094,10 +1175,16 @@ function check_message_exclusion(message) {
         return false;
     }
 
+    // check other allowed characters
+    // let allowed_characters = get_settings('characters_to_summarize')
+    // if (!allowed_characters.includes(get_character_key(message))) {
+    //     return false;
+    // }
+
     // Check if the message is too short
     let token_size = count_tokens(message.mes);
     if (token_size < get_settings('message_length_threshold')) {
-        return false
+        return false;
     }
 
     return true;
@@ -1871,75 +1958,81 @@ function setup_settings_listeners() {
 }
 
 
-// The HTML for all settings
-let original_settings_element = null;
-let settings_content = null;
+// Popout handling.
+// We save a jQuery reference to the entire settings content, and move it between the original location and the popout.
+// This is done carefully to preserve all event listeners when moving, and the move is always done before calling remove() on the popout.
+// clone() doesn't work because of the select2 widget for some reason.
+let $settings_element = null;  // all settings content
+let $original_settings_parent = null;  // original location of the settings element
+let $popout = null;  // the popout element
+let POPOUT_VISIBLE = false;
 function setup_popout() {
+    // initialize the popout logic, creating the $popout object and storing the $settings_element
+
     // Get the settings element and store it
-    original_settings_element = $(`#${settings_div_id}`).find('.inline-drawer-content')
-    settings_content = original_settings_element.html();
+    $settings_element = $(`#${settings_div_id}`).find(`.inline-drawer-content .${settings_content_class}`)
+    $original_settings_parent = $settings_element.parent()  // where the settings are originally placed
 
-    // set up the popout button
-    bind_function('#qvink_popout_button', (e) => {
-        toggle_popout(e);
-        e.stopPropagation();
-    })
-}
-function toggle_popout(e) {
-    // toggle the popout window
-
-    // If already open, close it (trigger the close button)
-    if ($('#qmExtensionPopout').length === 1) {
-        debug('Saw existing popout, removing');
-        $('#qmExtensionPopout').fadeOut(animation_duration, () => { $('#qmExtensionPopoutClose').trigger('click'); });
-        return;
-    }
-
-    // Otherwise, create it
     debug('Creating popout window...');
+
+    // repurposes the zoomed avatar template (it's a floating div to the left of the chat)
+    $popout = $($('#zoomed_avatar_template').html());
+    $popout.attr('id', 'qmExtensionPopout').removeClass('zoomed_avatar').addClass('draggable').empty();
 
     // create the control bar with the close button
     const controlBarHtml = `<div class="panelControlBar flex-container">
-    <div id="qmExtensionPopoutheader" class="fa-solid fa-grip drag-grabber hoverglow"></div>
-    <div id="qmExtensionPopoutClose" class="fa-solid fa-circle-xmark hoverglow dragClose"></div>
+    <div class="fa-solid fa-grip drag-grabber hoverglow"></div>
+    <div class="fa-solid fa-circle-xmark hoverglow dragClose"></div>
     </div>`;
-
-    // repurposes the zoomed avatar template (it's a floating div to the left of the chat)
-    const newElement = $($('#zoomed_avatar_template').html());
-    newElement.attr('id', 'qmExtensionPopout').removeClass('zoomed_avatar').addClass('draggable').empty();
-
-    // replace the original settings content with a placeholder
-    original_settings_element.empty();
-    original_settings_element.html('<div class="flex-container alignitemscenter justifyCenter wide100p"><small>Currently popped out</small></div>');
-
-    // add the settings content to the new popout
-    newElement.append(controlBarHtml).append(settings_content);
-    $('body').append(newElement);  // add the popout to the body
-    $('#drawer_content').addClass('scrollableInnerFull')
+    $popout.append(controlBarHtml)
 
     loadMovingUIState();
-    $('#qmExtensionPopout').fadeIn(animation_duration);
-    dragElement(newElement);
+    dragElement($popout);
 
-    // set up all UI listeners and set all settings to the current values
-    setup_settings_listeners();
-    refresh_settings()
+    // set up the popout button in the settings to toggle it
+    bind_function('#qvink_popout_button', (e) => {
+        toggle_popout();
+        e.stopPropagation();
+    })
+
+    // when escape is pressed, toggle the popout.
+    // This has to be here because ST removes .draggable items when escape is pressed, destroying the popout.
+    $(document).on('keydown', async function (event) {
+         if (event.key === 'Escape') {
+             close_popout()
+         }
+    });
+}
+function open_popout() {
+    debug("Showing popout")
+    $('body').append($popout);  // add the popout to the body
 
     // setup listener for close button to remove the popout
-    $('#qmExtensionPopoutClose').off('click').on('click', function () {
-        $('#drawer_content').removeClass('scrollableInnerFull');
-        $('#qmExtensionPopout').fadeOut(animation_duration, () => {
-            original_settings_element.empty();  // clear the placeholder from the original settings element
-            original_settings_element.html(settings_content);  // restore the original settings content
-            $('#qmExtensionPopout').remove();  // remove the popout
-
-            // set up all UI listeners and set all settings to the current values
-            setup_settings_listeners();
-            refresh_settings()
-        });
+    $popout.find('.dragClose').off('click').on('click', function () {
+        close_popout()
     });
 
+    $settings_element.appendTo($popout)  // move the settings to the popout
+    $popout.fadeIn(animation_duration);
+    POPOUT_VISIBLE = true
 }
+function close_popout() {
+    debug("Hiding popout")
+    $popout.fadeOut(animation_duration, () => {
+        $settings_element.appendTo($original_settings_parent)  // move the settings back
+        $popout.remove()  // remove the popout
+    });
+    POPOUT_VISIBLE = false
+}
+function toggle_popout() {
+    // toggle the popout window
+    if (POPOUT_VISIBLE) {
+        close_popout()
+    } else {
+        open_popout()
+    }
+}
+
 
 function dump_memories_to_lorebook() {
     // Dump all memories marked for remembering to a lorebook entry.

@@ -37,6 +37,9 @@ Cons, with attempted solutions:
   - Grey: Excluded
 
 ### Todo
+- Add option to select which characters are summarized in a group
+- Add slash command to toggle popout
+- Add slash command to stop summarization
 - ~~Add a delay option to slow down summarization (to handle rate limits for external APIs)~~
 - ~~Handle swiping, editing, and deleting summaries~~
 - ~~button to re-summarize a given message~~
