@@ -55,6 +55,60 @@ You can also try unchecking "Nest Message in Summary Prompt" in the settings - s
 If it's something else, please turn on "Debug Mode" in the settings and send me the output logs from your browser console and raise an issue or message on discord.
 
 
+### Changelog
+#### v0.7.3
+- **IMPORTANT:** You must update ST for this version to work as it relies on the following PRs:
+  - https://github.com/SillyTavern/SillyTavern/pull/3327#issue-2803062094
+  - https://github.com/SillyTavern/SillyTavern/pull/3331#issue-2803412920
+
+- **New feature**: You can now prevent certain characters from being summarized in group chats. To do this, open the group chat panel and go down to where you would normally mute characters. Use the glowing brain icon to toggle whether a character will be summarized. Note that this is separate from config profiles, and will only apply to the group chat you are in.
+- **New Slash Command**: `/stop_summarization` -  same as the stop button, aborts any summarization currently running.
+- **New Slash Command**: `/toggle_memory_popout` - toggles the memory config popout.
+- **Change**: Finally reworked the popout logic to fix the problem with the escape key. For real this time.
+- **Change**: Message visuals now properly update retroactively when clicking "load more messages" for long chats. Made possible via the second PR above, which was needed to emit an event after the new messages are loaded.
+- **Change**: You guessed it, moved settings around again.
+
+
+#### v0.7.1
+- **IMPORTANT:** Your current profiles will be unbound from their characters, and you will need to re-lock them.
+- **Change**: Changed how profiles are stored, now properly using character avatar paths instead of character_id to keep track of locked profiles. This means that your current profiles will be unbound from their characters, and you will need to re-lock them. Sorry about this, it shouldn't change again after this update unless ST makes an internal change.
+- **Fix**: Fixing several bugs with the progress bar and adding a background to make it more readable.
+- **Fix**: Fixing issue causing some config settings to not be applied properly in some circumstances.
+- **New Feature**: Added option to specify a time delay (in seconds) between consecutive summarizations, useful for external APIs that have rate limit. Integrated with the progress bar, and stopping summarizing will also cancel the delay.
+
+#### v0.6.0
+- **IMPORTANT**: the summarization prompt now requires the **{{message}}** macro, and optionally the **{{history}}** macro. You can temporarily reset the templates to default settings to see how they are used.
+
+- **Change**: I changed the settings UI again, sorry couldn't help it. Things were getting cluttered.
+  - All prompt editing has been moved to separate popups
+  - The "current memory state" has been moved to a separate popup
+  - Moved "Summarization" section to the top, as it is probably be used the most
+  - Some buttons shrunk down, some settings moved around
+
+- **New feature**: Ability to add message history to summarization prompt using the {{history}} macro.
+You can configure how many messages (and/or summaries) to add as context when summarizing a given message. 
+
+- **Change**: The summarization prompt now requires the {{message}} macro to insert the message for summarization. If your prompt doesn't have it, it will automatically be inserted at the bottom.
+
+- **New Feature**: New button to preview an example of the summarization prompt with everything filled into the instruct template. Useful for tweaking how the prompt is structured so you don't have to run a test generation and check the console.
+
+- **New feature**: Ability to do summaries in "batches", specifying how many messages to wait before catching up. Summaries are still done one message at a time, but this means you don't have to wait after every single message.
+
+- **New feature**: Progress bar added to show summarization progress (when more than 1 message is being summarized). Can be disabled for auto-summarization.
+
+- **New feature**: The button in the config to re-summarize the chat now has a popup to select various inclusion options (only summarize messages without summaries, only re-summarize short-term memories, etc).
+ 
+- **Change**: because of the new ability to add previous summarizations as context, summarizations now must occur in chronological order. There is now a config option to limit how far back auto-summarization will start (default 100 messages). This means that if you start summarizing on a fresh new chat, it will start 100 messages back unless you change the config setting.
+
+
+#### v0.4.5
+- **New Feature**: Added the ability to limit the number of messages sent in normal generations. By default it is -1 (disabled), but making this 4 for example would mean only 4 recent messages get sent when generating. The memories still get sent normally.
+- **Change**: Reworked method used to "lock" a profile to specific characters. Now there is just a button to lock the currently selected profile (similar to how you lock a persona), instead of selecting it in a separate dropdown. Looks less cluttered I think.
+- **Fix**: Made the default profile selection work with groups.
+- **New Feature**: Added the ability to completely disable the extension on a chat-by-chat basis. Either use the button at the very top of the config, or use the /toggle_memory command.
+- **New Feature**: Added option to have the extension disabled by default for newly created chats
+- **New Feature**: Added an option to delay summarization by some number of messages.
+
 ### Todo
 - ~~Add option to select which characters are summarized in a group~~
 - ~~Add slash command to toggle popout~~
