@@ -1,4 +1,4 @@
-import { getStringHash, debounce, waitUntilCondition, extractAllWords, isTrueBoolean, select2ChoiceClickSubscribe } from '../../../utils.js';
+import { getStringHash, debounce, copyText, waitUntilCondition, extractAllWords, isTrueBoolean, select2ChoiceClickSubscribe } from '../../../utils.js';
 import { getContext, getApiUrl, extension_settings, doExtrasFetch, modules, renderExtensionTemplateAsync } from '../../../extensions.js';
 import {
     activateSendButtons,
@@ -125,7 +125,6 @@ const default_settings = {
 
     // misc
     debug_mode: false,  // enable debug mode
-    lorebook_entry: null,  // lorebook entry to dump memories to
     display_memories: true,  // display memories in the chat below each message
     default_chat_enabled: true,  // whether memory is enabled by default for new chats
     limit_injected_messages: -1,  // limit the number of injected messages (-1 for no limit)
@@ -1248,7 +1247,7 @@ function update_message_inclusion_flags() {
         update_message_visuals(i, true);
     }
 }
-function concatenate_summaries(start=null, end=null, include=null, remember=null) {
+function concatenate_summaries(start=null, end=null, include=null, remember=null, exclusion_criteria=true) {
     // Given a start and end, concatenate the summaries of the messages in that range
     // Excludes messages that don't meet the inclusion criteria
 
@@ -1273,7 +1272,7 @@ function concatenate_summaries(start=null, end=null, include=null, remember=null
         let message = chat[i];
 
         // check against the message exclusion criteria
-        if (!check_message_exclusion(message)) {
+        if (exclusion_criteria && !check_message_exclusion(message)) {
             continue;
         }
 
@@ -1779,6 +1778,12 @@ function collect_chat_messages(no_summary=false, short=false, long=false, edited
     return indexes
 }
 
+function copy_summaries_to_clipboard() {
+    // copy all summaries in the chat to the clipboard
+    let text = concatenate_summaries(null, null, null, null, false);
+    copyText(text)
+    toastr.info("All memories copied to clipboard.")
+}
 
 // Event handling
 var last_message_swiped = null  // if an index, that was the last message swiped
@@ -1901,6 +1906,7 @@ function initialize_settings_listeners() {
         let history = get_message_history(chat.length-1);
         display_text_modal("{{history}} Macro Preview (Last Message)", history);
     })
+    bind_function('#copy_summaries_to_clipboard', copy_summaries_to_clipboard)
 
     // todo
     //bind_function('#dump_to_lorebook', dump_memories_to_lorebook);
@@ -2238,15 +2244,6 @@ function toggle_popout() {
     } else {
         open_popout()
     }
-}
-
-
-function dump_memories_to_lorebook() {
-    // Dump all memories marked for remembering to a lorebook entry.
-    let entry = get_settings('lorebook_entry');
-    let lorebook = getCharacterLore();
-    log("LOREBOOK: " + lorebook)
-
 }
 
 // Entry point

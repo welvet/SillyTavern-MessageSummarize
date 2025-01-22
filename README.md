@@ -60,8 +60,8 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - **IMPORTANT:** You must update ST for this version to work as it relies on the following PRs:
   - https://github.com/SillyTavern/SillyTavern/pull/3327#issue-2803062094
   - https://github.com/SillyTavern/SillyTavern/pull/3331#issue-2803412920
-
-- **New feature**: You can now prevent certain characters from being summarized in group chats. To do this, open the group chat panel and go down to where you would normally mute characters. Use the glowing brain icon to toggle whether a character will be summarized. Note that this is separate from config profiles, and will only apply to the group chat you are in.
+- **New Feature**: New button to copy all summaries in the entire chat to clipboard.
+- **New Feature**: You can now prevent certain characters from being summarized in group chats. To do this, open the group chat panel and go down to where you would normally mute characters. Use the glowing brain icon to toggle whether a character will be summarized. Note that this is separate from config profiles, and will only apply to the group chat you are in.
 - **New Slash Command**: `/stop_summarization` -  same as the stop button, aborts any summarization currently running.
 - **New Slash Command**: `/toggle_memory_popout` - toggles the memory config popout.
 - **Change**: Finally reworked the popout logic to fix the problem with the escape key. For real this time.
@@ -140,8 +140,7 @@ You can configure how many messages (and/or summaries) to add as context when su
 - Maybe add an option to use different completion presets for the summarization.
   - This would completely replace the max token limit, instead allowing the user to select a completion preset.
   - Would need to find a way to retrieve the mak_tokens anyway for the {{words}} macro.
-- Add a button to transfer all summaries marked for long-term memory into a lorebook entry
-- Need to detect when more messages are loaded into the chat via the "load more message" button, and update the message visuals to display any memories on them. Annoyingly, no event seems to be fired when the chat updates this way (that I could find).
-  - PR for event that triggers when more messages are loaded [here](https://github.com/SillyTavern/SillyTavern/pull/3331#issue-2803412920)
+- ~~Need to detect when more messages are loaded into the chat via the "load more message" button, and update the message visuals to display any memories on them. Annoyingly, no event seems to be fired when the chat updates this way (that I could find).~~
+  - ~~PR for event that triggers when more messages are loaded [here](https://github.com/SillyTavern/SillyTavern/pull/3331#issue-2803412920)~~
 
 

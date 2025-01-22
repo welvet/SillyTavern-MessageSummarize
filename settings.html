@@ -17,7 +17,8 @@
 
                 <div class="flex-container justifyspacebetween alignitemscenter">
                     <button id="toggle_chat_memory" class="menu_button flex1" title="Toggle whether memory is enabled for this chat specifically (overrides all settings)."><span>Toggle Chat Memory</span></button>
-                    <button id="preview_memory_state" class="menu_button fa-solid fa-eye margin0" title="Preview current memory state"></button>
+                    <button id="preview_memory_state" class="menu_button fa-solid fa-eye margin0" title="Preview current memory state (the exact text that will be injected into your context)."></button>
+                    <button id="copy_summaries_to_clipboard" class="menu_button fa-solid fa-copy" title="Copy ALL memories to clipboard (all memories in the entire chat, not just those injected)."></button>
                     <button id="refresh_memory" class="menu_button fa-solid fa-sync margin0" title="Just refreshes which memories are included and re-renders the memories under each message, doesn't change summaries. This is done automatically all the time, the button is here just in case."></button>
                 </div>
 
@@ -270,15 +271,6 @@
                         <span>Revert Settings</span>
                     </button>
                 </div>
-
-                <!--
-                <div class="flex-container justifyspacebetween alignitemscenter">
-                    <div id="dump_to_lorebook" class="menu_button flex1" title="Dump all memories marked for long-term memory to a lorebook entry">
-                        <span>Dump to Lorebook</span>
-                    </div>
-                </div>
-                <textarea id="lorebook_entry" class="text_pole textarea_compact" rows="1" placeholder="Lorebook entry to dump to"></textarea>
-                -->
 
             </div>
         </div>
