@@ -88,6 +88,6 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
   - Would need to find a way to retrieve the mak_tokens anyway for the {{words}} macro.
 - Add a button to transfer all summaries marked for long-term memory into a lorebook entry
 - Need to detect when more messages are loaded into the chat via the "load more message" button, and update the message visuals to display any memories on them. Annoyingly, no event seems to be fired when the chat updates this way (that I could find).
-- option to cascade summary edits when previous summaries are included in the summary prompt?
+  - PR for event that triggers when more messages are loaded [here](https://github.com/SillyTavern/SillyTavern/pull/3331#issue-2803412920)
 
 
