@@ -22,7 +22,7 @@ import {
 } from '../../../../script.js';
 import { formatInstructModeChat } from '../../../instruct-mode.js';
 import { Popup, POPUP_TYPE } from '../../../popup.js';
-import { is_group_generating, selected_group } from '../../../group-chats.js';
+import { is_group_generating, selected_group, openGroupId } from '../../../group-chats.js';
 import { loadMovingUIState, renderStoryString, power_user } from '../../../power-user.js';
 import { dragElement } from '../../../RossAscends-mods.js';
 import { getTextTokens, getTokenCount, tokenizers } from '../../../tokenizers.js';
@@ -50,6 +50,8 @@ const css_button_separator = `qvink_memory_button_separator`
 const css_edit_textarea = `qvink_memory_edit_textarea`
 const settings_div_id = `qvink_memory_settings`  // ID of the main settings div.
 const settings_content_class = `qvink_memory_settings_content` // Class for the main settings content div which is transferred to the popup
+const group_member_enable_button = `qvink_memory_group_member_enable`
+const group_member_enable_button_highlight = `qvink_memory_group_member_enabled`
 
 // Macros for long-term and short-term memory injection
 const long_memory_macro = `${MODULE_NAME}_long_memory`;
@@ -133,6 +135,7 @@ const global_settings = {
     character_profiles: {},  // dict of character identifiers to profile names
     profile: 'Default', // Current profile
     chats_enabled: {},  // dict of chat IDs to whether memory is enabled
+    disabled_group_characters: {}  // group chat IDs mapped to a list of disabled character keys
 }
 const settings_ui_map = {}  // map of settings to UI elements
 
@@ -239,7 +242,8 @@ function soft_reset_settings() {
     extension_settings[MODULE_NAME] = Object.assign(
         structuredClone(default_settings),
         structuredClone(global_settings),
-        extension_settings[MODULE_NAME]);
+        extension_settings[MODULE_NAME]
+    );
 
     // check for any missing profiles
     let profiles = get_settings('profiles');
@@ -255,7 +259,7 @@ function soft_reset_settings() {
     }
 }
 function reset_settings() {
-    // reset the current settings to default
+    // reset the current profile-specific settings to default
     Object.assign(extension_settings[MODULE_NAME], structuredClone(default_settings))
     refresh_settings();   // refresh the UI
 }
@@ -277,7 +281,6 @@ async function get_manifest() {
         return await response.json();
     })
 }
-
 function chat_enabled() {
     // check if the current chat is enabled
     let context = getContext();
@@ -309,6 +312,35 @@ function toggle_chat_enabled(id=null) {
 
     // refresh settings UI
     refresh_settings()
+}
+function character_enabled(character_key) {
+    // check if the given character is enabled for summarization in the current chat
+    let group_id = selected_group
+    if (selected_group === null) return true;  // not in group chat, always enabled
+
+    let disabled_characters_settings = get_settings('disabled_group_characters')
+    let disabled_characters = disabled_characters_settings[group_id]
+    if (!disabled_characters) return true;
+    return !disabled_characters.includes(character_key)
+
+}
+function toggle_character_enabled(character_key) {
+    // check if the given character is enabled for summarization in the current chat
+    let group_id = selected_group
+    if (group_id === undefined) return true;  // not in group chat, always enabled
+
+    let disabled_characters_settings = get_settings('disabled_group_characters')
+    let disabled_characters = disabled_characters_settings[group_id] || []
+    let disabled = disabled_characters.includes(character_key)
+
+    if (disabled) {  // if currently disabled, enable by removing it from the disabled set
+        disabled_characters.splice(disabled_characters.indexOf(character_key), 1);
+    } else {  // if enabled, disable by adding it to the disabled set
+        disabled_characters.push(character_key);
+    }
+
+    disabled_characters_settings[group_id] = disabled_characters
+    set_settings('disabled_group_characters', disabled_characters_settings)
 }
 
 
@@ -498,6 +530,14 @@ function refresh_settings() {
     for (let [key, [element, type]] of Object.entries(settings_ui_map)) {
         set_setting_ui_element(key, element, type);
     }
+
+
+    //////////////////////
+    // Settings not in the config
+
+    // set group chat character enable button state
+    set_character_enabled_button_states()
+
 }
 
 // some unused function for a multiselect
@@ -896,46 +936,6 @@ function edit_memory(index) {
         }
     })
 }
-function initialize_message_buttons() {
-    // Add the message buttons to the chat messages
-
-    let remember_button_class = `${MODULE_NAME}_remember_button`
-    let summarize_button_class = `${MODULE_NAME}_summarize_button`
-    let edit_button_class = `${MODULE_NAME}_edit_button`
-
-    let html = `
-<div title="Remember (toggle)" class="mes_button ${remember_button_class} fa-solid fa-brain" tabindex="0"></div>
-<div title="Summarize (AI)" class="mes_button ${summarize_button_class} fa-solid fa-quote-left" tabindex="0"></div>
-<div title="Edit Summary" class="mes_button ${edit_button_class} fa-solid fa-pen-fancy" tabindex="0"></div>
-<span class="${css_button_separator}"></span>
-`
-
-    $("#message_template .mes_buttons .extraMesButtons").prepend(html);
-
-    // button events
-    $(document).on("click", `.${remember_button_class}`, async function () {
-        const message_block = $(this).closest(".mes");
-        const message_id = Number(message_block.attr("mesid"));
-        remember_message_toggle(message_id);
-    });
-    $(document).on("click", `.${summarize_button_class}`, async function () {
-        const message_block = $(this).closest(".mes");
-        const message_id = Number(message_block.attr("mesid"));
-        await summarize_message(message_id);  // summarize the message, replacing the existing summary
-        refresh_memory();
-    });
-    $(document).on("click", `.${edit_button_class}`, async function () {
-        const message_block = $(this).closest(".mes");
-        const message_id = Number(message_block.attr("mesid"));
-        await edit_memory(message_id);
-    });
-
-    // when a message is hidden/unhidden, trigger a memory refresh
-    $(document).on("click", ".mes_hide", refresh_memory);
-    $(document).on("click", ".mes_unhide", refresh_memory);
-
-
-}
 async function display_text_modal(title, text="") {
     // Display a modal with the given title and text
     // replace newlines in text with <br> for HTML
@@ -1090,6 +1090,7 @@ function remove_progress_bar(id) {
     }
 }
 
+
 // Message functions
 function store_memory(message, key, value) {
     // store information on the message object
@@ -1155,7 +1156,7 @@ function check_message_exclusion(message) {
         return false;
     }
 
-    // first check if it has been marked to be remembered by the user - if so, it bypasses all exclusion criteria
+    // first check if it has been marked to be remembered by the user - if so, it bypasses all other exclusion criteria
     if (get_memory(message, 'remember')) {
         return true;
     }
@@ -1175,11 +1176,11 @@ function check_message_exclusion(message) {
         return false;
     }
 
-    // check other allowed characters
-    // let allowed_characters = get_settings('characters_to_summarize')
-    // if (!allowed_characters.includes(get_character_key(message))) {
-    //     return false;
-    // }
+    // check if the character is disabled
+    let char_key = get_character_key(message)
+    if (!character_enabled(char_key)) {
+        return false;
+    }
 
     // Check if the message is too short
     let token_size = count_tokens(message.mes);
@@ -1633,7 +1634,6 @@ function create_summary_prompt(index) {
     return prompt
 }
 
-
 function refresh_memory() {
     if (!chat_enabled()) { // if chat not enabled, remove the injections
         setExtensionPrompt(`${MODULE_NAME}_long`, "");
@@ -1722,7 +1722,6 @@ async function auto_summarize_chat() {
     // summarize the messages
     await summarize_messages(messages_to_summarize, show_progress);
 }
-
 function collect_chat_messages(no_summary=false, short=false, long=false, edited=false, excluded=false, limit=1) {
     // Get a list of chat message indexes identified by the given criteria
     let context = getContext();
@@ -1855,9 +1854,9 @@ async function on_chat_event(event=null, index=null) {
 }
 
 
-// UI handling
-function setup_settings_listeners() {
-    debug("Setting up listeners...")
+// UI initialization
+function initialize_settings_listeners() {
+    debug("Initializing settings listeners")
 
     // Trigger profile changes
     bind_function('#save_profile', () => save_profile(), false);
@@ -1956,6 +1955,90 @@ function setup_settings_listeners() {
 
     refresh_settings()
 }
+function initialize_message_buttons() {
+    // Add the message buttons to the chat messages
+    debug("Initializing message buttons")
+
+    let remember_button_class = `${MODULE_NAME}_remember_button`
+    let summarize_button_class = `${MODULE_NAME}_summarize_button`
+    let edit_button_class = `${MODULE_NAME}_edit_button`
+
+    let html = `
+<div title="Remember (toggle)" class="mes_button ${remember_button_class} fa-solid fa-brain" tabindex="0"></div>
+<div title="Summarize (AI)" class="mes_button ${summarize_button_class} fa-solid fa-quote-left" tabindex="0"></div>
+<div title="Edit Summary" class="mes_button ${edit_button_class} fa-solid fa-pen-fancy" tabindex="0"></div>
+<span class="${css_button_separator}"></span>
+`
+
+    $("#message_template .mes_buttons .extraMesButtons").prepend(html);
+
+    // button events
+    $(document).on("click", `.${remember_button_class}`, async function () {
+        const message_block = $(this).closest(".mes");
+        const message_id = Number(message_block.attr("mesid"));
+        remember_message_toggle(message_id);
+    });
+    $(document).on("click", `.${summarize_button_class}`, async function () {
+        const message_block = $(this).closest(".mes");
+        const message_id = Number(message_block.attr("mesid"));
+        await summarize_message(message_id);  // summarize the message, replacing the existing summary
+        refresh_memory();
+    });
+    $(document).on("click", `.${edit_button_class}`, async function () {
+        const message_block = $(this).closest(".mes");
+        const message_id = Number(message_block.attr("mesid"));
+        await edit_memory(message_id);
+    });
+
+    // when a message is hidden/unhidden, trigger a memory refresh
+    $(document).on("click", ".mes_hide", refresh_memory);
+    $(document).on("click", ".mes_unhide", refresh_memory);
+
+
+}
+function initialize_group_member_buttons() {
+    // Insert a button into the group member selection to disable summarization
+    debug("Initializing group member buttons")
+
+    let $template = $('#group_member_template').find('.group_member_icon')
+    let $button = $(`<div title="Toggle summarization for memory" class="right_menu_button fa-solid fa-lg fa-brain ${group_member_enable_button}"></div>`)
+
+    // add listeners
+    $(document).on("click", `.${group_member_enable_button}`, (e) => {
+        // find the parent group member block
+        let $char_block = $(e.target).parent().parent()
+
+        // get the character key from the avatar image title
+        let char_key = $char_block.find('.avatar').find('img').attr('title');
+
+        // toggle the enabled status of this character
+        toggle_character_enabled(char_key)
+        set_character_enabled_button_states()  // update the button state
+    })
+
+    $template.prepend($button)
+}
+function set_character_enabled_button_states() {
+    // for each character in the group chat, set the button state based on their enabled status
+    let $enable_buttons = $(`#rm_group_members`).find(`.${group_member_enable_button}`)
+
+    // if we are creating a new group (openGroupId is undefined), then hide the buttons
+    if (openGroupId === undefined) {
+        $enable_buttons.hide()
+        return
+    }
+
+    // set the state of each button
+    for (let button of $enable_buttons) {
+        let char_key = $(button).parent().parent().find('.avatar').find('img').attr('title');
+        let enabled = character_enabled(char_key)
+        if (enabled) {
+            $(button).addClass(group_member_enable_button_highlight)
+        } else {
+            $(button).removeClass(group_member_enable_button_highlight)
+        }
+    }
+}
 
 
 // Popout handling.
@@ -1966,7 +2049,7 @@ let $settings_element = null;  // all settings content
 let $original_settings_parent = null;  // original location of the settings element
 let $popout = null;  // the popout element
 let POPOUT_VISIBLE = false;
-function setup_popout() {
+function initialize_popout() {
     // initialize the popout logic, creating the $popout object and storing the $settings_element
 
     // Get the settings element and store it
@@ -2054,17 +2137,14 @@ jQuery(async function () {
     // Load settings
     initialize_settings();
 
-    // Set up settings UI
+    // Load the settings UI
     $("#extensions_settings2").append(await $.get(`${MODULE_DIR}/settings.html`));  // load html
 
     // setup UI listeners for settings UI
-    setup_settings_listeners();
-
-    // setup popout button
-    setup_popout()
-
-    // message buttons
+    initialize_settings_listeners();
+    initialize_popout()
     initialize_message_buttons();
+    initialize_group_member_buttons();
 
     // Event listeners
     eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, (id) => on_chat_event('new_message', id));
@@ -2073,6 +2153,8 @@ jQuery(async function () {
     eventSource.on(event_types.MESSAGE_EDITED, (id) => on_chat_event('message_edited', id));
     eventSource.on(event_types.MESSAGE_SWIPED, (id) => on_chat_event('message_swiped', id));
     eventSource.on(event_types.CHAT_CHANGED, () => on_chat_event('chat_changed'));
+    eventSource.on('groupSelected', set_character_enabled_button_states)
+    eventSource.on(event_types.GROUP_UPDATED, set_character_enabled_button_states)
 
     // Slash commands
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
