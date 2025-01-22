@@ -11,9 +11,9 @@ Pros:
 - Summarization occurs automatically after a message is generated, so if your model generates faster than you read you'll never have to wait.
 
 Cons, with attempted solutions:
-- If you use Context Shifting, performing the summarizations on each message breaks it. To reduce this, have added a feature that allows you to define a batch size, summarizing multiple messages at once (still one at a time).
-- If a message is too small, it may not be relevant at all. I've added a config setting to exclude messages under a given token length.
-- If a summarization is wrong, it can affect subsequent messages. I've added the ability to regenerate a summary or manually edit it if needed.
+- If you use Context Shifting, performing the summarizations on each message breaks it. To reduce this, have added a feature that allows you to define a batch size, summarizing multiple messages at once (still one at a time). This allows you to use context shifting for longer before summarizations occur.
+- If a message is too small, it may not be relevant. I've added a config setting to exclude messages under a given token length.
+- If a summarization is wrong, it can affect subsequent generations. I've added the ability to regenerate a summary or manually edit it if needed.
 - Summarizing a single message can sometimes miss important context from previous messages. I've added the ability to include a few previous messages (and/or summaries) in the summarization prompt as context.
 - If you want to add the extension to an existing chat, initial summarization of the chat might take a while. You can stop summarization at any time by clicking the "stop" button next to the progress bar.
 
@@ -24,12 +24,13 @@ Cons, with attempted solutions:
 - To re-summarize a message, click the "Quote" icon in the message button menu.
 - To edit a summary, click on the summary text directly or click the "pen" icon in the message button menu.
 - To summarize an existing chat, go to the config and click the "Summarize Chat" button next to the "Summarization" section (two curved arrows).
+- To only summarize certain characters in a group chat, open the group chat edit menu and scroll down to the member list. Click the glowing "brain" icon to toggle whether that character will be automatically summarized (if you have auto-summarization enabled).
 
 
 ### Notable Features
+- Configuration profiles: save and load different configurations profiles and set one to be auto-loaded for each character.
+- Popout config menu: customize summarization settings, injection settings, and auto-summarization message inclusion criteria.
 - Handles swiping, editing, and deleting messages.
-- Popout config menu - customize summarization settings, injection settings, and auto-summarization message inclusion criteria.
-- Configuration profiles - save and load different configurations profiles and set one to be auto-loaded for each character.
 - Summaries are optionally displayed in small text below each message, colored according to their status:
   - Green: Included in short-term memory
   - Blue: Marked for long-term memory (included in short-term or long-term memory)
@@ -38,8 +39,8 @@ Cons, with attempted solutions:
 
 ### Todo
 - ~~Add option to select which characters are summarized in a group~~
-- Add slash command to toggle popout
-- Add slash command to stop summarization
+- ~~Add slash command to toggle popout~~
+- ~~Add slash command to stop summarization~~
 - ~~Add a delay option to slow down summarization (to handle rate limits for external APIs)~~
 - ~~Handle swiping, editing, and deleting summaries~~
 - ~~button to re-summarize a given message~~
