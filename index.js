@@ -2039,6 +2039,127 @@ function set_character_enabled_button_states() {
         }
     }
 }
+function initialize_slash_commands() {
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'qvink_log_chat',
+        callback: (args) => {
+            log(getContext().chat)
+        },
+        helpString: 'log chat',
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'qvink_log_settings',
+        callback: (args) => {
+            log(extension_settings[MODULE_NAME])
+        },
+        helpString: 'Log current settings',
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'hard_reset',
+        callback: (args) => {
+            hard_reset_settings()
+            refresh_settings()
+            refresh_memory()
+        },
+        helpString: 'Hard reset all settings',
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'remember',
+        callback: (args) => {
+            remember_message_toggle(args.index);
+        },
+        helpString: 'Toggle the remember status of a message (default is the most recent message)',
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                name: 'index',
+                description: 'Index of the message to toggle',
+                isRequired: false,
+                typeList: ARGUMENT_TYPE.NUMBER,
+            }),
+        ],
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'toggle_memory',
+        callback: (args) => {
+            toggle_chat_enabled();  // toggle the memory for the current chat
+        },
+        helpString: 'Toggle memory for the current chat.',
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'toggle_memory_display',
+        callback: (args) => {
+            $('#display_memories').click();  // toggle the memory display
+        },
+        helpString: "Toggle the \"display memories\" setting on the current profile (doesn't save the profile).",
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'summarize_chat',
+        callback: (args) => {
+            let indexes = collect_chat_messages(args.limit, args.short, args.long, args.edited, args.excluded);
+            summarize_messages(indexes);
+        },
+        helpString: 'Summarize the chat',
+        argumentList: [
+            SlashCommandArgument.fromProps({
+                name: 'limit',
+                description: 'Limit the number of messages to summarize',
+                isRequired: false,
+                default: false,
+                typeList: ARGUMENT_TYPE.NUMBER,
+            }),
+            SlashCommandArgument.fromProps({
+                name: 'short',
+                description: 'Include messages with existing short-term memories',
+                isRequired: false,
+                default: false,
+                typeList: ARGUMENT_TYPE.BOOLEAN,
+            }),
+            SlashCommandArgument.fromProps({
+                name: 'long',
+                description: 'Include messages with existing long-term memories',
+                isRequired: false,
+                default: false,
+                typeList: ARGUMENT_TYPE.BOOLEAN,
+            }),
+            SlashCommandArgument.fromProps({
+                name: 'edited',
+                description: 'Include messages with manually edited memories',
+                isRequired: false,
+                default: false,
+                typeList: ARGUMENT_TYPE.BOOLEAN,
+            }),
+            SlashCommandArgument.fromProps({
+                name: 'excluded',
+                description: 'Include messages without existing memories',
+                isRequired: false,
+                default: true,
+                typeList: ARGUMENT_TYPE.BOOLEAN,
+            }),
+        ],
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'toggle_memory_popout',
+        callback: (args) => {
+            toggle_popout()
+        },
+        helpString: 'Toggle the config popout',
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'stop_summarization',
+        callback: (args) => {
+            stop_summarization()
+        },
+        helpString: 'Abort any summarization taking place.',
+    }));
+}
 
 
 // Popout handling.
@@ -2140,13 +2261,14 @@ jQuery(async function () {
     // Load the settings UI
     $("#extensions_settings2").append(await $.get(`${MODULE_DIR}/settings.html`));  // load html
 
-    // setup UI listeners for settings UI
+    // initialize UI stuff
     initialize_settings_listeners();
     initialize_popout()
     initialize_message_buttons();
     initialize_group_member_buttons();
+    initialize_slash_commands()
 
-    // Event listeners
+    // ST event listeners
     eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, (id) => on_chat_event('new_message', id));
     eventSource.on(event_types.MESSAGE_SENT, (id) => on_chat_event('message_sent', id));
     eventSource.on(event_types.MESSAGE_DELETED, (id) => on_chat_event('message_deleted', id));
@@ -2155,111 +2277,6 @@ jQuery(async function () {
     eventSource.on(event_types.CHAT_CHANGED, () => on_chat_event('chat_changed'));
     eventSource.on('groupSelected', set_character_enabled_button_states)
     eventSource.on(event_types.GROUP_UPDATED, set_character_enabled_button_states)
-
-    // Slash commands
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'qvink_log_chat',
-        callback: (args) => {
-            log(getContext().chat)
-        },
-        helpString: 'log chat',
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'qvink_log_settings',
-        callback: (args) => {
-            log(extension_settings[MODULE_NAME])
-        },
-        helpString: 'Log current settings',
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'remember',
-        callback: (args) => {
-            remember_message_toggle(args.index);
-        },
-        helpString: 'Toggle the remember status of a message (default is the most recent message)',
-        unnamedArgumentList: [
-            SlashCommandArgument.fromProps({
-                name: 'index',
-                description: 'Index of the message to toggle',
-                isRequired: false,
-                typeList: ARGUMENT_TYPE.NUMBER,
-            }),
-        ],
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'hard_reset',
-        callback: (args) => {
-            hard_reset_settings()
-            refresh_settings()
-            refresh_memory()
-        },
-        helpString: 'Hard reset all settings',
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'toggle_memory',
-        callback: (args) => {
-            toggle_chat_enabled();  // toggle the memory for the current chat
-        },
-        helpString: 'Toggle memory for the current chat.',
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'toggle_memory_display',
-        callback: (args) => {
-            $('#display_memories').click();  // toggle the memory display
-        },
-        helpString: "Toggle the \"display memories\" setting on the current profile (doesn't save the profile).",
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'summarize_chat',
-        callback: (args) => {
-            let indexes = collect_chat_messages(args.limit, args.short, args.long, args.edited, args.excluded);
-            summarize_messages(indexes);
-        },
-        helpString: 'Summarize the chat',
-        argumentList: [
-            SlashCommandArgument.fromProps({
-                name: 'limit',
-                description: 'Limit the number of messages to summarize',
-                isRequired: false,
-                default: false,
-                typeList: ARGUMENT_TYPE.NUMBER,
-            }),
-            SlashCommandArgument.fromProps({
-                name: 'short',
-                description: 'Include messages with existing short-term memories',
-                isRequired: false,
-                default: false,
-                typeList: ARGUMENT_TYPE.BOOLEAN,
-            }),
-            SlashCommandArgument.fromProps({
-                name: 'long',
-                description: 'Include messages with existing long-term memories',
-                isRequired: false,
-                default: false,
-                typeList: ARGUMENT_TYPE.BOOLEAN,
-            }),
-            SlashCommandArgument.fromProps({
-                name: 'edited',
-                description: 'Include messages with manually edited memories',
-                isRequired: false,
-                default: false,
-                typeList: ARGUMENT_TYPE.BOOLEAN,
-            }),
-            SlashCommandArgument.fromProps({
-                name: 'excluded',
-                description: 'Include messages without existing memories',
-                isRequired: false,
-                default: true,
-                typeList: ARGUMENT_TYPE.BOOLEAN,
-            }),
-        ],
-    }));
 
     // Macros
     MacrosParser.registerMacro("words", () => get_settings('summary_maximum_length'));
