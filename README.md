@@ -37,6 +37,24 @@ Cons, with attempted solutions:
   - Red: Marked for long-term memory, but now out of context.
   - Grey: Excluded
 
+### Troubleshooting:
+
+- "ForbiddenError: invalid csrf token": You opened ST in multiple tabs.
+
+- "Syntax Error: No number after minus sign in JSON at position X": update your koboldcpp, or try disabling "Request token probabilities".
+
+- Summaries seem to be continuing the conversation rather than summarizing: probably an issue with your instruct template.
+Make sure you are using the correct template for your model, and make sure that system messages are properly distinct from user messages (the summaries use a system prompt). 
+This can be caused by the "System same as user" checkbox in your instruct template settings, which will cause all system messages to be treated like a user - uncheck that.
+You can also try unchecking "Nest Message in Summary Prompt" in the settings - some models behave better with this off.
+
+- My jailbreak isn't working: You'll need to put the jailbreak in the summarization prompt if you want it to be included.
+
+- Just updated and things are broken: try reloading the page. If that fails, you can try using the "/hard_reset" command, but it WILL **DELETE YOUR CONFIG PROFILES**. 
+
+If it's something else, please turn on "Debug Mode" in the settings and send me the output logs from your browser console and raise an issue or message on discord.
+
+
 ### Todo
 - ~~Add option to select which characters are summarized in a group~~
 - ~~Add slash command to toggle popout~~
@@ -71,22 +89,5 @@ Cons, with attempted solutions:
 - Add a button to transfer all summaries marked for long-term memory into a lorebook entry
 - Need to detect when more messages are loaded into the chat via the "load more message" button, and update the message visuals to display any memories on them. Annoyingly, no event seems to be fired when the chat updates this way (that I could find).
 - option to cascade summary edits when previous summaries are included in the summary prompt?
-
-### Troubleshooting:
-
-- "ForbiddenError: invalid csrf token": You opened ST in multiple tabs.
-
-- "Syntax Error: No number after minus sign in JSON at position X": update your koboldcpp, or try disabling "Request token probabilities".
-
-- Summaries seem to be continuing the conversation rather than summarizing: probably an issue with your instruct template.
-Make sure you are using the correct template for your model, and make sure that system messages are properly distinct from user messages (the summaries use a system prompt). 
-This can be caused by the "System same as user" checkbox in your instruct template settings, which will cause all system messages to be treated like a user - uncheck that.
-You can also try unchecking "Nest Message in Summary Prompt" in the settings - some models behave better with this off.
-
-- My jailbreak isn't working: You'll need to put the jailbreak in the summarization prompt if you want it to be included.
-
-- Just updated and things are broken: try reloading the page. If that fails, you can try using the "/hard_reset" command, but it WILL **DELETE YOUR CONFIG PROFILES**. 
-
-If it's something else, please turn on "Debug Mode" in the settings and send me the output logs from your browser console and raise an issue or message on discord.
 
 
