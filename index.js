@@ -504,9 +504,12 @@ function refresh_settings() {
     if (chat_enabled()) {
         $('.settings_input').prop('disabled', false);  // enable all settings
 
-        // when auto-summarize is disabled, summarization_lag get disabled
+        // when auto-summarize is disabled, related settings get disabled
         let auto_summarize = get_settings('auto_summarize');
         $('#summarization_delay').prop('disabled', !auto_summarize);
+        $('#auto_summarize_message_limit').prop('disabled', !auto_summarize);
+        $('#auto_summarize_batch_size').prop('disabled', !auto_summarize);
+        $('#auto_summarize_progress').prop('disabled', !auto_summarize);
 
         // If message history is disabled, disable the relevant settings
         let history_disabled = get_settings('include_message_history_mode') === "none";

@@ -50,6 +50,12 @@
                     <span>Auto Summarize</span>
                 </label>
 
+                <label title="Show the progress bar when auto-summarizing more than 1 message." class="checkbox_label">
+                    <input id="auto_summarize_progress" type="checkbox" />
+                    <span>Auto Summarize Progress Bar</span>
+                </label>
+
+
                 <label class="checkbox_label" title="Number of messages to delay summarization (0 = summarize up to the most recent message, 1 = lag behind by one message, etc.)">
                     <input id="summarization_delay" class="text_pole widthUnset inline_setting" type="number" min="0" max="999" title="Number of messages to delay summarization (0 summarizes the message you just sent, 1 lags behind by one message, etc.)" />
                     <span>Auto Summarize Message Lag</span>
@@ -70,29 +76,24 @@
                     <span>Summarization Time Delay</span>
                 </label>
 
+                <label title="The maximum token length a summary is allowed to be before cutting it off. Use the {{words}} macro in the summarization prompt to get this value.">
+                    <input id="summary_maximum_length" class="text_pole widthUnset inline_setting" type="number" min="1" max="999" />
+                    <span>Summary Max Token Length</span>
+                </label>
+
                 <label title="Editing a message will automatically trigger a re-summarization if it has already been summarized." class="checkbox_label">
                     <input id="auto_summarize_on_edit" type="checkbox" />
-                    <span>Auto Re-summarize on Edit</span>
+                    <span>Re-summarize on Edit</span>
                 </label>
 
                 <label title="Swiping a message will automatically trigger a re-summarization if it has already been summarized." class="checkbox_label">
                     <input id="auto_summarize_on_swipe" type="checkbox" />
-                    <span>Auto Re-summarize on Swipe</span>
-                </label>
-
-                <label title="Show the progress bar when auto-summarizing more than 1 message." class="checkbox_label">
-                    <input id="auto_summarize_progress" type="checkbox" />
-                    <span>Auto Summarize Progress Bar</span>
+                    <span>Re-summarize on Swipe</span>
                 </label>
 
                 <label title="Block chat input while summarizing." class="checkbox_label">
                     <input id="block_chat" type="checkbox" />
                     <span>Block Chat</span>
-                </label>
-
-                <label title="The maximum token length a summary is allowed to be before cutting it off. Use the {{words}} macro in the summarization prompt to get this value.">
-                    <input id="summary_maximum_length" class="text_pole widthUnset" type="number" min="1" max="999" />
-                    <span>Summary Max Token Length</span>
                 </label>
 
                 <br>
