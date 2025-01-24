@@ -57,7 +57,7 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 
 ### Changelog
 #### v0.7.3
-- **IMPORTANT:** You must update ST for this version to work as it relies on the following PRs:
+- **IMPORTANT:** You must be on ST staging for this version to work as it relies on the following PRs which have not yet been merged into release:
   - https://github.com/SillyTavern/SillyTavern/pull/3327#issue-2803062094
   - https://github.com/SillyTavern/SillyTavern/pull/3331#issue-2803412920
 - **New Feature**: New button to copy all summaries in the entire chat to clipboard.
