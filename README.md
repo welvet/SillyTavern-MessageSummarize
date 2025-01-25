@@ -50,6 +50,8 @@ You can also try unchecking "Nest Message in Summary Prompt" in the settings - s
 
 - My jailbreak isn't working: You'll need to put the jailbreak in the summarization prompt if you want it to be included.
 
+- "min new tokens must be in (0, max_new_tokens(X)], got Y" - your model has a minimum token amount, which is conflicting with the "Summarization Max Token Length" setting from this extension. Either reduce the minimum token amount (usually in the completion settings), or increase you Summarization Max Token Length.
+
 - Just updated and things are broken: try reloading the page. If that fails, you can try using the "/hard_reset" command, but it WILL **DELETE YOUR CONFIG PROFILES**. 
 
 If it's something else, please turn on "Debug Mode" in the settings and send me the output logs from your browser console and raise an issue or message on discord.
