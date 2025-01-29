@@ -2078,6 +2078,7 @@ function initialize_slash_commands() {
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'remember',
         callback: (args, index) => {
+            if (index === "") index = null  // if not provided the index is an empty string, but we need it to be null to get the default behavior
             remember_message_toggle(index);
         },
         helpString: 'Toggle the remember status of a message (default is the most recent message)',
@@ -2171,6 +2172,7 @@ function initialize_slash_commands() {
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'summarize',
         callback: async (args, index) => {
+            if (index === "") index = null  // if not provided the index is an empty string, but we need it to be null to get the default behavior
             await summarize_message(index);  // summarize the message, replacing the existing summary
             refresh_memory();
         },

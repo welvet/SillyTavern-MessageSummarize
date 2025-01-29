@@ -66,6 +66,7 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - **New Feature**: You can now prevent certain characters from being summarized in group chats. To do this, open the group chat panel and go down to where you would normally mute characters. Use the glowing brain icon to toggle whether a character will be summarized. Note that this is separate from config profiles, and will only apply to the group chat you are in.
 - **New Slash Command**: `/stop_summarization` -  same as the stop button, aborts any summarization currently running.
 - **New Slash Command**: `/toggle_memory_popout` - toggles the memory config popout.
+- **New Slash Command**: `/summarize <n>` - summarizes the given message index (default to most recent message)
 - **Change**: Finally reworked the popout logic to fix the problem with the escape key. For real this time.
 - **Change**: Message visuals now properly update retroactively when clicking "load more messages" for long chats. Made possible via the second PR above, which was needed to emit an event after the new messages are loaded.
 - **Change**: You guessed it, moved settings around again.
