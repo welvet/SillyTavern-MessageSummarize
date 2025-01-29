@@ -2077,13 +2077,12 @@ function initialize_slash_commands() {
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'remember',
-        callback: (args) => {
-            remember_message_toggle(args.index);
+        callback: (args, index) => {
+            remember_message_toggle(index);
         },
         helpString: 'Toggle the remember status of a message (default is the most recent message)',
         unnamedArgumentList: [
             SlashCommandArgument.fromProps({
-                name: 'index',
                 description: 'Index of the message to toggle',
                 isRequired: false,
                 typeList: ARGUMENT_TYPE.NUMBER,
@@ -2167,6 +2166,22 @@ function initialize_slash_commands() {
             stop_summarization()
         },
         helpString: 'Abort any summarization taking place.',
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'summarize',
+        callback: async (args, index) => {
+            await summarize_message(index);  // summarize the message, replacing the existing summary
+            refresh_memory();
+        },
+        helpString: 'Summarize the given message index (defaults to most recent applicable message)',
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'Index of the message to summarize',
+                isRequired: false,
+                typeList: ARGUMENT_TYPE.NUMBER,
+            }),
+        ],
     }));
 }
 
