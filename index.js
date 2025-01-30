@@ -340,6 +340,8 @@ function toggle_character_enabled(character_key) {
 
     disabled_characters_settings[group_id] = disabled_characters
     set_settings('disabled_group_characters', disabled_characters_settings)
+
+    debug(`${disabled ? "Enabled" : "Disabled"} group character summarization (${character_key})`)
 }
 
 
