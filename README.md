@@ -70,6 +70,8 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - **Change**: Finally reworked the popout logic to fix the problem with the escape key. For real this time.
 - **Change**: Message visuals now properly update retroactively when clicking "load more messages" for long chats. Made possible via the second PR above, which was needed to emit an event after the new messages are loaded.
 - **Change**: You guessed it, moved settings around again.
+- **Fix**: Fixed issue causing old swipes to not have their memory saved properly. The chat also now properly scrolls to the bottom when summarizing and swiping the most recent message.
+- **Fix**: Fixed issue causing the most recent message's previous summary to be injected into the main prompt when swiping it.
 
 
 #### v0.7.1

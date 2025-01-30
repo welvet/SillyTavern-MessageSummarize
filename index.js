@@ -1111,7 +1111,7 @@ function store_memory(message, key, value) {
         if (!message.swipe_info[swipe_index].extra) {
             message.swipe_info[swipe_index].extra = {};
         }
-        message.swipe_info[swipe_index].extra[MODULE_NAME] = message.extra[MODULE_NAME];
+        message.swipe_info[swipe_index].extra[MODULE_NAME] = structuredClone(message.extra[MODULE_NAME])
     }
 
     saveChatDebounced();
@@ -1119,6 +1119,13 @@ function store_memory(message, key, value) {
 function get_memory(message, key) {
     // get information from the message object
     return message?.extra?.[MODULE_NAME]?.[key];
+}
+function get_previous_swipe_memory(message, key) {
+    // get information from the message's previous swipe
+    if (!message.swipe_id) {
+        return null;
+    }
+    return message?.swipe_info?.[message.swipe_id-1]?.extra?.[MODULE_NAME]?.[key];
 }
 async function remember_message_toggle(index=null) {
     // Toggle the "remember" status of a message
@@ -1326,7 +1333,7 @@ function get_short_memory() {
 // Add an interception function to reduce the number of messages injected normally
 // This has to match the manifest.json "generate_interceptor" key
 globalThis.memory_intercept_messages = function (chat, _contextSize, _abort, type) {
-    if (!chat_enabled()) return;   // if chat is disabled, do nothing
+    if (!chat_enabled()) return;   // if memory disabled, do nothing
     let limit = get_settings('limit_injected_messages');  // message limit from settings
     if (limit === -1) return;  // if limit is -1, do nothing
 
@@ -1420,6 +1427,11 @@ async function summarize_message(index=null) {
     // A full visual update with style should be done on the whole chat after inclusion criteria have been recalculated
     update_message_visuals(index, false, "Summarizing...")
 
+    // If the most recent message, scroll to the bottom
+    if (index === chat.length - 1) {
+        scroll_to_bottom_of_chat();
+    }
+
     // construct the full summary prompt for the message
     let prompt = create_summary_prompt(index)
 
@@ -1450,6 +1462,11 @@ async function summarize_message(index=null) {
 
     // update the message summary text again now with the memory, still no styling
     update_message_visuals(index, false)
+
+    // If the most recent message, scroll to the bottom
+    if (index === chat.length - 1) {
+        scroll_to_bottom_of_chat();
+    }
 }
 async function summarize_text(prompt) {
     // get size of text
@@ -1822,9 +1839,10 @@ async function on_chat_event(event=null, index=null) {
             if (streamingProcessor && !streamingProcessor.isFinished) break;  // Streaming in-progress
 
             if (last_message_swiped === index) {  // this is a swipe
+                let message = context.chat[index];
                 if (!get_settings('auto_summarize_on_swipe')) break;  // if auto-summarize on swipe is disabled, do nothing
-                if (!check_message_exclusion(context.chat[index])) break;  // if the message is excluded, skip
-                if (!get_memory(context.chat[index], 'memory')) break;  // if the message doesn't have a memory, skip
+                if (!check_message_exclusion(message)) break;  // if the message is excluded, skip
+                if (!get_previous_swipe_memory(message, 'memory')) break;  // if the previous swipe doesn't have a memory, skip
                 debug("re-summarizing on swipe")
                 await summarize_message(index);  // summarize the swiped message
                 refresh_memory()
@@ -1847,11 +1865,23 @@ async function on_chat_event(event=null, index=null) {
             summarize_message(index);  // summarize that message (no await so the message edit goes through)
             break;
 
-        case 'message_swiped':  // when this event occurs, don't do anything (a new_message event will follow)
+        case 'message_swiped':  // when this event occurs, don't summarize yet (a new_message event will follow)
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
             debug("Message swiped, reloading memory")
+
+            // if this is creating a new swipe, remove the current memory.
+            // This is detected when the swipe ID is greater than the last index in the swipes array,
+            //  i.e. when the swipe ID is EQUAL to the length of the swipes array, not when it's length-1.
+            let message = context.chat[index];
+            if (message.swipe_id === message.swipes.length) {
+                store_memory(message, 'memory', null);
+            }
+
             refresh_memory()
             last_message_swiped = index;
+
+            // make sure the chat is scrolled to the bottom because the memory will change
+            scroll_to_bottom_of_chat()
             break;
 
         default:
