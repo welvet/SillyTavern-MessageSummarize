@@ -59,7 +59,7 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 
 ### Changelog
 #### v0.7.3
-- **IMPORTANT:** You must be on ST staging for this version to work as it relies on the following PRs which have not yet been merged into release:
+- **IMPORTANT:** You must be on ST staging for this version to work as it relies on the following PRs which have not yet been merged into ST release:
   - https://github.com/SillyTavern/SillyTavern/pull/3327#issue-2803062094
   - https://github.com/SillyTavern/SillyTavern/pull/3331#issue-2803412920
 - **New Feature**: New button to copy all summaries in the entire chat to clipboard.
@@ -69,6 +69,7 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - **New Slash Command**: `/summarize <n>` - summarizes the given message index (default to most recent message)
 - **Change**: Finally reworked the popout logic to fix the problem with the escape key. For real this time.
 - **Change**: Message visuals now properly update retroactively when clicking "load more messages" for long chats. Made possible via the second PR above, which was needed to emit an event after the new messages are loaded.
+- **Change**: Now triggers a summarization on user message if the option is selected, instead of waiting until the character sends a message.
 - **Change**: You guessed it, moved settings around again.
 - **Fix**: Fixed issue causing old swipes to not have their memory saved properly. The chat also now properly scrolls to the bottom when summarizing and swiping the most recent message.
 - **Fix**: Fixed issue causing the most recent message's previous summary to be injected into the main prompt when swiping it.

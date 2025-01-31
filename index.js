@@ -817,6 +817,7 @@ function load_character_profile() {
 // UI functions
 function get_message_div(index) {
     // given a message index, get the div element for that message
+    // it will have an attribute "mesid" that is the message index
     let div = $(`div[mesid="${index}"]`);
     if (div.length === 0) {
         return null;
@@ -832,14 +833,13 @@ function update_message_visuals(i, style=true, text=null) {
     let message = chat[i];
     let memory = get_memory(message, 'memory');
     let include = get_memory(message, 'include');
-    let error = get_memory(message, 'error');
+    let error_message = get_memory(message, 'error');
     let remember = get_memory(message, 'remember');
-
-    // it will have an attribute "mesid" that is the message index
     let div_element = get_message_div(i);
 
     // div not found (message may not be loaded)
     if (!div_element) {
+        error("Failed to update message visuals: could not locate message div for index " + i);
         return;
     }
 
@@ -870,9 +870,9 @@ function update_message_visuals(i, style=true, text=null) {
         text = ""  // default text when no memory
         if (memory) {
             text = `Memory: ${memory}`
-        } else if (error) {
+        } else if (error_message) {
             style_class = ''  // clear the style class if there's an error
-            text = `Error: ${error}`
+            text = `Error: ${error_message}`
         }
     }
 
@@ -1829,13 +1829,19 @@ async function on_chat_event(event=null, index=null) {
             refresh_memory();
             break;
 
-        case 'message_sent':  // user sent a message
+        case 'user_message':
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
             last_message_swiped = null;
-            debug("user message")
+
+            // if auto-summarizing user messages is disabled, skip
+            if (!get_settings('include_user_messages')) break;
+
+            // otherwise, auto-summarize the chat
+            debug("New user message detected, summarizing")
+            await auto_summarize_chat();  // auto-summarize the chat (checks for exclusion criteria and whatnot)
             break;
 
-        case 'new_message':  // New message detected
+        case 'char_message':
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
             if (!context.groupId && context.characterId === undefined) break; // no characters or group selected
             if (streamingProcessor && !streamingProcessor.isFinished) break;  // Streaming in-progress
@@ -2046,11 +2052,14 @@ function initialize_group_member_buttons() {
 
     // add listeners
     $(document).on("click", `.${group_member_enable_button}`, (e) => {
-        // find the parent group member block
-        let $char_block = $(e.target).parent().parent()
 
-        // get the character key from the avatar image title
-        let char_key = $char_block.find('.avatar').find('img').attr('title');
+        let member_block = $(e.target).closest('.group_member');
+        let char_key = member_block.data('id')
+        let char_id = member_block.attr('chid')
+
+        if (!char_key) {
+            error("Character key not found in group member block.")
+        }
 
         // toggle the enabled status of this character
         toggle_character_enabled(char_key)
@@ -2071,7 +2080,8 @@ function set_character_enabled_button_states() {
 
     // set the state of each button
     for (let button of $enable_buttons) {
-        let char_key = $(button).parent().parent().find('.avatar').find('img').attr('title');
+        let member_block = $(button).closest('.group_member');
+        let char_key = member_block.data('id')
         let enabled = character_enabled(char_key)
         if (enabled) {
             $(button).addClass(group_member_enable_button_highlight)
@@ -2318,8 +2328,8 @@ jQuery(async function () {
     initialize_slash_commands()
 
     // ST event listeners
-    eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, (id) => on_chat_event('new_message', id));
-    eventSource.on(event_types.MESSAGE_SENT, (id) => on_chat_event('message_sent', id));
+    eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, (id) => on_chat_event('char_message', id));
+    eventSource.on(event_types.USER_MESSAGE_RENDERED, (id) => on_chat_event('user_message', id));
     eventSource.on(event_types.MESSAGE_DELETED, (id) => on_chat_event('message_deleted', id));
     eventSource.on(event_types.MESSAGE_EDITED, (id) => on_chat_event('message_edited', id));
     eventSource.on(event_types.MESSAGE_SWIPED, (id) => on_chat_event('message_swiped', id));
