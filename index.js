@@ -842,7 +842,6 @@ function update_message_visuals(i, style=true, text=null) {
 
     // div not found (message may not be loaded)
     if (!div_element) {
-        error("Failed to update message visuals: could not locate message div for index " + i);
         return;
     }
 
