@@ -67,6 +67,7 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - **New Slash Command**: `/stop_summarization` -  same as the stop button, aborts any summarization currently running.
 - **New Slash Command**: `/toggle_memory_popout` - toggles the memory config popout.
 - **New Slash Command**: `/summarize <n>` - summarizes the given message index (default to most recent message)
+- **New Menu Button**: You can now toggle memory for the current chat in the wand menu.
 - **Change**: Finally reworked the popout logic to fix the problem with the escape key. For real this time.
 - **Change**: Message visuals now properly update retroactively when clicking "load more messages" for long chats. Made possible via the second PR above, which was needed to emit an event after the new messages are loaded.
 - **Change**: Now triggers a summarization on user message if the option is selected, instead of waiting until the character sends a message.
@@ -116,10 +117,6 @@ You can configure how many messages (and/or summaries) to add as context when su
 - **New Feature**: Added an option to delay summarization by some number of messages.
 
 ### Todo
-- ~~Add option to select which characters are summarized in a group~~
-- ~~Add slash command to toggle popout~~
-- ~~Add slash command to stop summarization~~
-- ~~Add a delay option to slow down summarization (to handle rate limits for external APIs)~~
 - ~~Handle swiping, editing, and deleting summaries~~
 - ~~button to re-summarize a given message~~
 - ~~Display summaries below each message~~
@@ -143,6 +140,10 @@ You can configure how many messages (and/or summaries) to add as context when su
 - ~~Allow disabling extension in individual chats without giving it a profile.~~
 - ~~Add option to include a few previous messages/summaries in the summary prompt as context~~
 - ~~Progress bar for summarization of chat history~~
+- ~~Add option to select which characters are summarized in a group~~
+- ~~Add slash command to toggle popout~~
+- ~~Add slash command to stop summarization~~
+- ~~Add a delay option to slow down summarization (to handle rate limits for external APIs)~~
 - Maybe add an option to use different completion presets for the summarization.
   - This would completely replace the max token limit, instead allowing the user to select a completion preset.
   - Would need to find a way to retrieve the mak_tokens anyway for the {{words}} macro.

@@ -311,6 +311,9 @@ function toggle_chat_enabled(id=null) {
 
     // refresh settings UI
     refresh_settings()
+
+    // scroll to the bottom of the chat
+    scroll_to_bottom_of_chat();
 }
 function character_enabled(character_key) {
     // check if the given character is enabled for summarization in the current chat
@@ -2229,6 +2232,26 @@ function initialize_slash_commands() {
     }));
 }
 
+function add_menu_button(text, fa_icon, callback, hover=null) {
+    let $button = $(`
+    <div class="list-group-item flex-container flexGap5 interactable" title="${hover ?? text}" tabindex="0">
+        <i class="${fa_icon}"></i>
+        <span>${text}</span>
+    </div>
+    `)
+
+    let $extensions_menu = $('#extensionsMenu');
+    if (!$extensions_menu.length) {
+        error('Could not find the extensions menu');
+    }
+
+    $button.appendTo($extensions_menu)
+    $button.click(() => callback());
+}
+function initialize_menu_buttons() {
+    add_menu_button("Toggle Memory", "fa-solid fa-brain", toggle_chat_enabled, "Toggle memory for the current chat.")
+}
+
 
 // Popout handling.
 // We save a jQuery reference to the entire settings content, and move it between the original location and the popout.
@@ -2325,7 +2348,8 @@ jQuery(async function () {
     initialize_popout()
     initialize_message_buttons();
     initialize_group_member_buttons();
-    initialize_slash_commands()
+    initialize_slash_commands();
+    initialize_menu_buttons();
 
     // ST event listeners
     eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, (id) => on_chat_event('char_message', id));
