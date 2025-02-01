@@ -46,9 +46,14 @@
                     <button id="stop_summarization" class="menu_button fa-solid fa-stop" title="Stop all summarization immediately."></button>
                 </div>
 
-                 <label class="checkbox_label" title="New messages will be automatically summarized.">
+                 <label class="checkbox_label" title="New messages will be automatically summarized if they will be included in short-term memory.">
                     <input id="auto_summarize" type="checkbox" />
                     <span>Auto Summarize</span>
+                </label>
+
+                <label class="checkbox_label" title="Auto-summarization will be triggered when you send a message. When disabled, auto-summarization is triggered when you receive a message.">
+                    <input id="auto_summarize_on_send" type="checkbox" />
+                    <span>Auto Summarize On Send</span>
                 </label>
 
                 <label title="Show the progress bar when auto-summarizing more than 1 message." class="checkbox_label">
@@ -56,9 +61,8 @@
                     <span>Auto Summarize Progress Bar</span>
                 </label>
 
-
                 <label class="checkbox_label" title="Number of messages to delay summarization (0 = summarize up to the most recent message, 1 = lag behind by one message, etc.)">
-                    <input id="summarization_delay" class="text_pole widthUnset inline_setting" type="number" min="0" max="999" title="Number of messages to delay summarization (0 summarizes the message you just sent, 1 lags behind by one message, etc.)" />
+                    <input id="summarization_delay" class="text_pole widthUnset inline_setting" type="number" min="0" max="999" />
                     <span>Auto Summarize Message Lag</span>
                 </label>
 
@@ -136,7 +140,7 @@
 
                 <!-- Short-term memory -->
                 <hr>
-                <h4 class="textAlignCenter">Short-term Memory Injection <i class="fa-solid fa-info-circle" title="Determines which messages are included in the short-term memory injection and where. If you change this and include messages that weren't summarized previously, you can either re-summarize by clicking 'Regenerate All Memories' or just wait until automatic summarization triggers."></i></h4>
+                <h4 class="textAlignCenter">Short-term Memory Injection <i class="fa-solid fa-info-circle" title="Determines which messages are included in the short-term memory injection and where. If you change this and include messages that weren't summarized previously, you can either manually trigger a re-summarization or just wait until automatic summarization triggers."></i></h4>
 
                 <div class="flex-container justifyspacebetween alignitemscenter">
                     <button id="edit_short_term_memory_prompt" class="menu_button flex1" title="Edit the short-term memory prompt"><span>Edit</span></button>

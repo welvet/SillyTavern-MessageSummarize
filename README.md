@@ -2,28 +2,26 @@
 - This extension reworks how memory is stored by summarizing each message individually, rather than all at once.
 - Summaries are injected into the prompt at two levels: short-term memory and long-term memory.
 - Short term memory rotates out the most recent message summaries automatically.
-- Long-term memory stores summaries of manually-marked messages beyond the short-term memory.
+- Long-term memory stores summaries of manually-marked messages beyond the short-term limit.
 
-Pros:
-- Summarizing messages individually gets more accurate summaries, less likely to miss details.
-- Short-term memory guarantees that relevant info is always available from the most recent messages, but goes away once reaching the desired limit.
+Pros compared to the built-in summarization:
+- Summarizing messages individually (as opposed to all at once) gets more accurate summaries and is less likely to miss details.
+- Because each memory is stored separately, old summaries do not change when new ones are added.
+- Each summary is attached to the message it summarizes, so deleting a message removes only the associated memory.
+- Short-term memory guarantees that relevant info is always available from the most recent messages, but goes away once no longer relevant according to a set limit.
 - Long-term memory allows you to choose which details are important to remember, keeping them available for longer, up to a separate limit.
-- Summarization occurs automatically after a message is generated, so if your model generates faster than you read you'll never have to wait.
 
 Cons, with attempted solutions:
-- If you use Context Shifting, performing the summarizations on each message breaks it. To reduce this, have added a feature that allows you to define a batch size, summarizing multiple messages at once (still one at a time). This allows you to use context shifting for longer before summarizations occur.
-- If a message is too small, it may not be relevant. I've added a config setting to exclude messages under a given token length.
-- If a summarization is wrong, it can affect subsequent generations. I've added the ability to regenerate a summary or manually edit it if needed.
+- If you use Context Shifting, performing the summarizations on each message breaks it. To reduce this, I have added a feature that allows you to define a batch size, summarizing multiple messages at once (still one at a time). This allows you to use context shifting for longer before summarizations occur.
 - Summarizing a single message can sometimes miss important context from previous messages. I've added the ability to include a few previous messages (and/or summaries) in the summarization prompt as context.
-- If you want to add the extension to an existing chat, initial summarization of the chat might take a while. You can stop summarization at any time by clicking the "stop" button next to the progress bar.
 
 
 ### Usage
-- Install the extension in ST using the github link.
-- To mark a memory for long-term memory, click the "brain" icon in the message button menu.
+- Install the extension in ST using the github link: https://github.com/qvink/qvink_memory
+- To mark a message for long-term memory, click the "brain" icon in the message button menu.
 - To re-summarize a message, click the "Quote" icon in the message button menu.
 - To edit a summary, click on the summary text directly or click the "pen" icon in the message button menu.
-- To summarize an existing chat, go to the config and click the "Summarize Chat" button next to the "Summarization" section (two curved arrows).
+- To summarize an existing chat, go to the config and click the "Mass re-summarization" button next to the "Summarization" section (two curved arrows).
 - To only summarize certain characters in a group chat, open the group chat edit menu and scroll down to the member list. Click the glowing "brain" icon to toggle whether that character will be automatically summarized (if you have auto-summarization enabled).
 
 
@@ -37,25 +35,15 @@ Cons, with attempted solutions:
   - Red: Marked for long-term memory, but now out of context.
   - Grey: Excluded
 
-### Troubleshooting:
 
-- "ForbiddenError: invalid csrf token": You opened ST in multiple tabs.
-
-- "Syntax Error: No number after minus sign in JSON at position X": update your koboldcpp, or try disabling "Request token probabilities".
-
-- Summaries seem to be continuing the conversation rather than summarizing: probably an issue with your instruct template.
-Make sure you are using the correct template for your model, and make sure that system messages are properly distinct from user messages (the summaries use a system prompt). 
-This can be caused by the "System same as user" checkbox in your instruct template settings, which will cause all system messages to be treated like a user - uncheck that.
-You can also try unchecking "Nest Message in Summary Prompt" in the settings - some models behave better with this off.
-
-- My jailbreak isn't working: You'll need to put the jailbreak in the summarization prompt if you want it to be included.
-
-- "min new tokens must be in (0, max_new_tokens(X)], got Y" - your model has a minimum token amount, which is conflicting with the "Summarization Max Token Length" setting from this extension. Either reduce the minimum token amount (usually in the completion settings), or increase you Summarization Max Token Length.
-
-- Just updated and things are broken: try reloading the page. If that fails, you can try using the "/hard_reset" command, but it WILL **DELETE YOUR CONFIG PROFILES**. 
-
-If it's something else, please turn on "Debug Mode" in the settings and send me the output logs from your browser console and raise an issue or message on discord.
-
+### Slash Commands
+- `/toggle_memory`: Toggles the extension on and off for the current chat. Same as clicking "Toggle Chat Memory" in the config.
+- `/toggle_memory_display`: Toggles the display of summaries below each message. Same as clicking "Display Memories" in the config.
+- `/toggle_memory_popout`: Toggles the popout config menu.
+- `/summarize`: Summarizes the nth message in the chat (default to most recent message). Same as clicking the "quote" icon in the message button menu.
+- `/summarize_chat`: Summarizes the entire chat, with some message exclusion options. Same as clicking the "Mass re-summarization" button in the config.
+- `/stop_summarization`: stops any summarization currently running. Same as clicking the "stop" button in the config or next to the progress bar.
+- `/remember`: Mark the nth message for long-term memory, summarizing it if not already. Same as clicking the "brain" icon in the message button menu.
 
 ### Changelog
 #### v0.7.3
@@ -64,6 +52,7 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
   - https://github.com/SillyTavern/SillyTavern/pull/3331#issue-2803412920
 - **New Feature**: New button to copy all summaries in the entire chat to clipboard.
 - **New Feature**: You can now prevent certain characters from being summarized in group chats. To do this, open the group chat panel and go down to where you would normally mute characters. Use the glowing brain icon to toggle whether a character will be summarized. Note that this is separate from config profiles, and will only apply to the group chat you are in.
+- **New Feature**: Option to trigger auto-summarization when you *send* a message instead of when you *receive* one. This is useful if you frequently edit/swipe messages, as a summarization will only occur once you respond.
 - **New Slash Command**: `/stop_summarization` -  same as the stop button, aborts any summarization currently running.
 - **New Slash Command**: `/toggle_memory_popout` - toggles the memory config popout.
 - **New Slash Command**: `/summarize <n>` - summarizes the given message index (default to most recent message)
@@ -116,6 +105,28 @@ You can configure how many messages (and/or summaries) to add as context when su
 - **New Feature**: Added option to have the extension disabled by default for newly created chats
 - **New Feature**: Added an option to delay summarization by some number of messages.
 
+
+### Troubleshooting:
+
+- "ForbiddenError: invalid csrf token": You opened ST in multiple tabs.
+
+- "Syntax Error: No number after minus sign in JSON at position X": update your koboldcpp, or try disabling "Request token probabilities".
+
+- Summaries seem to be continuing the conversation rather than summarizing: probably an issue with your instruct template.
+Make sure you are using the correct template for your model, and make sure that system messages are properly distinct from user messages (the summaries use a system prompt). 
+This can be caused by the "System same as user" checkbox in your instruct template settings, which will cause all system messages to be treated like a user - uncheck that.
+You can also try toggling "Nest Message in Summary Prompt" in the settings - some models behave better with this.
+
+- My jailbreak isn't working: You'll need to put the jailbreak in the summarization prompt if you want it to be included.
+
+- "min new tokens must be in (0, max_new_tokens(X)], got Y": your model has a minimum token amount, which is conflicting with the "Summarization Max Token Length" setting from this extension. Either reduce the minimum token amount (usually in the completion settings), or increase you Summarization Max Token Length.
+
+- Just updated and things are broken: try reloading the page first.
+
+If it's something else, please turn on "Debug Mode" in the settings and send me the output logs from your browser console and raise an issue or message on discord.
+
+
+
 ### Todo
 - ~~Handle swiping, editing, and deleting summaries~~
 - ~~button to re-summarize a given message~~
@@ -131,12 +142,11 @@ You can configure how many messages (and/or summaries) to add as context when su
   - ~~Turns out to be an issue with ST. Issue raised [here](https://github.com/SillyTavern/SillyTavern/issues/3297#issue-2782705578)~~
   - ~~potential fix merged into staging branch [here](https://github.com/SillyTavern/SillyTavern/pull/3301).~~
 - ~~Fix issue causing the popout to bug out when pressing escape.~~
-- ~~Ability to edit summaries.~~
 - ~~Figure out how to limit the number of regular chat messages injected into the prompt so they can be replaced by the summaries.~~
 - ~~Move the prompt editing text areas to separate modals~~
 - ~~support group chats~~
 - ~~Add macro for max words to use in the summary prompt~~
-- ~~Set the frequency at which automatic summarizations occur (every X messages)~~
+- ~~Set the frequency at which automatic summarizations occur (e.g. every X messages)~~
 - ~~Allow disabling extension in individual chats without giving it a profile.~~
 - ~~Add option to include a few previous messages/summaries in the summary prompt as context~~
 - ~~Progress bar for summarization of chat history~~

@@ -96,6 +96,7 @@ const default_settings = {
     auto_summarize_on_edit: true,  // whether to automatically re-summarize edited chat messages
     auto_summarize_on_swipe: true,  // whether to automatically summarize new message swipes
     auto_summarize_progress: true,  // display a progress bar for auto-summarization
+    auto_summarize_on_send: false,  // trigger auto-summarization right before a new message is sent
 
     include_world_info: false,  // include world info in context when summarizing
     block_chat: true,  // block input when summarizing
@@ -510,10 +511,11 @@ function refresh_settings() {
 
         // when auto-summarize is disabled, related settings get disabled
         let auto_summarize = get_settings('auto_summarize');
-        $('#summarization_delay').prop('disabled', !auto_summarize);
+        $('#auto_summarize_on_send').prop('disabled', !auto_summarize)
         $('#auto_summarize_message_limit').prop('disabled', !auto_summarize);
         $('#auto_summarize_batch_size').prop('disabled', !auto_summarize);
         $('#auto_summarize_progress').prop('disabled', !auto_summarize);
+        $('#summarization_delay').prop('disabled', !auto_summarize);
 
         // If message history is disabled, disable the relevant settings
         let history_disabled = get_settings('include_message_history_mode') === "none";
@@ -1481,6 +1483,7 @@ async function summarize_text(prompt) {
         error(`Text ${token_size} exceeds context size ${context_size}.`);
     }
 
+    // TODO do the world info injection manually instead
     let include_world_info = get_settings('include_world_info');
     if (include_world_info) {
         /**
@@ -1808,11 +1811,12 @@ function copy_summaries_to_clipboard() {
 
 // Event handling
 var last_message_swiped = null  // if an index, that was the last message swiped
-async function on_chat_event(event=null, index=null) {
+async function on_chat_event(event=null, data=null) {
     // When the chat is updated, check if the summarization should be triggered
-    debug("Chat updated: " + event + " ID: " + index)
+    debug("Chat updated: " + event)
 
     const context = getContext();
+    let index = data
 
     switch (event) {
         case 'chat_changed':  // chat was changed
@@ -1823,7 +1827,6 @@ async function on_chat_event(event=null, index=null) {
                 scroll_to_bottom_of_chat();  // scroll to the bottom of the chat (area is added due to memories)
             }
             break;
-
         case 'message_deleted':   // message was deleted
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
             last_message_swiped = null;
@@ -1835,19 +1838,20 @@ async function on_chat_event(event=null, index=null) {
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
             last_message_swiped = null;
 
-            // if auto-summarizing user messages is disabled, skip
-            if (!get_settings('include_user_messages')) break;
+            if (!get_settings('auto_summarize')) break;  // if auto-summarize is disabled, do nothing
 
-            // otherwise, auto-summarize the chat
-            debug("New user message detected, summarizing")
-            await auto_summarize_chat();  // auto-summarize the chat (checks for exclusion criteria and whatnot)
+            // Summarize the chat if either "auto_summarize_on_send" is enabled or "include_user_messages" is enabled
+            if (get_settings('auto_summarize_on_send') || get_settings('include_user_messages')) {
+                debug("New user message detected, summarizing")
+                await auto_summarize_chat();  // auto-summarize the chat (checks for exclusion criteria and whatnot)
+            }
+
             break;
 
         case 'char_message':
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
             if (!context.groupId && context.characterId === undefined) break; // no characters or group selected
             if (streamingProcessor && !streamingProcessor.isFinished) break;  // Streaming in-progress
-
             if (last_message_swiped === index) {  // this is a swipe
                 let message = context.chat[index];
                 if (!get_settings('auto_summarize_on_swipe')) break;  // if auto-summarize on swipe is disabled, do nothing
@@ -1859,6 +1863,7 @@ async function on_chat_event(event=null, index=null) {
                 break;
             } else { // not a swipe
                 if (!get_settings('auto_summarize')) break;  // if auto-summarize is disabled, do nothing
+                if (get_settings("auto_summarize_on_send")) break;  // if auto_summarize_on_send is enabled, don't auto-summarize on character message
                 last_message_swiped = null;
                 debug("New message detected, summarizing")
                 await auto_summarize_chat();  // auto-summarize the chat (checks for exclusion criteria and whatnot)
@@ -1873,6 +1878,10 @@ async function on_chat_event(event=null, index=null) {
             if (!get_memory(context.chat[index], 'memory')) break;  // if the message doesn't have a memory, skip
             debug("Message with memory edited, summarizing")
             summarize_message(index);  // summarize that message (no await so the message edit goes through)
+
+            // TODO: I'd like to be able to refresh the memory here, but we can't await the summarization because
+            //  then the message edit visuals don't close.
+
             break;
 
         case 'message_swiped':  // when this event occurs, don't summarize yet (a new_message event will follow)
@@ -1962,6 +1971,7 @@ function initialize_settings_listeners() {
     bind_setting('#auto_summarize_batch_size', 'auto_summarize_batch_size', 'number');
     bind_setting('#auto_summarize_message_limit', 'auto_summarize_message_limit', 'number');
     bind_setting('#auto_summarize_progress', 'auto_summarize_progress', 'boolean');
+    bind_setting('#auto_summarize_on_send', 'auto_summarize_on_send', 'boolean');
 
     bind_setting('#include_world_info', 'include_world_info', 'boolean');
     bind_setting('#block_chat', 'block_chat', 'boolean');
@@ -2146,9 +2156,17 @@ function initialize_slash_commands() {
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'toggle_memory_display',
         callback: (args) => {
-            $('#display_memories').click();  // toggle the memory display
+            $(`.${settings_content_class} #display_memories`).click();  // toggle the memory display
         },
         helpString: "Toggle the \"display memories\" setting on the current profile (doesn't save the profile).",
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'toggle_memory_popout',
+        callback: (args) => {
+            toggle_popout()
+        },
+        helpString: 'Toggle the config popout',
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
@@ -2198,22 +2216,6 @@ function initialize_slash_commands() {
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'toggle_memory_popout',
-        callback: (args) => {
-            toggle_popout()
-        },
-        helpString: 'Toggle the config popout',
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'stop_summarization',
-        callback: (args) => {
-            stop_summarization()
-        },
-        helpString: 'Abort any summarization taking place.',
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'summarize',
         callback: async (args, index) => {
             if (index === "") index = null  // if not provided the index is an empty string, but we need it to be null to get the default behavior
@@ -2228,6 +2230,14 @@ function initialize_slash_commands() {
                 typeList: ARGUMENT_TYPE.NUMBER,
             }),
         ],
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'stop_summarization',
+        callback: (args) => {
+            stop_summarization()
+        },
+        helpString: 'Abort any summarization taking place.',
     }));
 }
 
