@@ -182,14 +182,17 @@ function get_current_character_identifier() {
     // uniquely identify the current character
     // You have to use the character's avatar image path to uniquely identify them
     let context = getContext();
-    let key = context.characterId;
-    if (!key) {
-        return null;
-    }
     if (context.groupId) {
         return context.groupId;  // if a group is selected, use the group ID
     }
-    return context.characters[key].avatar;
+
+    // otherwise get the avatar image path of the current character
+    let index = context.characterId;
+    if (!index) {  // not a group or a character
+        return null;
+    }
+
+    return context.characters[index].avatar;
 }
 
 // Completion presets
@@ -770,6 +773,7 @@ function delete_profile() {
 function toggle_character_profile() {
     // Toggle whether the current profile is set to the default for the current character (or group)
     let key = get_current_character_identifier();  // uniquely identify the current character or group chat
+    log("KEY: "+key)
     if (!key) {  // no character or group selected
         return;
     }
