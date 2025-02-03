@@ -52,7 +52,7 @@ Cons, with attempted solutions:
   - https://github.com/SillyTavern/SillyTavern/pull/3331#issue-2803412920
 - **New Feature**: New button to copy all summaries in the entire chat to clipboard.
 - **New Feature**: You can now prevent certain characters from being summarized in group chats. To do this, open the group chat panel and go down to where you would normally mute characters. Use the glowing brain icon to toggle whether a character will be summarized. Note that this is separate from config profiles, and will only apply to the group chat you are in.
-- **New Feature**: Option to trigger auto-summarization when you *send* a message instead of when you *receive* one. This is useful if you frequently edit/swipe messages, as a summarization will only occur once you respond.
+- **New Feature**: Option to trigger auto-summarization immediately *before* a new message instead of *after* a new message. This is useful if you frequently edit/swipe messages but don't want to use message lag. The tradeoff is that you then don't get the opportunity to edit the summary before it is injected for the following message.
 - **New Slash Command**: `/stop_summarization` -  same as the stop button, aborts any summarization currently running.
 - **New Slash Command**: `/toggle_memory_popout` - toggles the memory config popout.
 - **New Slash Command**: `/summarize <n>` - summarizes the given message index (default to most recent message)
@@ -126,6 +126,8 @@ You can also try toggling "Nest Message in Summary Prompt" in the settings - som
 If it's something else, please turn on "Debug Mode" in the settings and send me the output logs from your browser console and raise an issue or message on discord.
 
 
+### Known Issues
+- When using a message limit, world info time cooldown and sticky timed effects do not work properly.
 
 ### Todo
 - ~~Handle swiping, editing, and deleting summaries~~

@@ -1831,24 +1831,36 @@ async function on_chat_event(event=null, data=null) {
                 scroll_to_bottom_of_chat();  // scroll to the bottom of the chat (area is added due to memories)
             }
             break;
+
         case 'message_deleted':   // message was deleted
-            if (!chat_enabled()) break;  // if chat is disabled, do nothing
             last_message_swiped = null;
+            if (!chat_enabled()) break;  // if chat is disabled, do nothing
             debug("Message deleted, refreshing memory")
             refresh_memory();
             break;
 
-        case 'user_message':
+        case 'before_message':
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
-            last_message_swiped = null;
-
             if (!get_settings('auto_summarize')) break;  // if auto-summarize is disabled, do nothing
+            if (!get_settings('auto_summarize_on_send')) break;  // if auto-summarize-on-send is disabled, skip
+            index = context.chat.length - 1
+            if (last_message_swiped === index) break;  // this is a swipe, skip
+            debug("Summarizing chat before message")
+            await auto_summarize_chat();  // auto-summarize the chat
+            break;
 
-            // Summarize the chat if either "auto_summarize_on_send" is enabled or "include_user_messages" is enabled
-            if (get_settings('auto_summarize_on_send') || get_settings('include_user_messages')) {
-                debug("New user message detected, summarizing")
-                await auto_summarize_chat();  // auto-summarize the chat (checks for exclusion criteria and whatnot)
-            }
+        case 'user_message':
+            last_message_swiped = null;
+            if (!chat_enabled()) break;  // if chat is disabled, do nothing
+
+
+            // if (!get_settings('auto_summarize')) break;  // if auto-summarize is disabled, do nothing
+            //
+            // // Summarize the chat if either "auto_summarize_on_send" is enabled or "include_user_messages" is enabled
+            // if (get_settings('auto_summarize_on_send') || get_settings('include_user_messages')) {
+            //     debug("New user message detected, summarizing")
+            //     await auto_summarize_chat();  // auto-summarize the chat (checks for exclusion criteria and whatnot)
+            // }
 
             break;
 
@@ -1866,17 +1878,17 @@ async function on_chat_event(event=null, data=null) {
                 refresh_memory()
                 break;
             } else { // not a swipe
+                last_message_swiped = null;
                 if (!get_settings('auto_summarize')) break;  // if auto-summarize is disabled, do nothing
                 if (get_settings("auto_summarize_on_send")) break;  // if auto_summarize_on_send is enabled, don't auto-summarize on character message
-                last_message_swiped = null;
                 debug("New message detected, summarizing")
                 await auto_summarize_chat();  // auto-summarize the chat (checks for exclusion criteria and whatnot)
                 break;
             }
 
         case 'message_edited':  // Message has been edited
-            if (!chat_enabled()) break;  // if chat is disabled, do nothing
             last_message_swiped = null;
+            if (!chat_enabled()) break;  // if chat is disabled, do nothing
             if (!get_settings('auto_summarize_on_edit')) break;  // if auto-summarize on edit is disabled, skip
             if (!check_message_exclusion(context.chat[index])) break;  // if the message is excluded, skip
             if (!get_memory(context.chat[index], 'memory')) break;  // if the message doesn't have a memory, skip
@@ -1920,12 +1932,14 @@ function initialize_settings_listeners() {
     debug("Initializing settings listeners")
 
     // Trigger profile changes
+    bind_setting('#profile', 'profile', 'text', () => load_profile(), false);
     bind_function('#save_profile', () => save_profile(), false);
     bind_function('#restore_profile', () => load_profile(), false);
     bind_function('#rename_profile', () => rename_profile(), false)
     bind_function('#new_profile', new_profile, false);
     bind_function('#delete_profile', delete_profile, false);
     bind_function('#character_profile', () => toggle_character_profile(), false);
+
 
     bind_function('#rerun_memory', (e) => {summarize_chat_modal()})
     bind_function('#stop_summarization', stop_summarization);
@@ -1960,12 +1974,6 @@ function initialize_settings_listeners() {
         display_text_modal("{{history}} Macro Preview (Last Message)", history);
     })
     bind_function('#copy_summaries_to_clipboard', copy_summaries_to_clipboard)
-
-    // todo
-    //bind_function('#dump_to_lorebook', dump_memories_to_lorebook);
-    //bind_setting('#lorebook_entry', 'lorebook_entry')
-
-    bind_setting('#profile', 'profile', 'text', () => load_profile(), false);
 
     bind_setting('#auto_summarize', 'auto_summarize', 'boolean');
     bind_setting('#auto_summarize_on_edit', 'auto_summarize_on_edit', 'boolean');
@@ -2367,6 +2375,7 @@ jQuery(async function () {
     // ST event listeners
     eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, (id) => on_chat_event('char_message', id));
     eventSource.on(event_types.USER_MESSAGE_RENDERED, (id) => on_chat_event('user_message', id));
+    eventSource.on(event_types.GENERATE_BEFORE_COMBINE_PROMPTS, (id, stuff) => on_chat_event('before_message', id));
     eventSource.on(event_types.MESSAGE_DELETED, (id) => on_chat_event('message_deleted', id));
     eventSource.on(event_types.MESSAGE_EDITED, (id) => on_chat_event('message_edited', id));
     eventSource.on(event_types.MESSAGE_SWIPED, (id) => on_chat_event('message_swiped', id));
