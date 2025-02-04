@@ -50,18 +50,19 @@ Cons, with attempted solutions:
 - **IMPORTANT:** You must be on ST staging for this version to work as it relies on the following PRs which have not yet been merged into ST release:
   - https://github.com/SillyTavern/SillyTavern/pull/3327#issue-2803062094
   - https://github.com/SillyTavern/SillyTavern/pull/3331#issue-2803412920
-- **New Feature**: New button to copy all summaries in the entire chat to clipboard.
+  - https://github.com/SillyTavern/SillyTavern/pull/3430#issue-2831026016
 - **New Feature**: You can now prevent certain characters from being summarized in group chats. To do this, open the group chat panel and go down to where you would normally mute characters. Use the glowing brain icon to toggle whether a character will be summarized. Note that this is separate from config profiles, and will only apply to the group chat you are in.
-- **New Feature**: Option to trigger auto-summarization immediately *before* a new message instead of *after* a new message. This is useful if you frequently edit/swipe messages but don't want to use message lag. The tradeoff is that you then don't get the opportunity to edit the summary before it is injected for the following message.
+- **New Feature**: Option to trigger auto-summarization immediately *before* a new message instead of *after* a new message. This is useful if you don't want to use message lag to prevent the most recent message from getting immediately summarized after it is received. The tradeoff between this and message lag is that with this setting you don't get the opportunity to edit the summary before it is injected for the next message, whereas with message lag the summary of the most recent message won't be generated until after the next message. An example use-case for this setting would be if you have set your "Message History Limit" to 0, meaning that your previous messages aren't injected into context at all and you are completely relying on summaries. But, you also want to save on generation tokens by waiting until you have finished editing/swiping to perform a summary of the most recent message. In this case, you can't use message lag because then the most recent summary wouldn't be present for context. Instead, you would need to use this setting to prevent the most recent message from getting immediately summarized while also ensuring that the summary is generated before the next message.
+- **New Feature**: New button to copy all summaries in the entire chat to clipboard.
 - **New Slash Command**: `/stop_summarization` -  same as the stop button, aborts any summarization currently running.
 - **New Slash Command**: `/toggle_memory_popout` - toggles the memory config popout.
 - **New Slash Command**: `/summarize <n>` - summarizes the given message index (default to most recent message)
 - **New Menu Button**: You can now toggle memory for the current chat in the wand menu.
 - **Change**: Finally reworked the popout logic to fix the problem with the escape key. For real this time.
-- **Change**: Message visuals now properly update retroactively when clicking "load more messages" for long chats. Made possible via the second PR above, which was needed to emit an event after the new messages are loaded.
-- **Change**: Now triggers a summarization on user message if the option is selected, instead of waiting until the character sends a message.
+- **Change**: Message visuals now properly update retroactively when clicking "load more messages" for long chats.
+- **Change**: Auto-summarize now immediately triggers a summarization on user message if the option is selected, instead of waiting until the character sends a message.
 - **Change**: You guessed it, moved settings around again.
-- **Fix**: Fixed issue causing old swipes to not have their memory saved properly. The chat also now properly scrolls to the bottom when summarizing and swiping the most recent message.
+- **Fix**: Fixed issue causing old swipes to not have their memory saved properly. The chat also now properly scrolls to the bottom when summarizing and swiping the most recent message to accommodate the space of the displayed memory.
 - **Fix**: Fixed issue causing the most recent message's previous summary to be injected into the main prompt when swiping it.
 
 
@@ -127,7 +128,8 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 
 
 ### Known Issues
-- When using a message limit, world info time cooldown and sticky timed effects do not work properly.
+- When using a message limit, world info cooldown and sticky timed effects do not work properly. This is becausue the WI timed effects rely on the number of messages in the chat history during generation. I have not found a way around this yet.
+- When editing a message that already has a memory, the memory displayed below the message does not have the right color. This is just a visual bug, and it will correct itself after the next summarization.
 
 ### Todo
 - ~~Handle swiping, editing, and deleting summaries~~

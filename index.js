@@ -1345,7 +1345,7 @@ function get_short_memory() {
 globalThis.memory_intercept_messages = function (chat, _contextSize, _abort, type) {
     if (!chat_enabled()) return;   // if memory disabled, do nothing
     let limit = get_settings('limit_injected_messages');  // message limit from settings
-    if (limit === -1) return;  // if limit is -1, do nothing
+    if (limit < 0) return;  // if limit is -1, do nothing
 
     // truncate the chat up to the limit
     while (chat.length > limit) {
@@ -1896,7 +1896,7 @@ async function on_chat_event(event=null, data=null) {
             summarize_message(index);  // summarize that message (no await so the message edit goes through)
 
             // TODO: I'd like to be able to refresh the memory here, but we can't await the summarization because
-            //  then the message edit visuals don't close.
+            //  then the message edit textbox doesn't close until the summary is done.
 
             break;
 
