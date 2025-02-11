@@ -132,6 +132,7 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - When editing a message that already has a memory, the memory displayed below the message does not have the right color. This is just a visual bug, and it will correct itself after the next summarization.
 
 ### Todo
+- Add slash command to return state of the extension and toggle it on and off
 - ~~Handle swiping, editing, and deleting summaries~~
 - ~~button to re-summarize a given message~~
 - ~~Display summaries below each message~~
