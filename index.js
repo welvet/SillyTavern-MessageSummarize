@@ -510,7 +510,7 @@ function refresh_settings() {
 
     // enable or disable settings based on others
     if (chat_enabled()) {
-        $('.settings_input').prop('disabled', false);  // enable all settings
+        $(`.${settings_content_class} .settings_input`).prop('disabled', false);  // enable all settings
 
         // when auto-summarize is disabled, related settings get disabled
         let auto_summarize = get_settings('auto_summarize');
@@ -532,7 +532,7 @@ function refresh_settings() {
         }
 
     } else {  // memory is disabled for this chat
-        $('.settings_input').prop('disabled', true);  // disable all settings
+        $(`.${settings_content_class} .settings_input`).prop('disabled', true);  // disable all settings
     }
 
     // update the save icon highlight
