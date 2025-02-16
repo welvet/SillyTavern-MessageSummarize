@@ -2220,33 +2220,31 @@ function initialize_slash_commands() {
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'toggle_memory',
-        callback: (args) => {
-            toggle_chat_enabled();  // toggle the memory for the current chat
+        callback: (args, state) => {
+            if (state === "") {  // if not provided the state is an empty string, but we need it to be null to get the default behavior
+                state = null
+            } else {
+                state = state === "true"  // convert to boolean
+            }
+
+            toggle_chat_enabled(null, state);  // toggle the memory for the current chat
         },
-        helpString: 'Toggle memory for the current chat.',
+        helpString: 'Change whether memory is enabled for the current chat. If no state is provided, it will toggle the current state.',
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'Boolean value to set the memory state',
+                isRequired: false,
+                typeList: ARGUMENT_TYPE.BOOLEAN,
+            }),
+        ],
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'get_memory',
+        name: 'get_memory_enabled',
         callback: (args) => {
             return chat_enabled()
         },
         helpString: 'Return whether memory is currently enabled.'
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'set_memory',
-        callback: (args, state) => {
-            toggle_chat_enabled(null, state)
-        },
-        helpString: 'Enable or disable memory.',
-        unnamedArgumentList: [
-            SlashCommandArgument.fromProps({
-                description: 'Boolean value to set the memory state',
-                isRequired: true,
-                typeList: ARGUMENT_TYPE.BOOL,
-            }),
-        ],
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({

@@ -47,23 +47,29 @@ Cons, with attempted solutions:
 
 ### Changelog
 #### v0.7.3
-- **IMPORTANT:** You must be on ST staging for this version to work as it relies on the following PRs which have not yet been merged into ST release:
+- **IMPORTANT:** You must be on ST version 1.12.12 or above as it relies on the following PRs:
   - https://github.com/SillyTavern/SillyTavern/pull/3327#issue-2803062094
   - https://github.com/SillyTavern/SillyTavern/pull/3331#issue-2803412920
   - https://github.com/SillyTavern/SillyTavern/pull/3430#issue-2831026016
+- **New Feature**: You can now manually exclude a summarization from being injected without deleting it. A new button has been added to the message button menu to toggle the inclusion of the summary (labelled "Force Exclude"). Manually excluded summaries will be colored a darker grey color than automatically excluded summaries.
 - **New Feature**: You can now prevent certain characters from being summarized in group chats. To do this, open the group chat panel and go down to where you would normally mute characters. Use the glowing brain icon to toggle whether a character will be summarized. Note that this is separate from config profiles, and will only apply to the group chat you are in.
 - **New Feature**: Option to trigger auto-summarization immediately *before* a new message instead of *after* a new message. This is useful if you don't want to use message lag to prevent the most recent message from getting immediately summarized after it is received. The tradeoff between this and message lag is that with this setting you don't get the opportunity to edit the summary before it is injected for the next message, whereas with message lag the summary of the most recent message won't be generated until after the next message. An example use-case for this setting would be if you have set your "Message History Limit" to 0, meaning that your previous messages aren't injected into context at all and you are completely relying on summaries. But, you also want to save on generation tokens by waiting until you have finished editing/swiping to perform a summary of the most recent message. In this case, you can't use message lag because then the most recent summary wouldn't be present for context. Instead, you would need to use this setting to prevent the most recent message from getting immediately summarized while also ensuring that the summary is generated before the next message.
 - **New Feature**: New button to copy all summaries in the entire chat to clipboard.
 - **New Slash Command**: `/stop_summarization` -  same as the stop button, aborts any summarization currently running.
 - **New Slash Command**: `/toggle_memory_popout` - toggles the memory config popout.
 - **New Slash Command**: `/summarize <n>` - summarizes the given message index (default to most recent message)
-- **New Menu Button**: You can now toggle memory for the current chat in the wand menu.
+- **New Slash Command**: `/get_memory_enabled` - returns whether the extension is enabled in the current chat.
+- **New Slash Command**: `/force_exclude_memory <n>` - toggles the inclusion of the summary for the given message index, same as the new "Force Exclude" button.
+- **New Menu Button**: You can now also toggle memory for the current chat in the wand menu.
 - **Change**: Finally reworked the popout logic to fix the problem with the escape key. For real this time.
 - **Change**: Message visuals now properly update retroactively when clicking "load more messages" for long chats.
 - **Change**: Auto-summarize now immediately triggers a summarization on user message if the option is selected, instead of waiting until the character sends a message.
 - **Change**: You guessed it, moved settings around again.
+- **Change**: Moved the "summarize" message button away from the "remember" button to prevent accidentally re-summarizing a message when trying to mark it for long-term memory.
+- **Change**: The `/toggle_memory` slash command can now take a boolean argument to toggle the extension on and off directly within the current chat.
 - **Fix**: Fixed issue causing old swipes to not have their memory saved properly. The chat also now properly scrolls to the bottom when summarizing and swiping the most recent message to accommodate the space of the displayed memory.
 - **Fix**: Fixed issue causing the most recent message's previous summary to be injected into the main prompt when swiping it.
+- **Fix**: Fixed the `/remember` command not working properly when provided a message index.
 
 
 #### v0.7.1
@@ -132,8 +138,8 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - When editing a message that already has a memory, the memory displayed below the message does not have the right color. This is just a visual bug, and it will correct itself after the next summarization.
 
 ### Todo
-- Add slash command to return state of the extension and toggle it on and off
-- Add button to force-exclude a summary from memory
+- ~~Add slash command to return state of the extension and toggle it on and off~~
+- ~~Add button to force-exclude a summary from memory~~
 - Retrieve state of the auto-scroll chat setting and use for scrolling to the bottom
 - Allow setting a number of tokens for context sizes directly.
 - ~~Handle swiping, editing, and deleting summaries~~
