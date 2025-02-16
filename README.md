@@ -37,13 +37,15 @@ Cons, with attempted solutions:
 
 
 ### Slash Commands
-- `/toggle_memory`: Toggles the extension on and off for the current chat. Same as clicking "Toggle Chat Memory" in the config.
+- `/get_memory_enabled`: Returns whether the extension is enabled in the current chat.
+- `/toggle_memory`: Toggles the extension on and off for the current chat. Same as clicking "Toggle Chat Memory" in the config. Can also provide a boolean argument to toggle the extension directly.
 - `/toggle_memory_display`: Toggles the display of summaries below each message. Same as clicking "Display Memories" in the config.
 - `/toggle_memory_popout`: Toggles the popout config menu.
 - `/summarize`: Summarizes the nth message in the chat (default to most recent message). Same as clicking the "quote" icon in the message button menu.
 - `/summarize_chat`: Summarizes the entire chat, with some message exclusion options. Same as clicking the "Mass re-summarization" button in the config.
 - `/stop_summarization`: stops any summarization currently running. Same as clicking the "stop" button in the config or next to the progress bar.
 - `/remember`: Mark the nth message for long-term memory, summarizing it if not already. Same as clicking the "brain" icon in the message button menu.
+- `/force_exclude_memory`: Toggles the inclusion of the summary for the nth message. Same as clicking the "Force Exclude" button in the message button menu.
 
 ### Changelog
 #### v0.7.3
@@ -52,7 +54,7 @@ Cons, with attempted solutions:
   - https://github.com/SillyTavern/SillyTavern/pull/3331#issue-2803412920
   - https://github.com/SillyTavern/SillyTavern/pull/3430#issue-2831026016
 - **New Feature**: You can now manually exclude a summarization from being injected without deleting it. A new button has been added to the message button menu to toggle the inclusion of the summary (labelled "Force Exclude"). Manually excluded summaries will be colored a darker grey color than automatically excluded summaries.
-- **New Feature**: You can now prevent certain characters from being summarized in group chats. To do this, open the group chat panel and go down to where you would normally mute characters. Use the glowing brain icon to toggle whether a character will be summarized. Note that this is separate from config profiles, and will only apply to the group chat you are in.
+- **New Feature**: You can now prevent specific characters from being summarized in group chats. To do this, open the group chat panel and go down to where you would normally mute characters. Use the glowing brain icon to toggle whether a character will be summarized. Note that this is separate from config profiles, and will only apply to the group chat you are in.
 - **New Feature**: Option to trigger auto-summarization immediately *before* a new message instead of *after* a new message. This is useful if you don't want to use message lag to prevent the most recent message from getting immediately summarized after it is received. The tradeoff between this and message lag is that with this setting you don't get the opportunity to edit the summary before it is injected for the next message, whereas with message lag the summary of the most recent message won't be generated until after the next message. An example use-case for this setting would be if you have set your "Message History Limit" to 0, meaning that your previous messages aren't injected into context at all and you are completely relying on summaries. But, you also want to save on generation tokens by waiting until you have finished editing/swiping to perform a summary of the most recent message. In this case, you can't use message lag because then the most recent summary wouldn't be present for context. Instead, you would need to use this setting to prevent the most recent message from getting immediately summarized while also ensuring that the summary is generated before the next message.
 - **New Feature**: New button to copy all summaries in the entire chat to clipboard.
 - **New Slash Command**: `/stop_summarization` -  same as the stop button, aborts any summarization currently running.
@@ -70,6 +72,7 @@ Cons, with attempted solutions:
 - **Fix**: Fixed issue causing old swipes to not have their memory saved properly. The chat also now properly scrolls to the bottom when summarizing and swiping the most recent message to accommodate the space of the displayed memory.
 - **Fix**: Fixed issue causing the most recent message's previous summary to be injected into the main prompt when swiping it.
 - **Fix**: Fixed the `/remember` command not working properly when provided a message index.
+- **Misc**: This changelog and previous versions are now present on the github page.
 
 
 #### v0.7.1
@@ -119,6 +122,8 @@ You can configure how many messages (and/or summaries) to add as context when su
 
 - "Syntax Error: No number after minus sign in JSON at position X": update your koboldcpp, or try disabling "Request token probabilities".
 
+- "min new tokens must be in (0, max_new_tokens(X)], got Y": your model has a minimum token amount, which is conflicting with the "Summarization Max Token Length" setting from this extension. Either reduce the minimum token amount (usually in the completion settings), or increase you Summarization Max Token Length.
+
 - Summaries seem to be continuing the conversation rather than summarizing: probably an issue with your instruct template.
 Make sure you are using the correct template for your model, and make sure that system messages are properly distinct from user messages (the summaries use a system prompt). 
 This can be caused by the "System same as user" checkbox in your instruct template settings, which will cause all system messages to be treated like a user - uncheck that.
@@ -126,22 +131,24 @@ You can also try toggling "Nest Message in Summary Prompt" in the settings - som
 
 - My jailbreak isn't working: You'll need to put the jailbreak in the summarization prompt if you want it to be included.
 
-- "min new tokens must be in (0, max_new_tokens(X)], got Y": your model has a minimum token amount, which is conflicting with the "Summarization Max Token Length" setting from this extension. Either reduce the minimum token amount (usually in the completion settings), or increase you Summarization Max Token Length.
+- The summaries refer to "a person" or "someone" rather than the character by name: Try using the "Message History" setting to include a few previous messages in the summarization prompt to give the model a little more context.
 
-- Just updated and things are broken: try reloading the page first.
+- Just updated and things are broken: try reloading the page first, and make sure you are on the most recent version of ST. 
 
 If it's something else, please turn on "Debug Mode" in the settings and send me the output logs from your browser console and raise an issue or message on discord.
 
 
 ### Known Issues
-- When using a message limit, world info cooldown and sticky timed effects do not work properly. This is becausue the WI timed effects rely on the number of messages in the chat history during generation. I have not found a way around this yet.
+- When using a message limit, world info cooldown and sticky timed effects do not work properly. This is because the WI timed effects rely on the number of messages in the chat history during generation. I have not found a way around this yet.
 - When editing a message that already has a memory, the memory displayed below the message does not have the right color. This is just a visual bug, and it will correct itself after the next summarization.
 
 ### Todo
-- ~~Add slash command to return state of the extension and toggle it on and off~~
 - ~~Add button to force-exclude a summary from memory~~
+- ~~Add slash command to return state of the extension and toggle it on and off~~
 - Retrieve state of the auto-scroll chat setting and use for scrolling to the bottom
 - Allow setting a number of tokens for context sizes directly.
+- Slash command to retrieve a
+- Standardize the slash command naming once we have a few more.
 - ~~Handle swiping, editing, and deleting summaries~~
 - ~~button to re-summarize a given message~~
 - ~~Display summaries below each message~~
