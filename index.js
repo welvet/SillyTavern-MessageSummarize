@@ -45,6 +45,7 @@ const css_message_div = "qvink_memory_display"
 const css_short_memory = "qvink_short_memory"
 const css_long_memory = "qvink_long_memory"
 const css_remember_memory = `qvink_remember_memory`
+const css_exclude_memory = `qvink_exclude_memory`
 const summary_div_class = `qvink_memory_text`  // class put on all added summary divs to identify them
 const css_button_separator = `qvink_memory_button_separator`
 const css_edit_textarea = `qvink_memory_edit_textarea`
@@ -289,16 +290,28 @@ function chat_enabled() {
     let context = getContext();
     return get_settings('chats_enabled')?.[context.chatId] ?? get_settings('default_chat_enabled')
 }
-function toggle_chat_enabled(id=null) {
+
+function toggle_chat_enabled(id=null, value=null) {
     let context = getContext();
     if (id === null) {
         id = context.chatId;
     }
 
+    // if value is null, toggle. Otherwise, set to the given value
+
     // Toggle whether to enable or disable memory for the current character
     let enabled = get_settings('chats_enabled')
     let current = enabled[id] ?? get_settings('default_chat_enabled');
-    enabled[id] = !current;
+
+    if (value === null) {  // toggle
+        enabled[id] = !current;
+    } else if (value === current) {
+        return;  // no change
+    } else {  // set to the given value
+        enabled[id] = value;
+    }
+
+    // save the setting
     set_settings('chats_enabled', enabled);
 
     if (enabled[id]) {
@@ -844,6 +857,7 @@ function update_message_visuals(i, style=true, text=null) {
     let include = get_memory(message, 'include');
     let error_message = get_memory(message, 'error');
     let remember = get_memory(message, 'remember');
+    let exclude = get_memory(message, 'exclude');  // force-excluded by user
     let div_element = get_message_div(i);
 
     // div not found (message may not be loaded)
@@ -866,10 +880,12 @@ function update_message_visuals(i, style=true, text=null) {
     if (style) {
         if (remember && include) {  // marked to be remembered and included in memory anywhere
             style_class = css_long_memory
-        } else if (include === "short") { // not marked to remember, but included in short-term memory
+        } else if (include === "short") {  // not marked to remember, but included in short-term memory
             style_class = css_short_memory
         } else if (remember) {  // marked to be remembered but not included in memory
             style_class = css_remember_memory
+        } else if (exclude) {  // marked as force-excluded
+            style_class = css_exclude_memory
         }
     }
 
@@ -1147,6 +1163,7 @@ async function remember_message_toggle(index=null) {
     // toggle
     let message = context.chat[index]
     store_memory(message, 'remember', !get_memory(message, 'remember'));
+    store_memory(message, 'exclude', false);  // if it's remembered, it can't be excluded
 
     let new_status = get_memory(message, 'remember')
     let memory = get_memory(message, 'memory')
@@ -1157,6 +1174,22 @@ async function remember_message_toggle(index=null) {
         await summarize_message(index);
     }
     refresh_memory();
+}
+function forget_message_toggle(index=null) {
+    // Toggle the "forget" status of a message
+    let context = getContext();
+
+    // Default to the last message, min 0
+    index = Math.max(index ?? context.chat.length-1, 0)
+
+    // toggle
+    let message = context.chat[index]
+    store_memory(message, 'exclude', !get_memory(message, 'exclude'));
+    store_memory(message, 'remember', false);  // if it's excluded, it can't be remembered
+
+    let new_status = get_memory(message, 'exclude')
+    debug(`Set message ${index} exclude status: ${new_status}`);
+    refresh_memory()
 }
 function get_character_key(message) {
     // get the unique identifier of the character that sent a message
@@ -1178,6 +1211,11 @@ function check_message_exclusion(message) {
     // first check if it has been marked to be remembered by the user - if so, it bypasses all other exclusion criteria
     if (get_memory(message, 'remember')) {
         return true;
+    }
+
+    // check if it's marked to be excluded - if so, exclude it
+    if (get_memory(message, 'exclude')) {
+        return false;
     }
 
     // check if it's a user message and exclude if the setting is disabled
@@ -2033,9 +2071,11 @@ function initialize_message_buttons() {
     let remember_button_class = `${MODULE_NAME}_remember_button`
     let summarize_button_class = `${MODULE_NAME}_summarize_button`
     let edit_button_class = `${MODULE_NAME}_edit_button`
+    let forget_button_class = `${MODULE_NAME}_forget_button`
 
     let html = `
-<div title="Remember (toggle)" class="mes_button ${remember_button_class} fa-solid fa-brain" tabindex="0"></div>
+<div title="Remember (toggle inclusion of summary in long-term memory)" class="mes_button ${remember_button_class} fa-solid fa-brain" tabindex="0"></div>
+<div title="Force Exclude (toggle inclusion of summary from all memory)" class="mes_button ${forget_button_class} fa-solid fa-ban" tabindex="0"></div>
 <div title="Edit Summary" class="mes_button ${edit_button_class} fa-solid fa-pen-fancy" tabindex="0"></div>
 <div title="Summarize (AI)" class="mes_button ${summarize_button_class} fa-solid fa-quote-left" tabindex="0"></div>
 <span class="${css_button_separator}"></span>
@@ -2049,6 +2089,11 @@ function initialize_message_buttons() {
         const message_id = Number(message_block.attr("mesid"));
         remember_message_toggle(message_id);
     });
+    $(document).on("click", `.${forget_button_class}`, async function () {
+      const message_block = $(this).closest(".mes");
+        const message_id = Number(message_block.attr("mesid"));
+        forget_message_toggle(message_id);
+    })
     $(document).on("click", `.${summarize_button_class}`, async function () {
         const message_block = $(this).closest(".mes");
         const message_id = Number(message_block.attr("mesid"));
@@ -2158,11 +2203,50 @@ function initialize_slash_commands() {
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'force_exclude_memory',
+        callback: (args, index) => {
+            if (index === "") index = null  // if not provided the index is an empty string, but we need it to be null to get the default behavior
+            forget_message_toggle(index);
+        },
+        helpString: 'Toggle the ememory exclusion status of a message (default is the most recent message)',
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'Index of the message to toggle',
+                isRequired: false,
+                typeList: ARGUMENT_TYPE.NUMBER,
+            }),
+        ],
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'toggle_memory',
         callback: (args) => {
             toggle_chat_enabled();  // toggle the memory for the current chat
         },
         helpString: 'Toggle memory for the current chat.',
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'get_memory',
+        callback: (args) => {
+            return chat_enabled()
+        },
+        helpString: 'Return whether memory is currently enabled.'
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'set_memory',
+        callback: (args, state) => {
+            toggle_chat_enabled(null, state)
+        },
+        helpString: 'Enable or disable memory.',
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'Boolean value to set the memory state',
+                isRequired: true,
+                typeList: ARGUMENT_TYPE.BOOL,
+            }),
+        ],
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
