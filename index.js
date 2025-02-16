@@ -6,6 +6,7 @@ import {
     animation_duration,
     eventSource,
     event_types,
+    scrollChatToBottom,
     extension_prompt_roles,
     extension_prompt_types,
     generateQuietPrompt,
@@ -330,7 +331,7 @@ function toggle_chat_enabled(id=null, value=null) {
     refresh_settings()
 
     // scroll to the bottom of the chat
-    scroll_to_bottom_of_chat();
+    scrollChatToBottom()
 }
 function character_enabled(character_key) {
     // check if the given character is enabled for summarization in the current chat
@@ -909,11 +910,6 @@ function update_message_visuals(i, style=true, text=null) {
         edit_memory(i);
     })
 }
-function scroll_to_bottom_of_chat() {
-    // Scroll to the bottom of the chat
-    let chat = $('#chat');
-    chat.scrollTop(chat[0].scrollHeight);
-}
 function edit_memory(index) {
     // Allow the user to edit a message summary
     let message = getContext().chat[index];
@@ -1477,7 +1473,7 @@ async function summarize_message(index=null) {
 
     // If the most recent message, scroll to the bottom
     if (index === chat.length - 1) {
-        scroll_to_bottom_of_chat();
+        scrollChatToBottom();
     }
 
     // construct the full summary prompt for the message
@@ -1513,7 +1509,7 @@ async function summarize_message(index=null) {
 
     // If the most recent message, scroll to the bottom
     if (index === chat.length - 1) {
-        scroll_to_bottom_of_chat();
+        scrollChatToBottom()
     }
 }
 async function summarize_text(prompt) {
@@ -1866,7 +1862,7 @@ async function on_chat_event(event=null, data=null) {
             load_character_profile();  // load the profile for the current character
             refresh_memory();  // refresh the memory state
             if (context?.chat?.length) {
-                scroll_to_bottom_of_chat();  // scroll to the bottom of the chat (area is added due to memories)
+                scrollChatToBottom();  // scroll to the bottom of the chat (area is added due to memories)
             }
             break;
 
@@ -1954,7 +1950,7 @@ async function on_chat_event(event=null, data=null) {
             last_message_swiped = index;
 
             // make sure the chat is scrolled to the bottom because the memory will change
-            scroll_to_bottom_of_chat()
+            scrollChatToBottom();
             break;
 
         default:
