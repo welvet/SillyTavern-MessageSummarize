@@ -145,9 +145,8 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 ### Todo
 - ~~Add button to force-exclude a summary from memory~~
 - ~~Add slash command to return state of the extension and toggle it on and off~~
-- Retrieve state of the auto-scroll chat setting and use for scrolling to the bottom
 - Allow setting a number of tokens for context sizes directly.
-- Slash command to retrieve a
+- Slash command to retrieve a memory by index
 - Standardize the slash command naming once we have a few more.
 - ~~Handle swiping, editing, and deleting summaries~~
 - ~~button to re-summarize a given message~~

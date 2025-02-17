@@ -1888,13 +1888,13 @@ async function on_chat_event(event=null, data=null) {
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
 
 
-            // if (!get_settings('auto_summarize')) break;  // if auto-summarize is disabled, do nothing
-            //
-            // // Summarize the chat if either "auto_summarize_on_send" is enabled or "include_user_messages" is enabled
-            // if (get_settings('auto_summarize_on_send') || get_settings('include_user_messages')) {
-            //     debug("New user message detected, summarizing")
-            //     await auto_summarize_chat();  // auto-summarize the chat (checks for exclusion criteria and whatnot)
-            // }
+            if (!get_settings('auto_summarize')) break;  // if auto-summarize is disabled, do nothing
+
+            // Summarize the chat if either "auto_summarize_on_send" is enabled or "include_user_messages" is enabled
+            if (get_settings('auto_summarize_on_send') || get_settings('include_user_messages')) {
+                debug("New user message detected, summarizing")
+                await auto_summarize_chat();  // auto-summarize the chat (checks for exclusion criteria and whatnot)
+            }
 
             break;
 
