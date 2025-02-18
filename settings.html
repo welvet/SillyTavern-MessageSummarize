@@ -46,6 +46,13 @@
                     <button id="stop_summarization" class="menu_button fa-solid fa-stop" title="Stop all summarization immediately."></button>
                 </div>
 
+                <div class="flex-container justifyspacebetween alignitemscenter">
+                    <label for="completion_preset" class="checkbox_label">
+                        <span>Completion Preset </span>
+                        <select id="completion_preset" class="text_pole flex2" title="The paramter preset to use for summaries."></select>
+                    </label>
+                </div>
+
                  <label class="checkbox_label" title="New messages will be automatically summarized if they will be included in short-term memory.">
                     <input id="auto_summarize" type="checkbox" />
                     <span>Auto Summarize</span>
@@ -79,11 +86,6 @@
                 <label class="checkbox_label" title="Time in seconds to wait between summarizations. May be needed if you are using a external API with a rate limit.">
                     <input id="summarization_time_delay" class="text_pole widthUnset inline_setting" type="number" min="0" max="999" />
                     <span>Summarization Time Delay</span>
-                </label>
-
-                <label title="The maximum token length a summary is allowed to be before cutting it off. Use the {{words}} macro in the summarization prompt to get this value.">
-                    <input id="summary_maximum_length" class="text_pole widthUnset inline_setting" type="number" min="1" max="999" />
-                    <span>Summary Max Token Length</span>
                 </label>
 
                 <label title="Editing a message will automatically trigger a re-summarization if it has already been summarized." class="checkbox_label">

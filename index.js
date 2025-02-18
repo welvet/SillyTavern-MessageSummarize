@@ -19,7 +19,8 @@ import {
     setExtensionPrompt,
     streamingProcessor,
     stopGeneration,
-    callPopup
+    callPopup,
+    getRequestHeaders
 } from '../../../../script.js';
 import { formatInstructModeChat } from '../../../instruct-mode.js';
 import { Popup, POPUP_TYPE } from '../../../popup.js';
@@ -30,6 +31,7 @@ import { getTextTokens, getTokenCount, tokenizers } from '../../../tokenizers.js
 import { debounce_timeout } from '../../../constants.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
+import { executeSlashCommandsWithOptions } from '../../../slash-commands.js';
 import { ARGUMENT_TYPE, SlashCommandArgument, SlashCommandNamedArgument } from '../../../slash-commands/SlashCommandArgument.js';
 import { MacrosParser } from '../../../macros.js';
 import { commonEnumProviders } from '../../../slash-commands/SlashCommandCommonEnumsProvider.js';
@@ -90,6 +92,7 @@ const default_settings = {
 
     // summarization settings
     prompt: default_prompt,
+    completion_preset: null,  // completion preset to use for summarization. Null indicates the same as currently selected.
     auto_summarize: true,   // whether to automatically summarize new chat messages
     summarization_delay: 0,  // delay auto-summarization by this many messages (0 summarizes immediately after sending, 1 waits for one message, etc)
     summarization_time_delay: 0, // time in seconds to delay between summarizations
@@ -102,7 +105,6 @@ const default_settings = {
 
     include_world_info: false,  // include world info in context when summarizing
     block_chat: true,  // block input when summarizing
-    summary_maximum_length: 30,  // maximum token length of the summary
     nest_messages_in_prompt: false,  // nest messages to summarize in the prompt for summarization
 
     include_message_history: 3,  // include a number of previous messages in the prompt for summarization
@@ -200,22 +202,37 @@ function get_current_character_identifier() {
 // Completion presets
 async function get_current_preset() {
     // get the currently selected completion preset
-    return await executeSlashCommandsWithOptions(`/preset`)
+    let result = await executeSlashCommandsWithOptions(`/preset`)
+    debug(`Getting current completion preset: ${result.pipe}`)
+    return result.pipe
 }
 async function set_preset(name) {
     // Set the completion preset
+    debug(`Setting completion preset to ${name}`)
     if (get_settings('debug_mode')) {
         toastr.info(`Setting completion preset to ${name}`);
     }
     await executeSlashCommandsWithOptions(`/preset ${name}`)
 }
 function get_presets() {
-    // get a list of the available presets
+    // get a list of the available presets from the UI
     return $('#settings_preset_textgenerationwebui').children().map(function () {
         return $(this).text();
     }).get();
 }
 
+async function get_completion_preset_max_tokens() {
+    // get the maximum token length for the current completion preset
+    const response = await fetch('/api/settings/get', {
+        method: 'POST',
+        headers: getRequestHeaders(),
+        body: JSON.stringify({}),
+        cache: 'no-cache',
+    });
+    let data = await response.json();
+    let settings = JSON.parse(data.settings);
+    return settings.amount_gen
+}
 
 
 
@@ -493,7 +510,7 @@ function refresh_settings() {
 
     // Set the UI profile dropdowns to reflect the available profiles and the currently chosen one
     let profile_options = Object.keys(get_settings('profiles'));
-    let choose_profile_dropdown = $('#profile').empty();
+    let choose_profile_dropdown = $(`.${settings_content_class} #profile`).empty();
     let current_character_profile = get_character_profile();
     for (let profile of profile_options) {
 
@@ -509,6 +526,24 @@ function refresh_settings() {
     if (current_character_profile) {  // set the current chosen profile in the dropdown
         choose_profile_dropdown.val(current_character_profile);
     }
+
+    // set the completion preset dropdown
+    let $preset_select = $(`.${settings_content_class} #completion_preset`);
+    let current_preset = get_settings('completion_preset')
+    let preset_options = get_presets()
+    $preset_select.empty();
+    $preset_select.append(`<option value="">Same as Current</option>`)
+    for (let option of preset_options) {  // construct the dropdown options
+        $preset_select.append(`<option value="${option}">${option}</option>`)
+    }
+    if (current_preset !== null) {
+        $preset_select.val(current_preset)
+    } else {
+        $preset_select.val('')
+    }
+    $preset_select.on('click', function () {  // set a click event to refresh settings so we get any newly created presets
+        refresh_settings()
+    })
 
     // if prompt doesn't have {{message}}, insert it
     if (!get_settings('prompt').includes("{{message}}")) {
@@ -1521,8 +1556,16 @@ async function summarize_text(prompt) {
         error(`Text ${token_size} exceeds context size ${context_size}.`);
     }
 
+    // set the current completion preset and save the current one
+    let summary_preset = get_settings('completion_preset');
+    let current_preset = await get_current_preset();
+    if (summary_preset !== null) {
+        await set_preset(summary_preset);
+    }
+
     // TODO do the world info injection manually instead
     let include_world_info = get_settings('include_world_info');
+    let result;
     if (include_world_info) {
         /**
          * Background generation based on the provided prompt.
@@ -1534,7 +1577,7 @@ async function summarize_text(prompt) {
          * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
          * @returns
          */
-        return await generateQuietPrompt(prompt, false, false, '', "assistant", get_settings('summary_maximum_length'));
+        result = await generateQuietPrompt(prompt, false, false, '', "assistant");
     } else {
         /**
          * Generates a message using the provided prompt.
@@ -1546,8 +1589,15 @@ async function summarize_text(prompt) {
          * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
          * @returns {Promise<string>} Generated message
          */
-        return await generateRaw(prompt, '', true, false, '', get_settings('summary_maximum_length'));
+        result = await generateRaw(prompt, '', true, false, '');
     }
+
+    // restore the completion preset
+    if (summary_preset !== null) {
+        await set_preset(current_preset);
+    }
+
+    return result;
 }
 function get_message_history(index) {
     // Get a history of messages leading up to the given index (excluding the message at the index)
@@ -1883,19 +1933,10 @@ async function on_chat_event(event=null, data=null) {
             await auto_summarize_chat();  // auto-summarize the chat
             break;
 
+        // currently no triggers on user message rendered
         case 'user_message':
             last_message_swiped = null;
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
-
-
-            if (!get_settings('auto_summarize')) break;  // if auto-summarize is disabled, do nothing
-
-            // Summarize the chat if either "auto_summarize_on_send" is enabled or "include_user_messages" is enabled
-            if (get_settings('auto_summarize_on_send') || get_settings('include_user_messages')) {
-                debug("New user message detected, summarizing")
-                await auto_summarize_chat();  // auto-summarize the chat (checks for exclusion criteria and whatnot)
-            }
-
             break;
 
         case 'char_message':
@@ -1974,7 +2015,6 @@ function initialize_settings_listeners() {
     bind_function('#delete_profile', delete_profile, false);
     bind_function('#character_profile', () => toggle_character_profile(), false);
 
-
     bind_function('#rerun_memory', (e) => {summarize_chat_modal()})
     bind_function('#stop_summarization', stop_summarization);
     bind_function('#revert_settings', reset_settings);
@@ -2009,6 +2049,7 @@ function initialize_settings_listeners() {
     })
     bind_function('#copy_summaries_to_clipboard', copy_summaries_to_clipboard)
 
+    bind_setting('#completion_preset', 'completion_preset', 'text')
     bind_setting('#auto_summarize', 'auto_summarize', 'boolean');
     bind_setting('#auto_summarize_on_edit', 'auto_summarize_on_edit', 'boolean');
     bind_setting('#auto_summarize_on_swipe', 'auto_summarize_on_swipe', 'boolean');
@@ -2026,7 +2067,6 @@ function initialize_settings_listeners() {
     bind_setting('#include_thought_messages', 'include_thought_messages', 'boolean');
 
     bind_setting('#message_length_threshold', 'message_length_threshold', 'number');
-    bind_setting('#summary_maximum_length', 'summary_maximum_length', 'number');
     bind_setting('#nest_messages_in_prompt', 'nest_messages_in_prompt', 'boolean')
 
     bind_setting('#include_message_history', 'include_message_history', 'number');
@@ -2166,8 +2206,19 @@ function initialize_slash_commands() {
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'qvink_log_settings',
-        callback: (args) => {
+        callback: async (args) => {
             log(extension_settings[MODULE_NAME])
+
+            const response = await fetch('/api/settings/get', {
+                method: 'POST',
+                headers: getRequestHeaders(),
+                body: JSON.stringify({}),
+                cache: 'no-cache',
+            });
+            let data = await response.json();
+            let settings = JSON.parse(data.settings);
+            log(settings)
+
         },
         helpString: 'Log current settings',
     }));
@@ -2463,5 +2514,5 @@ jQuery(async function () {
     eventSource.on(event_types.GROUP_UPDATED, set_character_enabled_button_states)
 
     // Macros
-    MacrosParser.registerMacro("words", () => get_settings('summary_maximum_length'));
+    MacrosParser.registerMacro("words", () => get_completion_preset_max_tokens());
 });
