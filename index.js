@@ -2375,6 +2375,23 @@ function initialize_slash_commands() {
         },
         helpString: 'Abort any summarization taking place.',
     }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'get_memory',
+        callback: async (args, index) => {
+            let chat = getContext().chat
+            if (index === "") index = chat.length - 1
+            return get_memory(chat[index], "memory")
+        },
+        helpString: 'Return the memory associated with a given message index. If no index given, assumes the most recent message.',
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'Index of the message',
+                isRequired: false,
+                typeList: ARGUMENT_TYPE.NUMBER,
+            }),
+        ],
+    }));
 }
 
 function add_menu_button(text, fa_icon, callback, hover=null) {

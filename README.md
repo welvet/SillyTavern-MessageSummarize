@@ -151,7 +151,7 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Add button to force-exclude a summary from memory~~
 - ~~Add slash command to return state of the extension and toggle it on and off~~
 - Allow setting a number of tokens for context sizes directly.
-- Slash command to retrieve a memory by index
+- ~~Slash command to retrieve a memory by index~~
 - Standardize the slash command naming once we have a few more.
 - ~~Handle swiping, editing, and deleting summaries~~
 - ~~button to re-summarize a given message~~
@@ -179,9 +179,7 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Add slash command to toggle popout~~
 - ~~Add slash command to stop summarization~~
 - ~~Add a delay option to slow down summarization (to handle rate limits for external APIs)~~
-- Maybe add an option to use different completion presets for the summarization.
-  - This would completely replace the max token limit, instead allowing the user to select a completion preset.
-  - Would need to find a way to retrieve the mak_tokens anyway for the {{words}} macro.
+- ~~Maybe add an option to use different completion presets for the summarization.~~
 - ~~Need to detect when more messages are loaded into the chat via the "load more message" button, and update the message visuals to display any memories on them. Annoyingly, no event seems to be fired when the chat updates this way (that I could find).~~
   - ~~PR for event that triggers when more messages are loaded [here](https://github.com/SillyTavern/SillyTavern/pull/3331#issue-2803412920)~~
 
