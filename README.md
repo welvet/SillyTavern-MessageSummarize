@@ -1,4 +1,4 @@
-### Improved Summarization
+### Description
 - This extension reworks how memory is stored by summarizing each message individually, rather than all at once.
 - Summaries are injected into the prompt at two levels: short-term memory and long-term memory.
 - Short term memory rotates out the most recent message summaries automatically.
@@ -15,16 +15,6 @@ Cons, with attempted solutions:
 - If you use Context Shifting, performing the summarizations on each message breaks it. To reduce this, I have added a feature that allows you to define a batch size, summarizing multiple messages at once (still one at a time). This allows you to use context shifting for longer before summarizations occur.
 - Summarizing a single message can sometimes miss important context from previous messages. I've added the ability to include a few previous messages (and/or summaries) in the summarization prompt as context.
 
-
-### Usage
-- Install the extension in ST using the github link: https://github.com/qvink/qvink_memory
-- To mark a message for long-term memory, click the "brain" icon in the message button menu.
-- To re-summarize a message, click the "Quote" icon in the message button menu.
-- To edit a summary, click on the summary text directly or click the "pen" icon in the message button menu.
-- To summarize an existing chat, go to the config and click the "Mass re-summarization" button next to the "Summarization" section (two curved arrows).
-- To only summarize certain characters in a group chat, open the group chat edit menu and scroll down to the member list. Click the glowing "brain" icon to toggle whether that character will be automatically summarized (if you have auto-summarization enabled).
-
-
 ### Notable Features
 - Configuration profiles: save and load different configurations profiles and set one to be auto-loaded for each character.
 - Popout config menu: customize summarization settings, injection settings, and auto-summarization message inclusion criteria.
@@ -35,6 +25,27 @@ Cons, with attempted solutions:
   - Red: Marked for long-term memory, but now out of context.
   - Grey: Excluded
 
+### Usage
+- Install the extension in ST using the github link: https://github.com/qvink/qvink_memory
+- To mark a message for long-term memory, click the "brain" icon in the message button menu.
+- To re-summarize a message, click the "Quote" icon in the message button menu.
+- To edit a summary, click on the summary text directly or click the "pen" icon in the message button menu.
+- To summarize an existing chat, go to the config and click the "Mass re-summarization" button next to the "Summarization" section (two curved arrows).
+- To only summarize certain characters in a group chat, open the group chat edit menu and scroll down to the member list. Click the glowing "brain" icon to toggle whether that character will be automatically summarized (if you have auto-summarization enabled).
+
+### How to use the Dev branch
+ST doesn't have an easy way to switch extension branches, so you'll need to use git. 
+In your command line, go to the folder where extension is stored.
+This should look something like`SillyTavern/data/<user>/extensions/qvink_memory`.
+Then run the following git commands in your command line:
+- `git fetch origin dev:dev` (gets the dev branch info)
+- `git checkout dev` (switch to the dev branch)
+
+Then to switch back and forth, you can use `git checkout master` and `git checkout dev`.
+
+To update the dev branch when changes are made, run:
+- `git checkout dev` (make sure you are on the dev branch first)
+- `git pull origin dev` (pull any new changes)
 
 ### Slash Commands
 - `/get_memory_enabled`: Returns whether the extension is enabled in the current chat.
@@ -151,6 +162,7 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - When editing a message that already has a memory, the memory displayed below the message does not have the right color. This is just a visual bug, and it will correct itself after the next summarization.
 
 ### Todo
+- Fix reported freezing issue for chats with 30k+ messages
 - ~~Add button to force-exclude a summary from memory~~
 - ~~Add slash command to return state of the extension and toggle it on and off~~
 - ~~Allow setting a number of tokens for context sizes directly.~~

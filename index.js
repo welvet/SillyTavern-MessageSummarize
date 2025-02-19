@@ -232,7 +232,6 @@ function get_presets() {
         return $(this).text();
     }).get();
 }
-
 function get_summary_preset_max_tokens() {
     // get the maximum token length for the chosen summary preset
     let preset_name = get_settings('completion_preset');
