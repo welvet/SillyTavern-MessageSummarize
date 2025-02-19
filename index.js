@@ -117,14 +117,16 @@ const default_settings = {
 
     // injection settings
     long_template: default_long_template,
-    long_term_context_limit: 10,  // percentage of context size to use as long-term memory limit
+    long_term_context_limit: 10,  // context size to use as long-term memory limit
+    long_term_context_type: 'percent',  // percent or tokens
     long_term_position: extension_prompt_types.IN_PROMPT,
     long_term_role: extension_prompt_roles.SYSTEM,
     long_term_depth: 2,
     long_term_scan: false,
 
     short_template: default_short_template,
-    short_term_context_limit: 10,  // percentage of context size to use as short-term memory limit
+    short_term_context_limit: 10,
+    short_term_context_type: 'percent',
     short_term_position: extension_prompt_types.IN_PROMPT,
     short_term_depth: 2,
     short_term_role: extension_prompt_roles.SYSTEM,
@@ -175,14 +177,24 @@ function get_context_size() {
 function get_long_token_limit() {
     // Get the long-term memory token limit, given the current context size and settings
     let long_term_context_limit = get_settings('long_term_context_limit');
-    let context_size = get_context_size();
-    return Math.floor(context_size * long_term_context_limit/100);
+    let number_type = get_settings('long_term_context_type')
+    if (number_type === "percent") {
+        let context_size = get_context_size();
+        return Math.floor(context_size * long_term_context_limit / 100);
+    } else {
+        return long_term_context_limit
+    }
 }
 function get_short_token_limit() {
     // Get the short-term memory token limit, given the current context size and settings
     let short_term_context_limit = get_settings('short_term_context_limit');
-    let context_size = get_context_size();
-    return Math.floor(context_size * short_term_context_limit/100);
+    let number_type = get_settings('short_term_context_type')
+    if (number_type === "percent") {
+        let context_size = get_context_size();
+        return Math.floor(context_size * short_term_context_limit / 100);
+    } else {
+        return short_term_context_limit
+    }
 }
 function get_current_character_identifier() {
     // uniquely identify the current character
@@ -2086,6 +2098,9 @@ function initialize_settings_listeners() {
     bind_setting('#short_term_context_limit', 'short_term_context_limit', 'number', () => {
         $('#short_term_context_limit_display').text(get_short_token_limit());
     });
+    bind_setting('input[name="short_term_context_type"]', 'short_term_context_type', 'text', () => {
+        $('#short_term_context_limit_display').text(get_short_token_limit());
+    })
 
     bind_setting('input[name="long_term_position"]', 'long_term_position', 'number');
     bind_setting('#long_term_depth', 'long_term_depth', 'number');
@@ -2094,6 +2109,9 @@ function initialize_settings_listeners() {
     bind_setting('#long_term_context_limit', 'long_term_context_limit', 'number', () => {
         $('#long_term_context_limit_display').text(get_long_token_limit());  // update the displayed token limit
     });
+    bind_setting('input[name="long_term_context_type"]', 'long_term_context_type', 'text', () => {
+        $('#long_term_context_limit_display').text(get_long_token_limit());  // update the displayed token limit
+    })
 
     bind_setting('#debug_mode', 'debug_mode', 'boolean');
     bind_setting('#display_memories', 'display_memories', 'boolean')
