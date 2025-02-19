@@ -19,9 +19,11 @@ import {
     setExtensionPrompt,
     streamingProcessor,
     stopGeneration,
+    amount_gen,
     callPopup,
     getRequestHeaders
 } from '../../../../script.js';
+import { getPresetManager } from '../../../preset-manager.js'
 import { formatInstructModeChat } from '../../../instruct-mode.js';
 import { Popup, POPUP_TYPE } from '../../../popup.js';
 import { is_group_generating, selected_group, openGroupId } from '../../../group-chats.js';
@@ -92,7 +94,7 @@ const default_settings = {
 
     // summarization settings
     prompt: default_prompt,
-    completion_preset: null,  // completion preset to use for summarization. Null indicates the same as currently selected.
+    completion_preset: "",  // completion preset to use for summarization. Null indicates the same as currently selected.
     auto_summarize: true,   // whether to automatically summarize new chat messages
     summarization_delay: 0,  // delay auto-summarization by this many messages (0 summarizes immediately after sending, 1 waits for one message, etc)
     summarization_time_delay: 0, // time in seconds to delay between summarizations
@@ -200,11 +202,9 @@ function get_current_character_identifier() {
 }
 
 // Completion presets
-async function get_current_preset() {
+function get_current_preset() {
     // get the currently selected completion preset
-    let result = await executeSlashCommandsWithOptions(`/preset`)
-    debug(`Getting current completion preset: ${result.pipe}`)
-    return result.pipe
+    return getPresetManager().getSelectedPreset()
 }
 async function set_preset(name) {
     // Set the completion preset
@@ -221,17 +221,17 @@ function get_presets() {
     }).get();
 }
 
-async function get_completion_preset_max_tokens() {
-    // get the maximum token length for the current completion preset
-    const response = await fetch('/api/settings/get', {
-        method: 'POST',
-        headers: getRequestHeaders(),
-        body: JSON.stringify({}),
-        cache: 'no-cache',
-    });
-    let data = await response.json();
-    let settings = JSON.parse(data.settings);
-    return settings.amount_gen
+function get_summary_preset_max_tokens() {
+    // get the maximum token length for the chosen summary preset
+    let preset_name = get_settings('completion_preset');
+    if (preset_name === "") {  // none selected, use the current preset
+        preset_name = get_current_preset();
+    }
+    let { presets, preset_names } = getPresetManager().getPresetList()
+    let preset = presets[preset_names.indexOf(preset_name)]
+
+    // if the preset doesn't have a genamt, use the default. See https://discord.com/channels/1100685673633153084/1100820587586273343/1341566534908121149
+    return preset.genamt ?? amount_gen
 }
 
 
@@ -536,11 +536,7 @@ function refresh_settings() {
     for (let option of preset_options) {  // construct the dropdown options
         $preset_select.append(`<option value="${option}">${option}</option>`)
     }
-    if (current_preset !== null) {
-        $preset_select.val(current_preset)
-    } else {
-        $preset_select.val('')
-    }
+    $preset_select.val(current_preset)
     $preset_select.on('click', function () {  // set a click event to refresh settings so we get any newly created presets
         refresh_settings()
     })
@@ -1005,8 +1001,18 @@ async function display_text_modal(title, text="") {
 async function get_user_setting_text_input(key, title) {
     // Display a modal with a text area input, populated with a given setting value
     let value = get_settings(key) ?? '';
+    let max_tokens = get_summary_preset_max_tokens()
 
-    title = `<h3>${title}</h3>`//<button id="restore" title="Restore default" class="menu_button fa-solid fa-clock-rotate-left"></button>`
+    title = `
+<h3>${title}</h3>
+<p>
+Available Macros:
+<ul style="text-align: left; font-size: smaller;">
+    <li><b>{{message}}:</b> The message text.</li>
+    <li><b>{{history}}:</b> The message history as configured by the "Message History" setting.</li>
+    <li><b>{{words}}:</b> The token limit as defined by the chosen completion preset (Currently: ${max_tokens}).</li>
+</p>
+`
 
     let restore_button = {  // don't specify "result" key do not close the popup
         text: 'Restore Default',
@@ -1558,7 +1564,7 @@ async function summarize_text(prompt) {
 
     // set the current completion preset and save the current one
     let summary_preset = get_settings('completion_preset');
-    let current_preset = await get_current_preset();
+    let current_preset = get_current_preset();
     if (summary_preset !== null) {
         await set_preset(summary_preset);
     }
@@ -2208,17 +2214,6 @@ function initialize_slash_commands() {
         name: 'qvink_log_settings',
         callback: async (args) => {
             log(extension_settings[MODULE_NAME])
-
-            const response = await fetch('/api/settings/get', {
-                method: 'POST',
-                headers: getRequestHeaders(),
-                body: JSON.stringify({}),
-                cache: 'no-cache',
-            });
-            let data = await response.json();
-            let settings = JSON.parse(data.settings);
-            log(settings)
-
         },
         helpString: 'Log current settings',
     }));
@@ -2514,5 +2509,5 @@ jQuery(async function () {
     eventSource.on(event_types.GROUP_UPDATED, set_character_enabled_button_states)
 
     // Macros
-    MacrosParser.registerMacro("words", () => get_completion_preset_max_tokens());
+    MacrosParser.registerMacro("words", () => get_summary_preset_max_tokens());
 });

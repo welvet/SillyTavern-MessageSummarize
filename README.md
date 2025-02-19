@@ -127,6 +127,7 @@ You can configure how many messages (and/or summaries) to add as context when su
 - Summaries seem to be continuing the conversation rather than summarizing: probably an issue with your instruct template.
 Make sure you are using the correct template for your model, and make sure that system messages are properly distinct from user messages (the summaries use a system prompt). 
 This can be caused by the "System same as user" checkbox in your instruct template settings, which will cause all system messages to be treated like a user - uncheck that.
+Some default instruct templates also may not have anything defined for the "System message sequences" field - that should be filled out.
 You can also try toggling "Nest Message in Summary Prompt" in the settings - some models behave better with this.
 
 - My jailbreak isn't working: You'll need to put the jailbreak in the summarization prompt if you want it to be included.
