@@ -46,11 +46,14 @@ Cons, with attempted solutions:
 - `/stop_summarization`: stops any summarization currently running. Same as clicking the "stop" button in the config or next to the progress bar.
 - `/remember`: Mark the nth message for long-term memory, summarizing it if not already. Same as clicking the "brain" icon in the message button menu.
 - `/force_exclude_memory`: Toggles the inclusion of the summary for the nth message. Same as clicking the "Force Exclude" button in the message button menu.
+- `/get_memory <n>`: Get the memory associated with a given message index. Defaults to the most recent message.
 
 ### Changelog
 #### v0.8.0
 **IMPORTANT: The number of tokens used for your summaries will be broken and you will need to update your config. See below.**
 - **New Feature**: You can now choose a completion preset to use for summaries. Notably, this is how the max token length of summaries is now defined, and the previous "Summary Max Token Length" setting has been removed. By default, your currently selected preset will be used until changed. This means that **upon updating, your summaries will use the token length from your current preset** until you assign a custom preset which uses a different token length. The {{words}} macro also uses the value from the selected preset.
+- **New Feature**: You can now specify short and long-term context limit directly with a number of tokens.
+- **New Slash Command**: `/get_memory <n>` will return the memory associated with the given message index.
 
 #### v0.7.3
 - **IMPORTANT:** You must be on ST version 1.12.12 or above as it relies on the following PRs:
@@ -150,7 +153,7 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 ### Todo
 - ~~Add button to force-exclude a summary from memory~~
 - ~~Add slash command to return state of the extension and toggle it on and off~~
-- Allow setting a number of tokens for context sizes directly.
+- ~~Allow setting a number of tokens for context sizes directly.~~
 - ~~Slash command to retrieve a memory by index~~
 - Standardize the slash command naming once we have a few more.
 - ~~Handle swiping, editing, and deleting summaries~~
