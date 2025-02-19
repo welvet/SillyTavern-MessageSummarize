@@ -48,6 +48,10 @@ Cons, with attempted solutions:
 - `/force_exclude_memory`: Toggles the inclusion of the summary for the nth message. Same as clicking the "Force Exclude" button in the message button menu.
 
 ### Changelog
+#### v0.8.0
+**IMPORTANT: The number of tokens used for your summaries will be broken and you will need to update your config. See below.**
+- **New Feature**: You can now choose a completion preset to use for summaries. Notably, this is how the max token length of summaries is now defined, and the previous "Summary Max Token Length" setting has been removed. By default, your currently selected preset will be used until changed. This means that **upon updating, your summaries will use the token length from your current preset** until you assign a custom preset which uses a different token length. The {{words}} macro also uses the value from the selected preset.
+
 #### v0.7.3
 - **IMPORTANT:** You must be on ST version 1.12.12 or above as it relies on the following PRs:
   - https://github.com/SillyTavern/SillyTavern/pull/3327#issue-2803062094
