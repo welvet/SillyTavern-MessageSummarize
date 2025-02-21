@@ -219,6 +219,7 @@ function get_current_preset() {
     return getPresetManager().getSelectedPreset()
 }
 async function set_preset(name) {
+    if (name === get_current_preset()) return;  // If already using the current preset, return
     // Set the completion preset
     debug(`Setting completion preset to ${name}`)
     if (get_settings('debug_mode')) {
@@ -1551,6 +1552,14 @@ async function summarize_message(index=null) {
     // construct the full summary prompt for the message
     let prompt = create_summary_prompt(index)
 
+    // set the current completion preset and save the current one
+    let summary_preset = get_settings('completion_preset');
+    let current_preset = get_current_preset();
+    if (summary_preset !== null) {
+        await set_preset(summary_preset);
+    }
+
+
     // summarize it
     let summary;
     let err = null;
@@ -1564,6 +1573,11 @@ async function summarize_message(index=null) {
             error(`Unrecognized error when summarizing message ${index}: ${e}`)
         }
         summary = null
+    }
+
+    // restore the completion preset
+    if (summary_preset !== null) {
+        await set_preset(current_preset);
     }
 
     if (summary) {
@@ -1593,13 +1607,6 @@ async function summarize_text(prompt) {
         error(`Text ${token_size} exceeds context size ${context_size}.`);
     }
 
-    // set the current completion preset and save the current one
-    let summary_preset = get_settings('completion_preset');
-    let current_preset = get_current_preset();
-    if (summary_preset !== null) {
-        await set_preset(summary_preset);
-    }
-
     // TODO do the world info injection manually instead
     let include_world_info = get_settings('include_world_info');
     let result;
@@ -1627,11 +1634,6 @@ async function summarize_text(prompt) {
          * @returns {Promise<string>} Generated message
          */
         result = await generateRaw(prompt, '', true, false, '');
-    }
-
-    // restore the completion preset
-    if (summary_preset !== null) {
-        await set_preset(current_preset);
     }
 
     return result;
