@@ -1365,8 +1365,6 @@ function update_message_inclusion_flags() {
 function concatenate_summary(existing_text, message, include=null, remember=null, exclusion_criteria=true) {
     // given an existing text of concatenated summaries, concatenate the next one onto it
 
-    debug("Concatenating summary")
-
     let summary = get_memory(message, 'memory');
     if (!summary) {  // if there's no summary, skip it
         return existing_text
@@ -1393,8 +1391,6 @@ function concatenate_summaries(start=null, end=null, include=null, remember=null
 
     let context = getContext();
     let chat = context.chat;
-
-    debug("Concatenating summaries")
 
     // Default start is 0
     start = Math.max(start ?? 0, 0)
@@ -1978,6 +1974,14 @@ async function on_chat_event(event=null, data=null) {
         case 'user_message':
             last_message_swiped = null;
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
+            if (!get_settings('auto_summarize')) break;  // if auto-summarize is disabled, do nothing
+
+            // Summarize the chat if "include_user_messages" is enabled
+            if (get_settings('include_user_messages')) {
+                debug("New user message detected, summarizing")
+                await auto_summarize_chat();  // auto-summarize the chat (checks for exclusion criteria and whatnot)
+            }
+
             break;
 
         case 'char_message':
