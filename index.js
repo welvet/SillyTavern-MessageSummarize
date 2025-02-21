@@ -351,9 +351,7 @@ function toggle_chat_enabled(id=null, value=null) {
     refresh_memory()
 
     // update the message visuals
-    for (let i=context.chat.length - 1 ; i >= 0; i--) {
-        update_message_visuals(i);
-    }
+    update_all_message_visuals()
 
     // refresh settings UI
     refresh_settings()
@@ -894,16 +892,8 @@ function update_message_visuals(i, style=true, text=null) {
     // Each message div will have a div added to it with the memory for that message.
     // Even if there is no memory, I add the div because otherwise the spacing changes when the memory is added later.
 
-    let chat = getContext().chat;
-    let message = chat[i];
-    let memory = get_memory(message, 'memory');
-    let include = get_memory(message, 'include');
-    let error_message = get_memory(message, 'error');
-    let remember = get_memory(message, 'remember');
-    let exclude = get_memory(message, 'exclude');  // force-excluded by user
-    let div_element = get_message_div(i);
-
     // div not found (message may not be loaded)
+    let div_element = get_message_div(i);
     if (!div_element) {
         return;
     }
@@ -915,6 +905,15 @@ function update_message_visuals(i, style=true, text=null) {
     if (!get_settings('display_memories') || !chat_enabled()) {
         return;
     }
+
+    let chat = getContext().chat;
+    let message = chat[i];
+    let memory = get_memory(message, 'memory');
+    let include = get_memory(message, 'include');
+    let error_message = get_memory(message, 'error');
+    let remember = get_memory(message, 'remember');
+    let exclude = get_memory(message, 'exclude');  // force-excluded by user
+
 
     // get the div holding the main message text
     let message_element = div_element.find('div.mes_text');
@@ -951,6 +950,14 @@ function update_message_visuals(i, style=true, text=null) {
     memory_div.on('click', function () {
         edit_memory(i);
     })
+}
+function update_all_message_visuals() {
+    // update the message visuals of each visible message, styled according to the inclusion criteria
+    let chat = getContext().chat
+    let first_displayed_message_id = Number($('#chat').children('.mes').first().attr('mesid'))
+    for (let i=chat.length-1; i >= first_displayed_message_id; i--) {
+        update_message_visuals(i, true);
+    }
 }
 function edit_memory(index) {
     // Allow the user to edit a message summary
@@ -1301,11 +1308,15 @@ function update_message_inclusion_flags() {
     let context = getContext();
     let chat = context.chat;
 
+    debug("Updating message inclusion flags")
+
     // iterate through the chat in reverse order and mark the messages that should be included in short-term and long-term memory
     let short_limit_reached = false;
     let long_limit_reached = false;
     let long_term_end_index = null;  // index of the most recent message that doesn't fit in short-term memory
     let end = chat.length - 1;
+    let summary = ""  // total concatenated summary so far
+    let new_summary = ""  // temp summary storage to check token length
     for (let i = end; i >= 0; i--) {
         let message = chat[i];
 
@@ -1317,13 +1328,15 @@ function update_message_inclusion_flags() {
         }
 
         if (!short_limit_reached) {  // short-term limit hasn't been reached yet
-            let short_memory_text = concatenate_summaries(i, end);  // add up all the summaries down to this point
-            let short_token_size = count_tokens(short_memory_text);
+            new_summary = concatenate_summary(summary, message)  // add this message to the concatenated summaries
+            let short_token_size = count_tokens(new_summary);
             if (short_token_size > get_short_token_limit()) {  // over context limit
                 short_limit_reached = true;
                 long_term_end_index = i;  // this is where long-term memory ends and short-term begins
+                summary = ""  // reset summary
             } else {  // under context limit
                 store_memory(message, 'include', 'short');  // mark the message as short-term
+                summary = new_summary
                 continue
             }
         }
@@ -1331,12 +1344,13 @@ function update_message_inclusion_flags() {
         // if the short-term limit has been reached, check the long-term limit
         let remember = get_memory(message, 'remember');
         if (!long_limit_reached && remember) {  // long-term limit hasn't been reached yet and the message was marked to be remembered
-            let long_memory_text = concatenate_summaries(i, long_term_end_index, false, true)  // get all messages marked for remembering in long-term memory
-            let long_token_size = count_tokens(long_memory_text);
+            new_summary = concatenate_summary(summary, message, false, true)  // concatenate only if it's marked to remember
+            let long_token_size = count_tokens(new_summary);
             if (long_token_size > get_long_token_limit()) {  // over context limit
                 long_limit_reached = true;
             } else {
                 store_memory(message, 'include', 'long');  // mark the message as long-term
+                summary = new_summary
                 continue
             }
         }
@@ -1345,10 +1359,32 @@ function update_message_inclusion_flags() {
         store_memory(message, 'include', null);
     }
 
-    // update the message visuals of each message, styled according to the inclusion criteria
-    for (let i=chat.length-1; i >= 0; i--) {
-        update_message_visuals(i, true);
+    update_all_message_visuals()
+}
+function concatenate_summary(existing_text, message, include=null, remember=null, exclusion_criteria=true) {
+    // given an existing text of concatenated summaries, concatenate the next one onto it
+
+    debug("Concatenating summary")
+
+    let summary = get_memory(message, 'memory');
+    if (!summary) {  // if there's no summary, skip it
+        return existing_text
     }
+
+    // check against the message exclusion criteria
+    if (exclusion_criteria && !check_message_exclusion(message)) {
+        return existing_text
+    }
+
+    // If an inclusion flag is provided, check if the message is marked for that inclusion
+    if (include && get_memory(message, 'include') !== include) {
+        return existing_text
+    }
+    if (remember && get_memory(message, 'remember') !== remember) {
+        return existing_text
+    }
+
+    return existing_text + `\n* ${summary}`
 }
 function concatenate_summaries(start=null, end=null, include=null, remember=null, exclusion_criteria=true) {
     // Given a start and end, concatenate the summaries of the messages in that range
@@ -1356,6 +1392,8 @@ function concatenate_summaries(start=null, end=null, include=null, remember=null
 
     let context = getContext();
     let chat = context.chat;
+
+    debug("Concatenating summaries")
 
     // Default start is 0
     start = Math.max(start ?? 0, 0)
@@ -1369,34 +1407,14 @@ function concatenate_summaries(start=null, end=null, include=null, remember=null
         return '';
     }
 
-    // iterate through messages
-    let summaries = [];
+    // iterate through messages and concatenate the summaries
+    let summary = ""
     for (let i = start; i <= end; i++) {
         let message = chat[i];
-
-        // check against the message exclusion criteria
-        if (exclusion_criteria && !check_message_exclusion(message)) {
-            continue;
-        }
-
-        // If an inclusion flag is provided, check if the message is marked for that inclusion
-        if (include && get_memory(message, 'include') !== include) {
-            continue;
-        }
-        if (remember && get_memory(message, 'remember') !== remember) {
-            continue;
-        }
-
-        let summary = get_memory(message, 'memory');
-        if (!summary) {  // if there's no summary, skip it
-            continue;
-        }
-        summaries.push(summary)
+        summary = concatenate_summary(summary, message, include, remember, exclusion_criteria)
     }
 
-    // Add an asterisk to the beginning of each summary and join them with newlines
-    summaries = summaries.map((s) => `* ${s}`);
-    return summaries.join('\n');
+    return summary
 }
 function get_long_memory() {
     // get the injection text for long-term memory
@@ -1447,6 +1465,8 @@ async function summarize_messages(indexes, show_progress=true) {
     if (!indexes.length) {
         return;
     }
+
+    debug(`Summarizing ${indexes.length} messages`)
 
      // only show progress if there's more than one message to summarize
     show_progress = show_progress && indexes.length > 1;
@@ -1771,6 +1791,8 @@ function refresh_memory() {
         setExtensionPrompt(`${MODULE_NAME}_short`, "");
         return;
     }
+
+    debug("Refreshing memory")
 
     // Update the UI according to the current state of the chat memories, and update the injection prompts accordingly
     update_message_inclusion_flags()  // update the inclusion flags for all messages
