@@ -94,7 +94,7 @@ const default_settings = {
 
     // summarization settings
     prompt: default_prompt,
-    completion_preset: "",  // completion preset to use for summarization. Null indicates the same as currently selected.
+    completion_preset: "",  // completion preset to use for summarization. Empty ("") indicates the same as currently selected.
     auto_summarize: true,   // whether to automatically summarize new chat messages
     summarization_delay: 0,  // delay auto-summarization by this many messages (0 summarizes immediately after sending, 1 waits for one message, etc)
     summarization_time_delay: 0, // time in seconds to delay between summarizations
@@ -419,7 +419,7 @@ function character_enabled(character_key) {
 
 }
 function toggle_character_enabled(character_key) {
-    // check if the given character is enabled for summarization in the current chat
+    // Toggle whether the given character is enabled for summarization in the current chat
     let group_id = selected_group
     if (group_id === undefined) return true;  // not in group chat, always enabled
 
@@ -435,8 +435,8 @@ function toggle_character_enabled(character_key) {
 
     disabled_characters_settings[group_id] = disabled_characters
     set_settings('disabled_group_characters', disabled_characters_settings)
-
     debug(`${disabled ? "Enabled" : "Disabled"} group character summarization (${character_key})`)
+    refresh_memory()
 }
 
 
