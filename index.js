@@ -136,6 +136,7 @@ const default_settings = {
     debug_mode: false,  // enable debug mode
     display_memories: true,  // display memories in the chat below each message
     default_chat_enabled: true,  // whether memory is enabled by default for new chats
+    use_global_toggle_state: false,  // whether the on/off state for this profile uses the global state
     limit_injected_messages: -1,  // limit the number of injected messages (-1 for no limit)
 };
 const global_settings = {
@@ -143,6 +144,7 @@ const global_settings = {
     character_profiles: {},  // dict of character identifiers to profile names
     profile: 'Default', // Current profile
     chats_enabled: {},  // dict of chat IDs to whether memory is enabled
+    global_toggle_state: true,  // global state of memory (used when a profile uses the global state)
     disabled_group_characters: {}  // group chat IDs mapped to a list of disabled character keys
 }
 const settings_ui_map = {}  // map of settings to UI elements
@@ -357,34 +359,39 @@ async function get_manifest() {
     })
 }
 function chat_enabled() {
-    // check if the current chat is enabled
+    // check if the extension is enabled in the current chat
     let context = getContext();
+
+    // global state
+    if (get_settings('use_global_toggle_state')) {
+        return get_settings('global_toggle_state')
+    }
+
+    // per-chat state
     return get_settings('chats_enabled')?.[context.chatId] ?? get_settings('default_chat_enabled')
 }
-function toggle_chat_enabled(id=null, value=null) {
-    let context = getContext();
-    if (id === null) {
-        id = context.chatId;
-    }
-
-    // if value is null, toggle. Otherwise, set to the given value
-
-    // Toggle whether to enable or disable memory for the current character
-    let enabled = get_settings('chats_enabled')
-    let current = enabled[id] ?? get_settings('default_chat_enabled');
+function toggle_chat_enabled(value=null) {
+    // Change the state of the extension. If value is null, toggle. Otherwise, set to the given value
+    let current = chat_enabled();
 
     if (value === null) {  // toggle
-        enabled[id] = !current;
+        value = !current;
     } else if (value === current) {
         return;  // no change
-    } else {  // set to the given value
-        enabled[id] = value;
     }
 
-    // save the setting
-    set_settings('chats_enabled', enabled);
+    // set the new value
+    if (get_settings('use_global_toggle_state')) {   // using the global state - update the global state
+        set_settings('global_toggle_state', value);
+    } else {  // using per-chat state - update the chat state
+        let enabled = get_settings('chats_enabled');
+        let context = getContext();
+        enabled[context.chatId] = value;
+        set_settings('chats_enabled', enabled);
+    }
 
-    if (enabled[id]) {
+
+    if (value) {
         toastr.info(`Memory is now enabled for this chat`);
     } else {
         toastr.warning(`Memory is now disabled for this chat`);
@@ -392,7 +399,7 @@ function toggle_chat_enabled(id=null, value=null) {
     refresh_memory()
 
     // update the message visuals
-    update_all_message_visuals()
+    update_all_message_visuals()  //not needed? happens in update_message_influsion_flags
 
     // refresh settings UI
     refresh_settings()
@@ -2191,6 +2198,7 @@ function initialize_settings_listeners() {
     bind_setting('#debug_mode', 'debug_mode', 'boolean');
     bind_setting('#display_memories', 'display_memories', 'boolean')
     bind_setting('#default_chat_enabled', 'default_chat_enabled', 'boolean');
+    bind_setting('#use_global_toggle_state', 'use_global_toggle_state', 'boolean');
     bind_setting('#limit_injected_messages', 'limit_injected_messages', 'number');
 
     // trigger the change event once to update the display at start
@@ -2362,7 +2370,7 @@ function initialize_slash_commands() {
                 state = state === "true"  // convert to boolean
             }
 
-            toggle_chat_enabled(null, state);  // toggle the memory for the current chat
+            toggle_chat_enabled(state);  // toggle the memory for the current chat
         },
         helpString: 'Change whether memory is enabled for the current chat. If no state is provided, it will toggle the current state.',
         unnamedArgumentList: [

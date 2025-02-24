@@ -67,6 +67,7 @@ To update the dev branch when changes are made, run:
 
 - **New Feature**: You can now choose a completion preset to use for summaries. Notably, this is how the max token length of summaries is now defined, and the previous "Summary Max Token Length" setting has been removed. By default, your currently selected preset will be used until changed. This means that **upon updating, your summaries will use the token length from your current preset** until you assign a custom preset which uses a different token length. The {{words}} macro also uses the value from the selected preset.
 - **New Feature**: You can now specify short and long-term context limit directly with a number of tokens.
+- **New Feature**: You can now optionally set profiles to use a global toggle state between all chats that use this option. This means that if you toggle the extension off in one chat, it will be off in all chats that use this option. Chats that don't have this option enabled will not be affected, as is the current behavior.
 - **New Slash Command**: `/get_memory <n>` will return the memory associated with the given message index.
 - **Fix**: Optimized loading the extension in huge chats (10k+ messages), no longer freezes.
 
@@ -166,6 +167,8 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - When editing a message that already has a memory, the memory displayed below the message does not have the right color. This is just a visual bug, and it will correct itself after the next summarization.
 
 ### Todo
+- Remove disabled group members from context
+- ~~Option to use a global toggle state for chats~~
 - ~~Fix reported freezing issue for chats with 30k+ messages~~
 - ~~Add button to force-exclude a summary from memory~~
 - ~~Add slash command to return state of the extension and toggle it on and off~~
