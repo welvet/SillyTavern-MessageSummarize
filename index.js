@@ -150,7 +150,6 @@ const settings_ui_map = {}  // map of settings to UI elements
 
 
 
-
 // Utility functions
 function log(message) {
     console.log(`[${MODULE_NAME_FANCY}]`, message);
@@ -164,6 +163,12 @@ function error(message) {
     console.error(`[${MODULE_NAME_FANCY}]`, message);
     toastr.error(message, MODULE_NAME_FANCY);
 }
+
+function toast(message, type="info") {
+    // debounce the toast messages
+    toastr[type](message, MODULE_NAME_FANCY);
+}
+const toast_debounced = debounce(toast, 500);
 
 const saveChatDebounced = debounce(() => getContext().saveChat(), debounce_timeout.relaxed);
 function count_tokens(text, padding = 0) {
@@ -216,10 +221,21 @@ function get_current_character_identifier() {
 // Completion presets
 function get_current_preset() {
     // get the currently selected completion preset
-    return getPresetManager().getSelectedPreset()
+    return getPresetManager().getSelectedPresetName()
+}
+function get_summary_preset() {
+    // get the current summary preset OR the default if it isn't valid for the current API
+    let preset_name = get_settings('completion_preset');
+    if (preset_name === "" || !verify_preset(preset_name)) {  // none selected or invalid, use the current preset
+        preset_name = get_current_preset();
+    }
+    return preset_name
 }
 async function set_preset(name) {
     if (name === get_current_preset()) return;  // If already using the current preset, return
+
+    if (!check_preset_valid()) return;  // don't set an invalid preset
+
     // Set the completion preset
     debug(`Setting completion preset to ${name}`)
     if (get_settings('debug_mode')) {
@@ -228,22 +244,47 @@ async function set_preset(name) {
     await executeSlashCommandsWithOptions(`/preset ${name}`)
 }
 function get_presets() {
-    // get a list of the available presets from the UI
-    return $('#settings_preset_textgenerationwebui').children().map(function () {
-        return $(this).text();
-    }).get();
+    // Get the list of available completion presets
+    let { presets, preset_names } = getPresetManager().getPresetList()
+    // array of names
+    if (Array.isArray(preset_names)) return preset_names
+    // object of {names: index}
+    return Object.keys(preset_names)
+}
+function verify_preset(name) {
+    // check if the given preset name is valid for the current API
+    if (name === "") return true;  // no preset selected, always valid
+
+    let preset_names = get_presets()
+
+    if (Array.isArray(preset_names)) {  // array of names
+        return preset_names.includes(name)
+    } else {  // object of {names: index}
+        return preset_names[name] !== undefined
+    }
+
+}
+function check_preset_valid() {
+    // check whether the current preset is valid
+    let summary_preset = get_settings('completion_preset')
+    let valid_preset = verify_preset(summary_preset)
+    if (!valid_preset) {
+        toast_debounced(`Your selected summary preset "${summary_preset}" is not valid for the current API.`, "warning")
+        return false
+    }
+    return true
 }
 function get_summary_preset_max_tokens() {
     // get the maximum token length for the chosen summary preset
-    let preset_name = get_settings('completion_preset');
-    if (preset_name === "") {  // none selected, use the current preset
-        preset_name = get_current_preset();
-    }
-    let { presets, preset_names } = getPresetManager().getPresetList()
-    let preset = presets[preset_names.indexOf(preset_name)]
+    let preset_name = get_summary_preset()
+    let preset = getPresetManager().getCompletionPresetByName(preset_name)
 
-    // if the preset doesn't have a genamt, use the default. See https://discord.com/channels/1100685673633153084/1100820587586273343/1341566534908121149
-    return preset.genamt ?? amount_gen
+    // if the preset doesn't have a genamt (which it may not for some reason), use the current genamt. See https://discord.com/channels/1100685673633153084/1100820587586273343/1341566534908121149
+    // Also if you are using chat completion, it's openai_max_tokens instead.
+    let max_tokens = preset?.genamt || preset?.openai_max_tokens || amount_gen
+    debug("Got summary preset genamt: "+max_tokens)
+
+    return max_tokens
 }
 
 
@@ -320,7 +361,6 @@ function chat_enabled() {
     let context = getContext();
     return get_settings('chats_enabled')?.[context.chatId] ?? get_settings('default_chat_enabled')
 }
-
 function toggle_chat_enabled(id=null, value=null) {
     let context = getContext();
     if (id === null) {
@@ -514,6 +554,22 @@ function update_save_icon_highlight() {
         $('#save_profile').removeClass('button_highlight');
     }
 }
+function update_preset_dropdown() {
+    // set the completion preset dropdown
+    let $preset_select = $(`.${settings_content_class} #completion_preset`);
+    let summary_preset = get_settings('completion_preset')
+    let preset_options = get_presets()
+    $preset_select.empty();
+    $preset_select.append(`<option value="">Same as Current</option>`)
+    for (let option of preset_options) {  // construct the dropdown options
+        $preset_select.append(`<option value="${option}">${option}</option>`)
+    }
+    $preset_select.val(summary_preset)
+
+    // set a click event to refresh the preset dropdown for the currently available presets
+    $preset_select.off('click').on('click', () => update_preset_dropdown(true));
+
+}
 function refresh_settings() {
     // Refresh all settings UI elements according to the current settings
     debug("Refreshing settings...")
@@ -537,19 +593,8 @@ function refresh_settings() {
         choose_profile_dropdown.val(current_character_profile);
     }
 
-    // set the completion preset dropdown
-    let $preset_select = $(`.${settings_content_class} #completion_preset`);
-    let current_preset = get_settings('completion_preset')
-    let preset_options = get_presets()
-    $preset_select.empty();
-    $preset_select.append(`<option value="">Same as Current</option>`)
-    for (let option of preset_options) {  // construct the dropdown options
-        $preset_select.append(`<option value="${option}">${option}</option>`)
-    }
-    $preset_select.val(current_preset)
-    $preset_select.on('click', function () {  // set a click event to refresh settings so we get any newly created presets
-        refresh_settings()
-    })
+    update_preset_dropdown()
+    check_preset_valid()
 
     // if prompt doesn't have {{message}}, insert it
     if (!get_settings('prompt').includes("{{message}}")) {
@@ -744,6 +789,9 @@ function save_profile(profile=null) {
     let profiles = get_settings('profiles');
     profiles[profile] = copy_settings();
     set_settings('profiles', profiles);
+
+    // check preset validity
+    check_preset_valid()
 
     // update the button highlight
     update_save_icon_highlight();

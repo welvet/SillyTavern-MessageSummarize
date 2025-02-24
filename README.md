@@ -61,10 +61,14 @@ To update the dev branch when changes are made, run:
 
 ### Changelog
 #### v0.8.0
-**IMPORTANT: The number of tokens used for your summaries will be broken and you will need to update your config. See below.**
+**IMPORTANT #1:** The number of tokens used for your summaries will be broken and you will need to update your config. See below.
+
+**IMPORTANT #2:** You must be on the ST staging branch as it relies on the following PR: https://github.com/SillyTavern/SillyTavern/pull/3544#issue-2873858897
+
 - **New Feature**: You can now choose a completion preset to use for summaries. Notably, this is how the max token length of summaries is now defined, and the previous "Summary Max Token Length" setting has been removed. By default, your currently selected preset will be used until changed. This means that **upon updating, your summaries will use the token length from your current preset** until you assign a custom preset which uses a different token length. The {{words}} macro also uses the value from the selected preset.
 - **New Feature**: You can now specify short and long-term context limit directly with a number of tokens.
 - **New Slash Command**: `/get_memory <n>` will return the memory associated with the given message index.
+- **Fix**: Optimized loading the extension in huge chats (10k+ messages), no longer freezes.
 
 #### v0.7.3
 - **IMPORTANT:** You must be on ST version 1.12.12 or above as it relies on the following PRs:
@@ -162,7 +166,7 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - When editing a message that already has a memory, the memory displayed below the message does not have the right color. This is just a visual bug, and it will correct itself after the next summarization.
 
 ### Todo
-- Fix reported freezing issue for chats with 30k+ messages
+- ~~Fix reported freezing issue for chats with 30k+ messages~~
 - ~~Add button to force-exclude a summary from memory~~
 - ~~Add slash command to return state of the extension and toggle it on and off~~
 - ~~Allow setting a number of tokens for context sizes directly.~~
