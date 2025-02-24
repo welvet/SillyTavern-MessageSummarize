@@ -33,6 +33,7 @@ select.inline_setting {
     min-width: unset !important;
     max-width: unset !important;
     height: 1.2em;
+    line-height: 1em;
 }
 /* text input in a line of text */
 input.inline_setting     {
