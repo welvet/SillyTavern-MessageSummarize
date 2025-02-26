@@ -61,7 +61,7 @@ To update the dev branch when changes are made, run:
 
 ### Changelog
 #### v0.8.0
-**IMPORTANT #1:** The number of tokens used for your summaries will be broken and you will need to update your config. See below.
+**IMPORTANT #1:** The number of tokens used for your summaries will be broken and you will need to update your config.
 
 **IMPORTANT #2:** You must be on the ST staging branch as it relies on the following PR: https://github.com/SillyTavern/SillyTavern/pull/3544#issue-2873858897
 

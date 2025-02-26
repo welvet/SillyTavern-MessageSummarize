@@ -1072,20 +1072,13 @@ async function display_text_modal(title, text="") {
     let html = `<h2>${title}</h2><div style="text-align: left; overflow: auto;">${text}</div>`
     const popupResult = await callPopup(html, 'text', undefined, { okButton: `Close` });
 }
-async function get_user_setting_text_input(key, title) {
+async function get_user_setting_text_input(key, title, description="") {
     // Display a modal with a text area input, populated with a given setting value
     let value = get_settings(key) ?? '';
-    let max_tokens = get_summary_preset_max_tokens()
 
     title = `
 <h3>${title}</h3>
-<p>
-Available Macros:
-<ul style="text-align: left; font-size: smaller;">
-    <li><b>{{message}}:</b> The message text.</li>
-    <li><b>{{history}}:</b> The message history as configured by the "Message History" setting.</li>
-    <li><b>{{words}}:</b> The token limit as defined by the chosen completion preset (Currently: ${max_tokens}).</li>
-</p>
+<p>${description}</p>
 `
 
     let restore_button = {  // don't specify "result" key do not close the popup
@@ -2128,7 +2121,16 @@ function initialize_settings_listeners() {
     bind_function("#refresh_memory", () => refresh_memory());
 
     bind_function('#edit_summary_prompt', async () => {
-        get_user_setting_text_input('prompt', 'Edit Summary Prompt')
+        let max_tokens = get_summary_preset_max_tokens()
+        let description = `
+Available Macros:
+<ul style="text-align: left; font-size: smaller;">
+    <li><b>{{message}}:</b> The message text.</li>
+    <li><b>{{history}}:</b> The message history as configured by the "Message History" setting.</li>
+    <li><b>{{words}}:</b> The token limit as defined by the chosen completion preset (Currently: ${max_tokens}).</li>
+</ul>
+`
+        get_user_setting_text_input('prompt', 'Edit Summary Prompt', description)
     })
     bind_function('#preview_summary_prompt', async () => {
         let text = create_summary_prompt(getContext().chat.length-1)
