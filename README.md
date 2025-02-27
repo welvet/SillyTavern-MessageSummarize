@@ -70,6 +70,7 @@ To update the dev branch when changes are made, run:
 - **New Feature**: You can now optionally set profiles to use a global toggle state between all chats that use this option. This means that if you toggle the extension off in one chat, it will be off in all chats that use this option. Chats that don't have this option enabled will not be affected, as is the current behavior.
 - **New Slash Command**: `/get_memory <n>` will return the memory associated with the given message index.
 - **Fix**: Optimized loading the extension in huge chats (10k+ messages), no longer freezes.
+- **Fix**: The summaries used in the {{history}} macro now match the inclusion criteria of the summary injection. The *messages* included are not affected, just the associated summaries.
 
 #### v0.7.3
 - **IMPORTANT:** You must be on ST version 1.12.12 or above as it relies on the following PRs:

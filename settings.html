@@ -106,7 +106,7 @@
                 <br>
 
                 <div class="flex-container justifyspacebetween">
-                    <label title="Whether to use messages and/or summaries as context for summarization. You must use {{history}} in the summary prompt." class="checkbox_label">
+                    <label title="Whether to use messages and/or summaries as context for summarization. You must use {{history}} in the summary prompt. Summaries will follow configured inclusion criteria." class="checkbox_label">
                         <span>Message History </span>
                         <select id="include_message_history_mode" class="text_pole flex2">
                             <option value="none">None</option>
@@ -300,7 +300,7 @@
 
                 <label title="Limit the number of messages to send in regular prompts to this number (-1 for no limit). Message memories will still be sent.">
                     <input id="limit_injected_messages" class="text_pole widthUnset" type="number" min="0" max="999" />
-                    <span>Limit Message History</span>
+                    <span>Limit Message Context</span>
                 </label>
 
                 <div class="flex-container justifyspacebetween alignitemscenter">

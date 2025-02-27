@@ -1699,6 +1699,9 @@ function get_message_history(index) {
     for (let i = index-1; num_included < num_history_messages && i>=0; i--) {
         let m = chat[i];
         let include = true
+
+        // whether we include the message itself is determined only by these settings.
+        // Even if the message wouldn't be *summarized* we still want to include it in the history for context.
         if (m.is_user && !get_settings('include_user_messages_in_history')) {
             include = false;
         } else if (m.is_system && !get_settings('include_system_messages_in_history')) {
@@ -1711,8 +1714,12 @@ function get_message_history(index) {
 
         let included = false
         if (mode === "summaries_only" || mode === "messages_and_summaries") {
+
+            // Whether we include the *summary* is determined by the regular summary inclusion criteria.
+            // This is so the inclusion matches the summary injection.
+            let include_summary = check_message_exclusion(m)
             let summary = get_memory(m, 'memory')
-            if (summary) {
+            if (include_summary && summary) {
                 summary = `Summary: ${summary}`
                 history.push(formatInstructModeChat("assistant", summary, false, false, "", "", "", null))
                 included = true
