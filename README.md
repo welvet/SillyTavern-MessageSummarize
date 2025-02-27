@@ -158,6 +158,8 @@ You can also try toggling "Nest Message in Summary Prompt" in the settings - som
 
 - The summaries refer to "a person" or "someone" rather than the character by name: Try using the "Message History" setting to include a few previous messages in the summarization prompt to give the model a little more context.
 
+- The summaries are too long: You can select a custom completion preset in the settings to use for summarizations, and that can be used to set a maximum token length after which generation will be cut off. You can also use the {{words}} macro in the summarization prompt to try and guide the LLM according to that token length, though LLMs cannot actually count words so it functions more like a suggestion.
+
 - Just updated and things are broken: try reloading the page first, and make sure you are on the most recent version of ST. 
 
 If it's something else, please turn on "Debug Mode" in the settings and send me the output logs from your browser console and raise an issue or message on discord.
