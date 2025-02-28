@@ -1,47 +1,30 @@
 import { getStringHash, debounce, copyText, waitUntilCondition, extractAllWords, isTrueBoolean, select2ChoiceClickSubscribe } from '../../../utils.js';
 import { getContext, getApiUrl, extension_settings, doExtrasFetch, modules, renderExtensionTemplateAsync } from '../../../extensions.js';
 import {
-    activateSendButtons,
-    deactivateSendButtons,
     animation_duration,
-    eventSource,
-    event_types,
     scrollChatToBottom,
     extension_prompt_roles,
     extension_prompt_types,
-    generateQuietPrompt,
     is_send_press,
     saveSettingsDebounced,
-    substituteParams,
-    substituteParamsExtended,
     generateRaw,
     getMaxContextSize,
-    setExtensionPrompt,
     streamingProcessor,
-    stopGeneration,
     amount_gen,
-    callPopup,
     getRequestHeaders
 } from '../../../../script.js';
 import { getPresetManager } from '../../../preset-manager.js'
 import { formatInstructModeChat } from '../../../instruct-mode.js';
-import { Popup, POPUP_TYPE } from '../../../popup.js';
 import { is_group_generating, selected_group, openGroupId } from '../../../group-chats.js';
 import { loadMovingUIState, renderStoryString, power_user } from '../../../power-user.js';
 import { dragElement } from '../../../RossAscends-mods.js';
-import { getTextTokens, getTokenCount, tokenizers } from '../../../tokenizers.js';
 import { debounce_timeout } from '../../../constants.js';
-import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
-import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
-import { executeSlashCommandsWithOptions } from '../../../slash-commands.js';
-import { ARGUMENT_TYPE, SlashCommandArgument, SlashCommandNamedArgument } from '../../../slash-commands/SlashCommandArgument.js';
 import { MacrosParser } from '../../../macros.js';
 import { commonEnumProviders } from '../../../slash-commands/SlashCommandCommonEnumsProvider.js';
 export { MODULE_NAME };
 
 // THe module name modifies where settings are stored, where information is stored on message objects, macros, etc.
 const MODULE_NAME = 'qvink_memory';
-const MODULE_DIR = `scripts/extensions/third-party/${MODULE_NAME}`;
 const MODULE_NAME_FANCY = 'Qvink Memory';
 const PROGRESS_BAR_ID = `${MODULE_NAME}_progress_bar`;
 
@@ -95,7 +78,6 @@ const default_settings = {
     // summarization settings
     prompt: default_prompt,
     completion_preset: "",  // completion preset to use for summarization. Empty ("") indicates the same as currently selected.
-    connection_profile: "",  // connection profile to use for summarization. Empty ("") indicates the same as currently selected.
     auto_summarize: true,   // whether to automatically summarize new chat messages
     summarization_delay: 0,  // delay auto-summarization by this many messages (0 summarizes immediately after sending, 1 waits for one message, etc)
     summarization_time_delay: 0, // time in seconds to delay between summarizations
@@ -176,7 +158,8 @@ const toast_debounced = debounce(toast, 500);
 const saveChatDebounced = debounce(() => getContext().saveChat(), debounce_timeout.relaxed);
 function count_tokens(text, padding = 0) {
     // count the number of tokens in a text
-    return getTokenCount(text, padding);
+    let ctx = getContext();
+    return ctx.getTokenCount(text, padding);
 }
 function get_context_size() {
     // Get the current context size
@@ -220,6 +203,12 @@ function get_current_character_identifier() {
 
     return context.characters[index].avatar;
 }
+function get_extension_directory() {
+    // get the directory of the extension
+    let index_path = new URL(import.meta.url).pathname
+    return index_path.substring(0, index_path.lastIndexOf('/'))  // remove the /index.js from the path
+}
+
 
 // Completion presets
 function get_current_preset() {
@@ -244,7 +233,8 @@ async function set_preset(name) {
     if (get_settings('debug_mode')) {
         toastr.info(`Setting completion preset to ${name}`);
     }
-    await executeSlashCommandsWithOptions(`/preset ${name}`)
+    let ctx = getContext();
+    await ctx.executeSlashCommandsWithOptions(`/preset ${name}`)
 }
 function get_presets() {
     // Get the list of available completion presets
@@ -406,13 +396,31 @@ function get_settings(key) {
     return extension_settings[MODULE_NAME]?.[key] ?? default_settings[key];
 }
 async function get_manifest() {
-    return await fetch(`${MODULE_DIR}/manifest.json`).then(async response => {
-        if (!response.ok) {
-            error(`Error getting manifest.json: status: ${response.status}`);
-            error(response)
-        }
+    // Get the manifest.json for the extension
+    let module_dir = get_extension_directory();
+    let path = `${module_dir}/manifest.json`
+    let response = await fetch(path)
+    if (response.ok) {
         return await response.json();
+    }
+    error(`Error getting manifest.json from "${path}": status: ${response.status}`);
+}
+async function load_settings_html() {
+    // fetch the settings html file and append it to the settings div.
+    log("Loading settings.html...")
+
+    let module_dir = get_extension_directory()
+    let path = `${module_dir}/settings.html`
+    let found = await $.get(path).then(async response => {
+        log(`Loaded settings.html at "${path}"`)
+        $("#extensions_settings2").append(response);  // load html into the settings div\
+        return true
+    }).catch((response) => {
+        error(`Error getting settings.json from "${path}": status: ${response.status}`);
+        return false
     })
+
+    return new Promise(resolve => resolve(found))
 }
 function chat_enabled() {
     // check if the extension is enabled in the current chat
@@ -896,8 +904,9 @@ function load_profile(profile=null) {
 }
 async function rename_profile() {
     // Rename the current profile via user input
+    let ctx = getContext();
     let old_name = get_settings('profile');
-    let new_name = await Popup.show.input("Rename Configuration Profile", `Enter a new name:`, old_name);
+    let new_name = await ctx.Popup.show.input("Rename Configuration Profile", `Enter a new name:`, old_name);
 
     // if it's the same name or none provided, do nothing
     if (!new_name || old_name === new_name) {
@@ -1142,9 +1151,10 @@ function edit_memory(index) {
 async function display_text_modal(title, text="") {
     // Display a modal with the given title and text
     // replace newlines in text with <br> for HTML
+    let ctx = getContext();
     text = text.replace(/\n/g, '<br>');
     let html = `<h2>${title}</h2><div style="text-align: left; overflow: auto;">${text}</div>`
-    const popupResult = await callPopup(html, 'text', undefined, { okButton: `Close` });
+    const popupResult = await ctx.callPopup(html, 'text', undefined, { okButton: `Close` });
 }
 async function get_user_setting_text_input(key, title, description="") {
     // Display a modal with a text area input, populated with a given setting value
@@ -1162,8 +1172,8 @@ async function get_user_setting_text_input(key, title, description="") {
             popup.mainInput.value = default_settings[key] ?? '';
         }
     }
-
-    let popup = new Popup(title, POPUP_TYPE.INPUT, value, {rows: 20, customButtons: [restore_button]});
+    let ctx = getContext();
+    let popup = new ctx.Popup(title, ctx.POPUP_TYPE.INPUT, value, {rows: 20, customButtons: [restore_button]});
 
     // Now remove the ".result-control" class to prevent it from submitting when you hit enter.
     // This should have been a configuration option for the popup.
@@ -1215,7 +1225,8 @@ async function summarize_chat_modal() {
         },
     ]
 
-    let popup = new Popup(html, POPUP_TYPE.CONFIRM, null, {rows: 20, okButton: 'Summarize', cancelButton: 'Cancel', customInputs: custom_inputs});
+    let ctx = getContext();
+    let popup = new ctx.Popup(html, ctx.POPUP_TYPE.CONFIRM, null, {rows: 20, okButton: 'Summarize', cancelButton: 'Cancel', customInputs: custom_inputs});
 
     function get_messages_to_summarize() {
         // get settings from the input
@@ -1539,9 +1550,10 @@ function get_long_memory() {
     // get the injection text for long-term memory
     let text = concatenate_summaries(null, null, "long");
     let template = get_settings('long_template')
+    let ctx = getContext();
 
     // first replace any global macros
-    template = substituteParamsExtended(template);
+    template = ctx.substituteParamsExtended(template);
 
     // handle the #if macros using our custom function because ST DOESN'T EXPOSE THEIRS FOR SOME REASON
     template = substitute_conditionals(template, {[long_memory_macro]: text});
@@ -1552,9 +1564,10 @@ function get_short_memory() {
     // get the injection text for short-term memory
     let text = concatenate_summaries(null, null, "short");
     let template = get_settings('short_template')
+    let ctx = getContext();
 
     // first replace any global macros
-    template = substituteParamsExtended(template);
+    template = ctx.substituteParamsExtended(template);
 
     // handle the #if macros using our custom function because ST DOESN'T EXPOSE THEIRS FOR SOME REASON
     template = substitute_conditionals(template, {[short_memory_macro]: text});
@@ -1584,7 +1597,7 @@ async function summarize_messages(indexes, show_progress=true) {
     if (!indexes.length) {
         return;
     }
-
+    let ctx = getContext();
     debug(`Summarizing ${indexes.length} messages`)
 
      // only show progress if there's more than one message to summarize
@@ -1595,7 +1608,7 @@ async function summarize_messages(indexes, show_progress=true) {
 
     // optionally block user from sending chat messages while summarization is in progress
     if (get_settings('block_chat')) {
-        deactivateSendButtons();
+        ctx.deactivateSendButtons();
     }
 
     let n = 0;
@@ -1642,7 +1655,7 @@ async function summarize_messages(indexes, show_progress=true) {
     }
 
     if (get_settings('block_chat')) {
-        activateSendButtons();
+        ctx.activateSendButtons();
     }
     refresh_memory()
 
@@ -1725,6 +1738,8 @@ async function summarize_text(prompt) {
         error(`Text ${token_size} exceeds context size ${context_size}.`);
     }
 
+    let ctx = getContext()
+
     // TODO do the world info injection manually instead
     let include_world_info = get_settings('include_world_info');
     let result;
@@ -1739,7 +1754,7 @@ async function summarize_text(prompt) {
          * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
          * @returns
          */
-        result = await generateQuietPrompt(prompt, false, false, '', "assistant");
+        result = await ctx.generateQuietPrompt(prompt, false, false, '', "assistant");
     } else {
         /**
          * Generates a message using the provided prompt.
@@ -1868,21 +1883,21 @@ function substitute_params(text, params) {
 function create_summary_prompt(index) {
     // create the full summary prompt for the message at the given index
 
-    let context = getContext()
-    let chat = context.chat
+    let ctx = getContext()
+    let chat = ctx.chat
     let message = chat[index];
 
     // get history of messages (formatted as system messages) leading up to the message
     let history_text = get_message_history(index);
 
     // format the message itself
-    let message_text = formatInstructModeChat(message.name, message.mes, message.is_user, false, "", context.name1, context.name2, null)
+    let message_text = formatInstructModeChat(message.name, message.mes, message.is_user, false, "", ctx.name1, ctx.name2, null)
 
     // get the full prompt template from settings
     let prompt = get_settings('prompt');
 
     // first substitute any global macros like {{words}}, {{persona}}, {{char}}, etc...
-    prompt = substituteParamsExtended(prompt)
+    prompt = ctx.substituteParamsExtended(prompt)
 
     // then substitute any {{#if macro}} ... {{/if}} blocks
     prompt = substitute_conditionals(prompt, {"message": message_text, "history": history_text})
@@ -1906,16 +1921,17 @@ function create_summary_prompt(index) {
     }
 
     // append the assistant starting message template to the text, replacing the name with "assistant" if needed
-    let output_sequence = substituteParamsExtended(power_user.instruct.output_sequence, {name: "assistant"});
+    let output_sequence = ctx.substituteParamsExtended(power_user.instruct.output_sequence, {name: "assistant"});
     prompt = `${prompt}\n${output_sequence}\nSummary:`
 
     return prompt
 }
 
 function refresh_memory() {
+    let ctx = getContext();
     if (!chat_enabled()) { // if chat not enabled, remove the injections
-        setExtensionPrompt(`${MODULE_NAME}_long`, "");
-        setExtensionPrompt(`${MODULE_NAME}_short`, "");
+        ctx.setExtensionPrompt(`${MODULE_NAME}_long`, "");
+        ctx.setExtensionPrompt(`${MODULE_NAME}_short`, "");
         return;
     }
 
@@ -1930,11 +1946,11 @@ function refresh_memory() {
 
     // inject the memories into the templates, if they exist
     if (long_injection) {
-        setExtensionPrompt(`${MODULE_NAME}_long`,  long_injection,  get_settings('long_term_position'), get_settings('long_term_depth'), get_settings('long_term_scan'), get_settings('long_term_role'));
+        ctx.setExtensionPrompt(`${MODULE_NAME}_long`,  long_injection,  get_settings('long_term_position'), get_settings('long_term_depth'), get_settings('long_term_scan'), get_settings('long_term_role'));
     }
 
     if (short_injection) {
-        setExtensionPrompt(`${MODULE_NAME}_short`, short_injection, get_settings('short_term_position'), get_settings('short_term_depth'), get_settings('short_term_scan'), get_settings('short_term_role'));
+        ctx.setExtensionPrompt(`${MODULE_NAME}_short`, short_injection, get_settings('short_term_position'), get_settings('short_term_depth'), get_settings('short_term_scan'), get_settings('short_term_role'));
     }
 
     return `${long_injection}\n${short_injection}`  // return the concatenated memory text
@@ -1944,7 +1960,8 @@ const refresh_memory_debounced = debounce(refresh_memory, debounce_timeout.relax
 function stop_summarization() {
     // Immediately stop summarization of the chat
     STOP_SUMMARIZATION = true  // set the flag
-    stopGeneration();  // stop generation on current message
+    let ctx = getContext()
+    ctx.stopGeneration();  // stop generation on current message
     clearTimeout(SUMMARIZATION_DELAY_TIMEOUT)  // clear the summarization delay timeout
     if (SUMMARIZATION_DELAY_RESOLVE !== null) SUMMARIZATION_DELAY_RESOLVE()  // resolve the delay promise so the await goes through
     log("Aborted summarization.")
@@ -2178,7 +2195,7 @@ async function on_chat_event(event=null, data=null) {
 
 // UI initialization
 function initialize_settings_listeners() {
-    debug("Initializing settings listeners")
+    log("Initializing settings listeners")
 
     // Trigger profile changes
     bind_setting('#profile', 'profile', 'text', () => load_profile(), false);
@@ -2233,7 +2250,6 @@ Available Macros:
     bind_function('#copy_summaries_to_clipboard', copy_summaries_to_clipboard)
 
     bind_setting('#completion_preset', 'completion_preset', 'text')
-    bind_setting('#connection_profile', 'connection_profile', 'text')
     bind_setting('#auto_summarize', 'auto_summarize', 'boolean');
     bind_setting('#auto_summarize_on_edit', 'auto_summarize_on_edit', 'boolean');
     bind_setting('#auto_summarize_on_swipe', 'auto_summarize_on_swipe', 'boolean');
@@ -2387,6 +2403,13 @@ function set_character_enabled_button_states() {
     }
 }
 function initialize_slash_commands() {
+    let ctx = getContext()
+    let SlashCommandParser = ctx.SlashCommandParser
+    let SlashCommand = ctx.SlashCommand
+    let SlashCommandArgument = ctx.SlashCommandArgument
+    let SlashCommandNamedArgument = ctx.SlashCommandNamedArgument
+    let ARGUMENT_TYPE = ctx.ARGUMENT_TYPE
+
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'qvink_log_chat',
         callback: (args) => {
@@ -2691,8 +2714,8 @@ jQuery(async function () {
     // Load settings
     initialize_settings();
 
-    // Load the settings UI
-    $("#extensions_settings2").append(await $.get(`${MODULE_DIR}/settings.html`));  // load html
+    // load settings html
+    await load_settings_html();
 
     // initialize UI stuff
     initialize_settings_listeners();
@@ -2703,6 +2726,9 @@ jQuery(async function () {
     initialize_menu_buttons();
 
     // ST event listeners
+    let ctx = getContext();
+    let eventSource = ctx.eventSource;
+    let event_types = ctx.event_types;
     eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, (id) => on_chat_event('char_message', id));
     eventSource.on(event_types.USER_MESSAGE_RENDERED, (id) => on_chat_event('user_message', id));
     eventSource.on(event_types.GENERATE_BEFORE_COMBINE_PROMPTS, (id, stuff) => on_chat_event('before_message', id));
