@@ -95,6 +95,7 @@ const default_settings = {
     // summarization settings
     prompt: default_prompt,
     completion_preset: "",  // completion preset to use for summarization. Empty ("") indicates the same as currently selected.
+    connection_profile: "",  // connection profile to use for summarization. Empty ("") indicates the same as currently selected.
     auto_summarize: true,   // whether to automatically summarize new chat messages
     summarization_delay: 0,  // delay auto-summarization by this many messages (0 summarizes immediately after sending, 1 waits for one message, etc)
     summarization_time_delay: 0, // time in seconds to delay between summarizations
@@ -267,7 +268,7 @@ function verify_preset(name) {
 
 }
 function check_preset_valid() {
-    // check whether the current preset is valid
+    // check whether the current preset selected for summarization is valid
     let summary_preset = get_settings('completion_preset')
     let valid_preset = verify_preset(summary_preset)
     if (!valid_preset) {
@@ -287,6 +288,61 @@ function get_summary_preset_max_tokens() {
     debug("Got summary preset genamt: "+max_tokens)
 
     return max_tokens
+}
+
+// Connection profiles
+async function get_current_connection_profile() {
+    // get the current connection profile
+    let result = await executeSlashCommandsWithOptions(`/profile`)
+    return result.pipe
+
+}
+async function get_connection_profile_api(name) {
+    let result = await executeSlashCommandsWithOptions(`/profile-get ${name}`)
+    return JSON.parse(result.pipe).api
+}
+function get_summary_connection_profile() {
+    // get the current connection profile OR the default if it isn't valid for the current API
+    let name = get_settings('connection_profile');
+    if (name === "" || !verify_connection_profile(name)) {  // none selected or invalid, use the current preset
+        name = get_current_connection_profile();
+    }
+    return name
+}
+async function set_connection_profile(name) {
+    // Set the connection profile
+    if (name === await get_current_connection_profile()) return;  // If already using the current preset, return
+
+    if (!check_connection_profile_valid()) return;  // don't set an invalid preset
+
+    // Set the completion preset
+    debug(`Setting connection profile to ${name}`)
+    if (get_settings('debug_mode')) {
+        toastr.info(`Setting connection profile to ${name}`);
+    }
+    await executeSlashCommandsWithOptions(`/profile ${name}`)
+}
+async function get_connection_profiles() {
+    // Get a list of available connection profiles
+    let result = await executeSlashCommandsWithOptions(`/profile-list`)
+    return JSON.parse(result.pipe)
+}
+function verify_connection_profile(name) {
+    // check if the given connection profile name is valid
+    if (name === "") return true;  // no profile selected, always valid
+
+    let names = get_connection_profiles()
+    return names.includes(name)
+}
+function check_connection_profile_valid() {
+    // check whether the current connection profile selected for summarization is valid
+    let summary_connection = get_settings('completion_preset')
+    let valid_preset = verify_preset(summary_connection)
+    if (!valid_preset) {
+        toast_debounced(`Your selected summary connection profile "${summary_connection}" is not valid.`, "warning")
+        return false
+    }
+    return true
 }
 
 
@@ -574,8 +630,23 @@ function update_preset_dropdown() {
     $preset_select.val(summary_preset)
 
     // set a click event to refresh the preset dropdown for the currently available presets
-    $preset_select.off('click').on('click', () => update_preset_dropdown(true));
+    $preset_select.off('click').on('click', () => update_preset_dropdown());
 
+}
+async function update_connection_profile_dropdown() {
+    // set the completion preset dropdown
+    let $connection_select = $(`.${settings_content_class} #connection_profile`);
+    let summary_connection = get_settings('connection_profile')
+    let connection_options = await get_connection_profiles()
+    $connection_select.empty();
+    $connection_select.append(`<option value="">Same as Current</option>`)
+    for (let option of connection_options) {  // construct the dropdown options
+        $connection_select.append(`<option value="${option}">${option}</option>`)
+    }
+    $connection_select.val(summary_connection)
+
+    // set a click event to refresh the dropdown
+    $connection_select.off('click').on('click', () => update_connection_profile_dropdown());
 }
 function refresh_settings() {
     // Refresh all settings UI elements according to the current settings
@@ -602,6 +673,9 @@ function refresh_settings() {
 
     update_preset_dropdown()
     check_preset_valid()
+
+    update_connection_profile_dropdown()
+    check_connection_profile_valid()
 
     // if prompt doesn't have {{message}}, insert it
     if (!get_settings('prompt').includes("{{message}}")) {
@@ -2159,6 +2233,7 @@ Available Macros:
     bind_function('#copy_summaries_to_clipboard', copy_summaries_to_clipboard)
 
     bind_setting('#completion_preset', 'completion_preset', 'text')
+    bind_setting('#connection_profile', 'connection_profile', 'text')
     bind_setting('#auto_summarize', 'auto_summarize', 'boolean');
     bind_setting('#auto_summarize_on_edit', 'auto_summarize_on_edit', 'boolean');
     bind_setting('#auto_summarize_on_swipe', 'auto_summarize_on_swipe', 'boolean');
@@ -2323,6 +2398,10 @@ function initialize_slash_commands() {
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'qvink_log_settings',
         callback: async (args) => {
+            let name = await get_current_connection_profile()
+            log(name)
+            log(await get_connection_profile_api(name))
+            log(await get_connection_profiles())
             log(extension_settings[MODULE_NAME])
         },
         helpString: 'Log current settings',

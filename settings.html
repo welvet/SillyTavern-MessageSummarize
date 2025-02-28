@@ -47,7 +47,14 @@
                 </div>
 
                 <div class="flex-container justifyspacebetween alignitemscenter">
-                    <label for="completion_preset" class="checkbox_label" title="The completion preset to use for summaries. Note that choosing a different preset will require temporarily switching to that preset during summarization, discarding any unsaved changes to the current preset. Also be aware that presets are not shared between APIs.">
+                    <label class="checkbox_label" title="The connection profile to use for summaries. Note that choosing a different profile will require temporarily switching to the profile during summarization, discarding any unsaved changes to the current profile.">
+                        <span>Connection Profile </span>
+                        <select id="connection_profile" class="text_pole flex2"></select>
+                    </label>
+                </div>
+
+                <div class="flex-container justifyspacebetween alignitemscenter">
+                    <label class="checkbox_label" title="The completion preset to use for summaries. Note that choosing a different preset will require temporarily switching to that preset during summarization, discarding any unsaved changes to the current preset. Also be aware that presets are not shared between connection APIs.">
                         <span>Completion Preset </span>
                         <select id="completion_preset" class="text_pole flex2"></select>
                     </label>
