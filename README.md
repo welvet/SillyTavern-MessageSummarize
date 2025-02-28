@@ -170,7 +170,11 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - When editing a message that already has a memory, the memory displayed below the message does not have the right color. This is just a visual bug, and it will correct itself after the next summarization.
 
 ### Todo
-- Remove disabled group members from context
+- Ability to choose a connection profile for summarization
+- Ability to modify memory directly without visiting each message
+  - Need a new popup interface where summaries can be edited, excluded, marked, etc without having to go to each message in the chat.
+  - All summaries should be loaded in a giant scroll window
+- ~~Remove disabled group members from context~~
 - ~~Option to use a global toggle state for chats~~
 - ~~Fix reported freezing issue for chats with 30k+ messages~~
 - ~~Add button to force-exclude a summary from memory~~
