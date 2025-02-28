@@ -41,7 +41,7 @@ export { MODULE_NAME };
 
 // THe module name modifies where settings are stored, where information is stored on message objects, macros, etc.
 const MODULE_NAME = 'qvink_memory';
-const MODULE_DIR = `scripts/extensions/third-party/${MODULE_NAME}`;
+const MODULE_NAME_HISTORY = ["SillyTavern-MessageSummarize", "qvink_memory"]
 const MODULE_NAME_FANCY = 'Qvink Memory';
 const PROGRESS_BAR_ID = `${MODULE_NAME}_progress_bar`;
 
@@ -350,13 +350,38 @@ function get_settings(key) {
     return extension_settings[MODULE_NAME]?.[key] ?? default_settings[key];
 }
 async function get_manifest() {
-    return await fetch(`${MODULE_DIR}/manifest.json`).then(async response => {
+    // Get the manifest.json for the extension
+    for (let module_name of MODULE_NAME_HISTORY) {
+        let module_dir = `scripts/extensions/third-party/${module_name}`;
+        let response = await fetch(`${module_dir}/manifest.json`)
         if (!response.ok) {
-            error(`Error getting manifest.json: status: ${response.status}`);
-            error(response)
+            debug(`Error getting manifest.json from "${module_dir}": status: ${response.status}`);
+            continue;
         }
         return await response.json();
-    })
+    }
+
+    error("Failed to load manifest.json")
+}
+async function load_settings_html() {
+    // fetch the settings html file and append it to the settings div.
+    log("Loading settings.html...")
+    let found;
+    for (let module_name of MODULE_NAME_HISTORY) {
+        let module_dir = `scripts/extensions/third-party/${module_name}`;
+        let found = await $.get(`${module_dir}/settings.html`).then(async response => {
+            log("Found settings.html")
+            $("#extensions_settings2").append(response);  // load html into the settings div\
+            return true
+        }).catch((response) => {
+            debug(`Error getting settings.json from "${module_dir}": status: ${response.status}`);
+            return false
+        })
+
+        if (found) break;
+    }
+
+    return new Promise(resolve => resolve(found))
 }
 function chat_enabled() {
     // check if the extension is enabled in the current chat
@@ -2104,7 +2129,7 @@ async function on_chat_event(event=null, data=null) {
 
 // UI initialization
 function initialize_settings_listeners() {
-    debug("Initializing settings listeners")
+    log("Initializing settings listeners")
 
     // Trigger profile changes
     bind_setting('#profile', 'profile', 'text', () => load_profile(), false);
@@ -2612,8 +2637,8 @@ jQuery(async function () {
     // Load settings
     initialize_settings();
 
-    // Load the settings UI
-    $("#extensions_settings2").append(await $.get(`${MODULE_DIR}/settings.html`));  // load html
+    // load settings html
+    await load_settings_html();
 
     // initialize UI stuff
     initialize_settings_listeners();
