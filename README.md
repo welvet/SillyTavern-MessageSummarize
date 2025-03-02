@@ -60,10 +60,12 @@ To update the dev branch when changes are made, run:
 - `/get_memory <n>`: Get the memory associated with a given message index. Defaults to the most recent message.
 
 ### Changelog
-#### v0.8.0
+#### v0.8.1
 **IMPORTANT #1:** The number of tokens used for your summaries will be broken and you will need to update your config.
 
-**IMPORTANT #2:** You must be on the ST staging branch as it relies on the following PR: https://github.com/SillyTavern/SillyTavern/pull/3544#issue-2873858897
+**IMPORTANT #2:** You must be on the ST staging branch as it relies on the following PRs: 
+  - https://github.com/SillyTavern/SillyTavern/pull/3544#issue-2873858897
+  - https://github.com/SillyTavern/SillyTavern/pull/3592#issue-2889204530
 
 - **New feature**: You can now choose a connection profile to use for summaries. By default, your currently selected profile will be used.
 - **New Feature**: You can now choose a completion preset to use for summaries. Notably, this is how the max token length of summaries is now defined, and the previous "Summary Max Token Length" setting has been removed. By default, your currently selected preset will be used until changed. This means that **upon updating, your summaries will use the token length from your current preset** until you assign a custom preset which uses a different token length. The {{words}} macro also uses the value from the selected preset.
