@@ -1,5 +1,5 @@
-import { getStringHash, debounce, copyText, waitUntilCondition, extractAllWords, isTrueBoolean, select2ChoiceClickSubscribe } from '../../../utils.js';
-import { getContext, getApiUrl, extension_settings, doExtrasFetch, modules, renderExtensionTemplateAsync } from '../../../extensions.js';
+import { getStringHash, debounce, copyText } from '../../../utils.js';
+import { getContext, getApiUrl, extension_settings } from '../../../extensions.js';
 import {
     animation_duration,
     scrollChatToBottom,
@@ -11,7 +11,7 @@ import {
     getMaxContextSize,
     streamingProcessor,
     amount_gen,
-    getRequestHeaders
+    CONNECT_API_MAP
 } from '../../../../script.js';
 import { getPresetManager } from '../../../preset-manager.js'
 import { formatInstructModeChat } from '../../../instruct-mode.js';
@@ -21,6 +21,7 @@ import { dragElement } from '../../../RossAscends-mods.js';
 import { debounce_timeout } from '../../../constants.js';
 import { MacrosParser } from '../../../macros.js';
 import { commonEnumProviders } from '../../../slash-commands/SlashCommandCommonEnumsProvider.js';
+//import { CHAT_COMPLETION_SOURCES, TEXTGEN_TYPES } from '../../../constants.js';
 export { MODULE_NAME };
 
 // THe module name modifies where settings are stored, where information is stored on message objects, macros, etc.
@@ -133,8 +134,6 @@ const global_settings = {
 const settings_ui_map = {}  // map of settings to UI elements
 
 
-
-
 // Utility functions
 function log(message) {
     console.log(`[${MODULE_NAME_FANCY}]`, message);
@@ -215,10 +214,10 @@ function get_current_preset() {
     // get the currently selected completion preset
     return getPresetManager().getSelectedPresetName()
 }
-function get_summary_preset() {
+async function get_summary_preset() {
     // get the current summary preset OR the default if it isn't valid for the current API
     let preset_name = get_settings('completion_preset');
-    if (preset_name === "" || !verify_preset(preset_name)) {  // none selected or invalid, use the current preset
+    if (preset_name === "" || !await verify_preset(preset_name)) {  // none selected or invalid, use the current preset
         preset_name = get_current_preset();
     }
     return preset_name
@@ -236,19 +235,20 @@ async function set_preset(name) {
     let ctx = getContext();
     await ctx.executeSlashCommandsWithOptions(`/preset ${name}`)
 }
-function get_presets() {
-    // Get the list of available completion presets
-    let { presets, preset_names } = getPresetManager().getPresetList()
+async function get_presets() {
+    // Get the list of available completion presets for the selected connection profile API
+    let summary_api = await get_connection_profile_api()  // API for the summary connection profile (undefined if not active)
+    let { presets, preset_names } = getPresetManager().getPresetList(summary_api)  // presets for the given API (current if undefined)
     // array of names
     if (Array.isArray(preset_names)) return preset_names
     // object of {names: index}
     return Object.keys(preset_names)
 }
-function verify_preset(name) {
+async function verify_preset(name) {
     // check if the given preset name is valid for the current API
     if (name === "") return true;  // no preset selected, always valid
 
-    let preset_names = get_presets()
+    let preset_names = await get_presets()
 
     if (Array.isArray(preset_names)) {  // array of names
         return preset_names.includes(name)
@@ -257,19 +257,19 @@ function verify_preset(name) {
     }
 
 }
-function check_preset_valid() {
+async function check_preset_valid() {
     // check whether the current preset selected for summarization is valid
     let summary_preset = get_settings('completion_preset')
-    let valid_preset = verify_preset(summary_preset)
+    let valid_preset = await verify_preset(summary_preset)
     if (!valid_preset) {
         toast_debounced(`Your selected summary preset "${summary_preset}" is not valid for the current API.`, "warning")
         return false
     }
     return true
 }
-function get_summary_preset_max_tokens() {
+async function get_summary_preset_max_tokens() {
     // get the maximum token length for the chosen summary preset
-    let preset_name = get_summary_preset()
+    let preset_name = await get_summary_preset()
     let preset = getPresetManager().getCompletionPresetByName(preset_name)
 
     // if the preset doesn't have a genamt (which it may not for some reason), use the current genamt. See https://discord.com/channels/1100685673633153084/1100820587586273343/1341566534908121149
@@ -281,58 +281,86 @@ function get_summary_preset_max_tokens() {
 }
 
 // Connection profiles
+let connection_profiles_active;
+function check_connection_profiles_active() {
+    // detect whether the connection profiles extension is active by checking for the UI elements
+    if (connection_profiles_active === undefined) {
+        connection_profiles_active = $('#sys-settings-button').find('#connection_profiles').length > 0
+    }
+    return connection_profiles_active;
+}
 async function get_current_connection_profile() {
+    if (!check_connection_profiles_active()) return;  // if the extension isn't active, return
     // get the current connection profile
-    let result = await executeSlashCommandsWithOptions(`/profile`)
+    let ctx = getContext();
+    let result = await ctx.executeSlashCommandsWithOptions(`/profile`)
     return result.pipe
-
 }
 async function get_connection_profile_api(name) {
-    let result = await executeSlashCommandsWithOptions(`/profile-get ${name}`)
-    return JSON.parse(result.pipe).api
+    // Get the API for the given connection profile name. If not given, get the current summary profile.
+    if (!check_connection_profiles_active()) return;  // if the extension isn't active, return
+    if (name === undefined) name = await get_summary_connection_profile()
+    let ctx = getContext();
+    let result = await ctx.executeSlashCommandsWithOptions(`/profile-get ${name}`)
+    let data = JSON.parse(result.pipe)
+
+    // need to map the API type to a completion API
+    if (CONNECT_API_MAP[data.api] === undefined) {
+        error(`API type "${data.api}" not found in CONNECT_API_MAP - could not identify API.`)
+        return
+    }
+    return CONNECT_API_MAP[data.api].selected
 }
-function get_summary_connection_profile() {
+async function get_summary_connection_profile() {
     // get the current connection profile OR the default if it isn't valid for the current API
     let name = get_settings('connection_profile');
-    if (name === "" || !verify_connection_profile(name)) {  // none selected or invalid, use the current preset
-        name = get_current_connection_profile();
+
+    // If none selected, invalid, or connection profiles not active, use the current profile
+    if (name === "" || !await verify_connection_profile(name) || !check_connection_profiles_active()) {
+        name = await get_current_connection_profile();
     }
+
     return name
 }
 async function set_connection_profile(name) {
     // Set the connection profile
+    if (!check_connection_profiles_active()) return;  // if the extension isn't active, return
     if (name === await get_current_connection_profile()) return;  // If already using the current preset, return
-
-    if (!check_connection_profile_valid()) return;  // don't set an invalid preset
+    if (!await check_connection_profile_valid()) return;  // don't set an invalid preset
 
     // Set the completion preset
-    debug(`Setting connection profile to ${name}`)
+    debug(`Setting connection profile to "${name}"`)
     if (get_settings('debug_mode')) {
-        toastr.info(`Setting connection profile to ${name}`);
+        toastr.info(`Setting connection profile to "${name}"`);
     }
-    await executeSlashCommandsWithOptions(`/profile ${name}`)
+    let ctx = getContext();
+    await ctx.executeSlashCommandsWithOptions(`/profile ${name}`)
 }
 async function get_connection_profiles() {
     // Get a list of available connection profiles
-    let result = await executeSlashCommandsWithOptions(`/profile-list`)
+
+    if (!check_connection_profiles_active()) return;  // if the extension isn't active, return
+    let ctx = getContext();
+    let result = await ctx.executeSlashCommandsWithOptions(`/profile-list`)
     return JSON.parse(result.pipe)
 }
-function verify_connection_profile(name) {
+async function verify_connection_profile(name) {
     // check if the given connection profile name is valid
+    if (!check_connection_profiles_active()) return;  // if the extension isn't active, return
     if (name === "") return true;  // no profile selected, always valid
 
-    let names = get_connection_profiles()
+    let names = await get_connection_profiles()
     return names.includes(name)
 }
-function check_connection_profile_valid() {
+async function check_connection_profile_valid()  {
     // check whether the current connection profile selected for summarization is valid
-    let summary_connection = get_settings('completion_preset')
-    let valid_preset = verify_preset(summary_connection)
-    if (!valid_preset) {
+    if (!check_connection_profiles_active()) return;  // if the extension isn't active, return
+    let summary_connection = get_settings('connection_profile')
+    let valid = await verify_connection_profile(summary_connection)
+    if (!valid) {
         toast_debounced(`Your selected summary connection profile "${summary_connection}" is not valid.`, "warning")
-        return false
     }
-    return true
+    return valid
 }
 
 
@@ -625,11 +653,11 @@ function update_save_icon_highlight() {
         $('#save_profile').removeClass('button_highlight');
     }
 }
-function update_preset_dropdown() {
+async function update_preset_dropdown() {
     // set the completion preset dropdown
     let $preset_select = $(`.${settings_content_class} #completion_preset`);
     let summary_preset = get_settings('completion_preset')
-    let preset_options = get_presets()
+    let preset_options = await get_presets()
     $preset_select.empty();
     $preset_select.append(`<option value="">Same as Current</option>`)
     for (let option of preset_options) {  // construct the dropdown options
@@ -679,11 +707,18 @@ function refresh_settings() {
         choose_profile_dropdown.val(current_character_profile);
     }
 
+    // connection profiles
+    if (check_connection_profiles_active()) {
+        update_connection_profile_dropdown()
+        check_connection_profile_valid()
+    } else { // if connection profiles extension isn't active, hide the connection profile dropdown
+        $(`.${settings_content_class} #connection_profile`).parent().hide()
+        log("Connection profiles extension not active. Hiding connection profile dropdown.")
+    }
+
+    // completion presets
     update_preset_dropdown()
     check_preset_valid()
-
-    update_connection_profile_dropdown()
-    check_connection_profile_valid()
 
     // if prompt doesn't have {{message}}, insert it
     if (!get_settings('prompt').includes("{{message}}")) {
@@ -1683,12 +1718,15 @@ async function summarize_message(index=null) {
     // construct the full summary prompt for the message
     let prompt = create_summary_prompt(index)
 
-    // set the current completion preset and save the current one
+    // set the summary connection profile and save the current one
+    let summary_profile = get_settings('connection_profile');
+    let current_profile = await get_current_connection_profile()
+    await set_connection_profile(summary_profile);
+
+    // set the summary completion preset and save the current one
     let summary_preset = get_settings('completion_preset');
-    let current_preset = get_current_preset();
-    if (summary_preset !== null) {
-        await set_preset(summary_preset);
-    }
+    let current_preset = await get_current_preset();
+    await set_preset(summary_preset);
 
 
     // summarize it
@@ -1706,10 +1744,9 @@ async function summarize_message(index=null) {
         summary = null
     }
 
-    // restore the completion preset
-    if (summary_preset !== null) {
-        await set_preset(current_preset);
-    }
+    // restore the completion preset and connection profile
+    await set_preset(current_preset);
+    await set_connection_profile(current_profile);
 
     if (summary) {
         debug("Message summarized: " + summary)
@@ -2249,6 +2286,7 @@ Available Macros:
     })
     bind_function('#copy_summaries_to_clipboard', copy_summaries_to_clipboard)
 
+    bind_setting('#connection_profile', 'connection_profile', 'text')
     bind_setting('#completion_preset', 'completion_preset', 'text')
     bind_setting('#auto_summarize', 'auto_summarize', 'boolean');
     bind_setting('#auto_summarize_on_edit', 'auto_summarize_on_edit', 'boolean');
@@ -2333,7 +2371,7 @@ function initialize_message_buttons() {
         remember_message_toggle(message_id);
     });
     $(document).on("click", `.${forget_button_class}`, async function () {
-      const message_block = $(this).closest(".mes");
+        const message_block = $(this).closest(".mes");
         const message_id = Number(message_block.attr("mesid"));
         forget_message_toggle(message_id);
     })
@@ -2421,10 +2459,6 @@ function initialize_slash_commands() {
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'qvink_log_settings',
         callback: async (args) => {
-            let name = await get_current_connection_profile()
-            log(name)
-            log(await get_connection_profile_api(name))
-            log(await get_connection_profiles())
             log(extension_settings[MODULE_NAME])
         },
         helpString: 'Log current settings',

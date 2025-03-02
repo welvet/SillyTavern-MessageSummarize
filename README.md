@@ -65,8 +65,9 @@ To update the dev branch when changes are made, run:
 
 **IMPORTANT #2:** You must be on the ST staging branch as it relies on the following PR: https://github.com/SillyTavern/SillyTavern/pull/3544#issue-2873858897
 
+- **New feature**: You can now choose a connection profile to use for summaries. By default, your currently selected profile will be used.
 - **New Feature**: You can now choose a completion preset to use for summaries. Notably, this is how the max token length of summaries is now defined, and the previous "Summary Max Token Length" setting has been removed. By default, your currently selected preset will be used until changed. This means that **upon updating, your summaries will use the token length from your current preset** until you assign a custom preset which uses a different token length. The {{words}} macro also uses the value from the selected preset.
-- **New Feature**: You can now specify short and long-term context limit directly with a number of tokens.
+- **New Feature**: You can now optionally specify short and long-term context limit directly with a number of tokens.
 - **New Feature**: You can now optionally set profiles to use a global toggle state between all chats that use this option. This means that if you toggle the extension off in one chat, it will be off in all chats that use this option. Chats that don't have this option enabled will not be affected, as is the current behavior.
 - **New Slash Command**: `/get_memory <n>` will return the memory associated with the given message index.
 - **Fix**: Optimized loading the extension in huge chats (10k+ messages), no longer freezes.
@@ -174,6 +175,7 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - Ability to modify memory directly without visiting each message
   - Need a new popup interface where summaries can be edited, excluded, marked, etc without having to go to each message in the chat.
   - All summaries should be loaded in a giant scroll window
+  - Option to mass-delete summaries
 - ~~Remove disabled group members from context~~
 - ~~Option to use a global toggle state for chats~~
 - ~~Fix reported freezing issue for chats with 30k+ messages~~
