@@ -1,4 +1,4 @@
-import { getStringHash, debounce, copyText } from '../../../utils.js';
+import { getStringHash, debounce, copyText, trimToEndSentence } from '../../../utils.js';
 import { getContext, getApiUrl, extension_settings } from '../../../extensions.js';
 import {
     animation_duration,
@@ -1804,6 +1804,11 @@ async function summarize_text(prompt) {
          * @returns {Promise<string>} Generated message
          */
         result = await generateRaw(prompt, '', true, false, '');
+    }
+
+    // trim incomplete sentences if set in ST power user settings
+    if (ctx.powerUserSettings.trim_sentences) {
+        result = trimToEndSentence(result);
     }
 
     return result;
