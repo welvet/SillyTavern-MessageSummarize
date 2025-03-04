@@ -91,6 +91,8 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 
 ### Todo
 - ~~Sentence trimming for summaries.~~
+- Ability to turn off summaries being displayed, but still view them on a given message.
+  - Button click to collapse/expand per message?
 - Ability to modify memory directly without visiting each message
   - Need a new popup interface where summaries can be edited, excluded, marked, etc without having to go to each message in the chat.
   - All summaries should be loaded in a giant scroll window
