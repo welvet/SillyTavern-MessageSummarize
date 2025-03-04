@@ -1718,14 +1718,16 @@ async function summarize_message(index=null) {
     // construct the full summary prompt for the message
     let prompt = create_summary_prompt(index)
 
-    // set the summary connection profile and save the current one
-    let summary_profile = get_settings('connection_profile');
-    let current_profile = await get_current_connection_profile()
-    await set_connection_profile(summary_profile);
-
-    // set the summary completion preset and save the current one
+    // Save the current completion preset (must happen before you set the connection profile because it changes the preset)
     let summary_preset = get_settings('completion_preset');
     let current_preset = await get_current_preset();
+
+    // Get the current connection profile
+    let summary_profile = get_settings('connection_profile');
+    let current_profile = await get_current_connection_profile()
+
+    // set the completion preset and connection profile for summarization (preset must be set after connection profile)
+    await set_connection_profile(summary_profile);
     await set_preset(summary_preset);
 
 
@@ -1745,8 +1747,9 @@ async function summarize_message(index=null) {
     }
 
     // restore the completion preset and connection profile
-    await set_preset(current_preset);
     await set_connection_profile(current_profile);
+    await set_preset(current_preset);
+
 
     if (summary) {
         debug("Message summarized: " + summary)
