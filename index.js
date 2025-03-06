@@ -121,6 +121,7 @@ const default_settings = {
     display_memories: true,  // display memories in the chat below each message
     default_chat_enabled: true,  // whether memory is enabled by default for new chats
     use_global_toggle_state: false,  // whether the on/off state for this profile uses the global state
+    prompt_prefill: false,  // whether to add the prefill to the prompt
     limit_injected_messages: -1,  // limit the number of injected messages (-1 for no limit)
 };
 const global_settings = {
@@ -1718,6 +1719,13 @@ async function summarize_message(index=null) {
     // construct the full summary prompt for the message
     let prompt = create_summary_prompt(index)
 
+    // optionally disable the prompt prefill
+    let current_prefill;
+    if (!get_settings('prompt_prefill')) {
+        current_prefill = context.powerUserSettings.user_prompt_bias
+        context.powerUserSettings.user_prompt_bias = ""
+    }
+
     // Save the current completion preset (must happen before you set the connection profile because it changes the preset)
     let summary_preset = get_settings('completion_preset');
     let current_preset = await get_current_preset();
@@ -1729,7 +1737,6 @@ async function summarize_message(index=null) {
     // set the completion preset and connection profile for summarization (preset must be set after connection profile)
     await set_connection_profile(summary_profile);
     await set_preset(summary_preset);
-
 
     // summarize it
     let summary;
@@ -1749,6 +1756,11 @@ async function summarize_message(index=null) {
     // restore the completion preset and connection profile
     await set_connection_profile(current_profile);
     await set_preset(current_preset);
+
+    // restore the prompt prefill
+    if (!get_settings('prompt_prefill')) {
+        context.powerUserSettings.user_prompt_bias = current_prefill
+    }
 
 
     if (summary) {
@@ -2305,6 +2317,7 @@ Available Macros:
     bind_setting('#auto_summarize_message_limit', 'auto_summarize_message_limit', 'number');
     bind_setting('#auto_summarize_progress', 'auto_summarize_progress', 'boolean');
     bind_setting('#auto_summarize_on_send', 'auto_summarize_on_send', 'boolean');
+    bind_setting('#prompt_prefill', 'prompt_prefill', 'boolean')
 
     bind_setting('#include_world_info', 'include_world_info', 'boolean');
     bind_setting('#block_chat', 'block_chat', 'boolean');
