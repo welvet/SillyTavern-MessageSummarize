@@ -47,6 +47,13 @@ const group_member_enable_button_highlight = `qvink_memory_group_member_enabled`
 const long_memory_macro = `${MODULE_NAME}_long_memory`;
 const short_memory_macro = `${MODULE_NAME}_short_memory`;
 
+// message button classes
+const remember_button_class = `${MODULE_NAME}_remember_button`
+const summarize_button_class = `${MODULE_NAME}_summarize_button`
+const edit_button_class = `${MODULE_NAME}_edit_button`
+const forget_button_class = `${MODULE_NAME}_forget_button`
+const delete_button_class = `${MODULE_NAME}_delete_button`
+
 // global flags and whatnot
 var STOP_SUMMARIZATION = false  // flag toggled when stopping summarization
 var SUMMARIZATION_DELAY_TIMEOUT = null  // the set_timeout object for the summarization delay
@@ -1343,6 +1350,87 @@ function remove_progress_bar(id) {
     }
 }
 
+function update_memory_state_interface($content) {
+    // Update the content of the memory state interface
+    let ctx = getContext();
+    log($content)
+
+    let $mass_select_checkbox = $('<input type="checkbox" id="mass_select_checkbox">').appendTo($('th.mass_select'))
+    $mass_select_checkbox.off('change').on('change', function () {  // when the mass checkbox is toggled, apply the change to all checkboxes
+        let checked = $mass_select_checkbox.prop('checked');
+        $content.find('input[type="checkbox"]').prop('checked', checked);
+    })
+
+    // add a table row for each memory in chat
+    for (let i=0; i<ctx.chat.length; i++) {
+        let msg = ctx.chat[i];
+        let memory = get_memory(msg, 'memory') || ""
+        let $table = $content.find('table')
+
+        let $select_checkbox = $(`<input type="checkbox" id="memory_${i}" name="memory_${i}" value="${i}">`)
+        let $buttons = $(`
+<div title="Remember (toggle inclusion of summary in long-term memory)" class="mes_button ${remember_button_class} fa-solid fa-brain"></div>
+<div title="Force Exclude (toggle inclusion of summary from all memory)" class="mes_button ${forget_button_class} fa-solid fa-ban"></div>
+<div title="Re-Summarize (AI)" class="mes_button ${summarize_button_class} fa-solid fa-quote-left"></div>
+<div title="Delete" class="mes_button ${delete_button_class} fa-solid fa-trash"></div>
+`)
+        let $row = $('<tr></tr>')
+        $row.appendTo($table)
+
+        // add each item like above
+        $select_checkbox.wrap('<td></td>').parent().appendTo($row)
+        $(`<td>${i}</td>`).appendTo($row)
+        $(`<td>${memory}</td>`).appendTo($row)
+        $buttons.wrap('<td></td>').parent().appendTo($row)
+    }
+}
+
+async function show_memory_state_interface() {
+    // Display the interface for editing the memory state
+
+    // The div with the "mes" class mimics the structure of a chat message that my callback
+    //   registered works the same as if you clicked the button on the message itself.
+    let html_content = `
+<div id="qvink_memory_state_interface">
+<div>Memory State</div>
+<table style="text-align: left;">
+    <tr>
+        <th class="mass_select" title="Select all/none"></th>
+        <th title="Message ID associated with the memory">ID</th>
+        <th title="Memory text"><div class="mes" mesid="${id}">Memory</div></th>
+        <th class="actions">Actions</th>
+    </tr>
+</table>
+<div>
+    <div>Bulk Actions</div>
+    <div title="Toggle inclusion of summary in long-term memory" class="mes_button ${remember_button_class} fa-solid fa-brain">Remember</div>
+    <div title="Force Exclude (toggle inclusion of summary from all memory)" class="mes_button ${forget_button_class} fa-solid fa-ban">Exclude</div>
+    <div title="Re-Summarize (AI)" class="mes_button ${summarize_button_class} fa-solid fa-quote-left">Summarize</div>
+    <div title="Delete" class="mes_button ${delete_button_class} fa-solid fa-trash">Delete</div>
+</div>
+</div>
+`
+    let ctx = getContext();
+    let popup = new ctx.Popup(html_content, 'text', undefined, {rows: 20, okButton: 'Close', cancelButton: null, wider: true, allowVerticalScrolling: true});
+    let $content = $(popup.content)
+    update_memory_state_interface($content)
+
+    // get list of selected message IDs
+    function get_selected() {
+        let selected = [];
+        $content.find('input[type="checkbox"]:checked').each(function () {
+            let id = $(this).val();
+            selected.push(Number(id));
+        })
+        return selected;
+    }
+
+
+
+    let input = await popup.show();
+    log("INPUT: "+input)
+}
+
 
 // Message functions
 function store_memory(message, key, value) {
@@ -2268,6 +2356,7 @@ function initialize_settings_listeners() {
     bind_function('#revert_settings', reset_settings);
 
     bind_function('#toggle_chat_memory', () => toggle_chat_enabled(), false);
+    bind_function('#edit_memory_state', () => show_memory_state_interface())
     bind_function('#preview_memory_state', async () => {
         let text = refresh_memory()
         text = `...\n\n${text}\n\n...`
@@ -2370,11 +2459,6 @@ function initialize_message_buttons() {
     // Add the message buttons to the chat messages
     debug("Initializing message buttons")
 
-    let remember_button_class = `${MODULE_NAME}_remember_button`
-    let summarize_button_class = `${MODULE_NAME}_summarize_button`
-    let edit_button_class = `${MODULE_NAME}_edit_button`
-    let forget_button_class = `${MODULE_NAME}_forget_button`
-
     let html = `
 <div title="Remember (toggle inclusion of summary in long-term memory)" class="mes_button ${remember_button_class} fa-solid fa-brain" tabindex="0"></div>
 <div title="Force Exclude (toggle inclusion of summary from all memory)" class="mes_button ${forget_button_class} fa-solid fa-ban" tabindex="0"></div>
@@ -2406,6 +2490,11 @@ function initialize_message_buttons() {
         const message_block = $(this).closest(".mes");
         const message_id = Number(message_block.attr("mesid"));
         await edit_memory(message_id);
+    });
+    $(document).on("click", `.${delete_button_class}`, async function () {
+        const message_block = $(this).closest(".mes");
+        const message_id = Number(message_block.attr("mesid"));
+        store_memory(getContext().chat[message_id], "memory", "")
     });
 
     // when a message is hidden/unhidden, trigger a memory refresh
