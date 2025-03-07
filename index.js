@@ -2276,7 +2276,7 @@ function initialize_settings_listeners() {
     bind_function("#refresh_memory", () => refresh_memory());
 
     bind_function('#edit_summary_prompt', async () => {
-        let max_tokens = get_summary_preset_max_tokens()
+        let max_tokens = await get_summary_preset_max_tokens()
         let description = `
 Available Macros:
 <ul style="text-align: left; font-size: smaller;">
@@ -2796,5 +2796,5 @@ jQuery(async function () {
     eventSource.on(event_types.GROUP_UPDATED, set_character_enabled_button_states)
 
     // Macros
-    MacrosParser.registerMacro("words", () => get_summary_preset_max_tokens());
+    MacrosParser.registerMacro("words", async () => await get_summary_preset_max_tokens());
 });
