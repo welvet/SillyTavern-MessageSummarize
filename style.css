@@ -128,7 +128,20 @@ By default, text is greyed to indicate that is it not injected.
 }
 
 /* Memory state interface */
+#qvink_memory_state_interface {
+    display: flex;
+    flex-direction: column;
+    height: 80vh;
+}
 #qvink_memory_state_interface button.menu_button i {
-    margin-right: 1em;  /* buttons with icon before text needs margin */
+    margin-right: 1em;  /* buttons with icon before text needs margin after the icon */
+}
+#qvink_memory_state_interface table {
+    display: block;
+    overflow-y: auto;
+}
+#qvink_memory_state_interface table thead {
+    position: sticky;
+    top: 0;
 }
 

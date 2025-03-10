@@ -1201,7 +1201,9 @@ async function display_text_modal(title, text="") {
     let ctx = getContext();
     text = text.replace(/\n/g, '<br>');
     let html = `<h2>${title}</h2><div style="text-align: left; overflow: auto;">${text}</div>`
-    const popupResult = await ctx.callPopup(html, 'text', undefined, { okButton: `Close` });
+    //const popupResult = await ctx.callPopup(html, 'text', undefined, { okButton: `Close` });
+    let popup = new ctx.Popup(html, ctx.POPUP_TYPE.TEXT, undefined, {okButton: 'Close'});
+    await popup.show()
 }
 async function get_user_setting_text_input(key, title, description="") {
     // Display a modal with a text area input, populated with a given setting value
@@ -1365,47 +1367,61 @@ function update_memory_state_interface($content) {
 
     let button_html = `
 <div>
-    <div title="Remember (toggle inclusion of summary in long-term memory)" class="mes_button fa-solid fa-brain ${remember_button_class}"></div>
-    <div title="Force Exclude (toggle inclusion of summary from all memory)" class="mes_button fa-solid fa-ban ${forget_button_class}"></div>
-    <div title="Re-Summarize (AI)" class="mes_button fa-solid fa-quote-left ${summarize_button_class}"></div>
+    <div title="Remember (toggle inclusion of summary in long-term memory)"     class="mes_button fa-solid fa-brain ${remember_button_class}"></div>
+    <div title="Force Exclude (toggle inclusion of summary from all memory)"    class="mes_button fa-solid fa-ban ${forget_button_class}"></div>
+    <div title="Re-Summarize (AI)"                                              class="mes_button fa-solid fa-quote-left ${summarize_button_class}"></div>
 </div>
 `
+    // whether to show messages with no summary
+    let show_no_summary = $content.find('#show_no_summary').is(':checked');
 
     // add a table row for each memory in chat
-    let $table = $content.find('table')
+    let $table = $content.find('tbody')
+    let $row;
+    let $previous_row;
     for (let i=0; i<ctx.chat.length; i++) {
         let msg = ctx.chat[i];
         let memory = get_memory(msg, 'memory') || ""
-        let error = get_memory(msg, 'error')
+        let error = get_memory(msg, 'error') || ""
         let row_id = `memory_${i}`
 
+        log("HERE")
+
         // check if a row already exists for this memory
-        let $row = $table.find(`tr#${row_id}`);
+        $row = $table.find(`tr#${row_id}`);
         let $memory;
         let $select_checkbox;
         let $buttons;
         if ($row.length === 0) {  // doesn't exist
 
-            // if no memory and no error, skip
-            if (!memory && !error) continue;
+            if (!show_no_summary && !memory && !error) {
+                if (!memory && !error) continue;  // if no memory and no error, skip
+            }
 
             $memory = $(`<textarea>${memory}</textarea>`)
-            $select_checkbox = $(`<input type="checkbox" value="${i}">`)
+            $select_checkbox = $(`<input class="message_select" type="checkbox" value="${i}">`)
             $buttons = $(button_html)
 
             // create the row. The "message_id" attribute tells all handlers what message ID this is.
             $row = $(`<tr message_id="${i}" id="${row_id}"></tr>`)
-            $row.appendTo($table)
+
+            // append this new row after the previous row
+            if ($previous_row) {
+                $row.insertAfter($previous_row)
+            } else {
+                $row.appendTo($table)
+            }
+
 
             // add each item
             $select_checkbox.wrap('<td></td>').parent().appendTo($row)
             $(`<td>${i}</td>`).appendTo($row)
-            $memory.wrap(`<td style="width: 100%;"></td>`).parent().appendTo($row)
+            $memory.wrap(`<td style="width: 83%;"></td>`).parent().appendTo($row)
             $buttons.wrap(`<td></td>`).parent().appendTo($row)
         } else {  // already exists
 
             // if no memory and no error, remove it
-            if (!memory && !error) {
+            if (!show_no_summary && !memory && !error) {
                 $row.remove();
                 continue;
             }
@@ -1425,7 +1441,13 @@ function update_memory_state_interface($content) {
         // set style
         $memory.removeClass().addClass(`${css_message_div} ${get_summary_style_class(msg)}`)
 
+        // save as previous row
+        $previous_row = $row
     }
+
+    update_selected_count($content)
+
+    update_bulk_button_enabled($content)
 }
 function copy_summaries_to_clipboard(indexes) {
     // copy the summaries of the given messages to clipboard
@@ -1433,28 +1455,48 @@ function copy_summaries_to_clipboard(indexes) {
     copyText(text)
     toastr.info("All memories copied to clipboard.")
 }
-
 async function show_memory_state_interface() {
     // Display the interface for editing the memory state
 
     let html_content = `
 <div id="qvink_memory_state_interface">
-<div>
-    <h3>Memory State</h3>
+<div class="flex-container justifyspacebetween alignitemscenter">
+    <h4>Memory State</h4>
     <button id="preview_memory_state" class="menu_button fa-solid fa-eye margin0" title="Preview current memory state (the exact text that will be injected into your context)."></button>
+    <label class="checkbox_label" title="Show messages without summaries.">
+        <input id="show_no_summary" type="checkbox" />
+    <span>Show empty summaries</span>
+</label>
 </div>
 
-<table style="text-align: left;">
+<div>
+    <div title="Select/deselect summaries">Select Subsets</div>
+    <div class="flex-container justifyspacebetween alignitemscenter">
+        <button id="select_no_summary" class="menu_button flex1" title="Select empty summaries">No Summary</button>
+        <button id="select_short_term" class="menu_button flex1" title="Select summaries currently in short-term memory">Short-Term</button>
+        <button id="select_long_term"  class="menu_button flex1" title="Select summaries marked for long-term memory (even if they are out of long-term context)">Long-Term</button>
+        <button id="select_excluded"   class="menu_button flex1" title="Select summaries currently force-excluded from all memory">Force-Excluded</button>
+        <button id="select_edited"     class="menu_button flex1" title="Select summaries that have been manually edited">Edited</button>
+    </div>
+</div>
+
+<hr>
+<table>
+<thead>
     <tr>
-        <th class="mass_select" title="Select all/none"></th>
+        <th class="mass_select" title="Select all/none"><input id="mass_select" type="checkbox"/></th>
         <th title="Message ID associated with the memory">ID</th>
         <th title="Memory text">Memory</th>
         <th class="actions">Actions</th>
     </tr>
+</thead>
+<tbody></tbody>
 </table>
 
+
+<hr>
 <div>
-    <div>Bulk Actions</div>
+    <div>Bulk Actions (Selected: <span id="selected_count"></span>)</div>
     <div class="flex-container justifyspacebetween alignitemscenter">
         <button id="bulk_remember"   disabled class="menu_button flex1" title="Toggle inclusion of selected summaries in long-term memory"> <i class="fa-solid fa-brain"></i>Remember</button>
         <button id="bulk_exclude"    disabled class="menu_button flex1" title="Toggle inclusion of selected summaries from all memory">     <i class="fa-solid fa-ban"></i>Exclude</button>
@@ -1466,30 +1508,90 @@ async function show_memory_state_interface() {
 </div>
 `
     let ctx = getContext();
-    let popup = new ctx.Popup(html_content, ctx.POPUP_TYPE.TEXT, undefined, {rows: 20, wider: true, allowVerticalScrolling: true});
+    let popup = new ctx.Popup(html_content, ctx.POPUP_TYPE.TEXT, undefined, {rows: 20, wider: true});
     let $content = $(popup.content)
     update_memory_state_interface($content)
 
-
-    let $mass_select_checkbox = $('<input type="checkbox">').appendTo($content.find('th.mass_select'))
+    let $mass_select_checkbox = $content.find('#mass_select')
     $mass_select_checkbox.on('change', function () {  // when the mass checkbox is toggled, apply the change to all checkboxes
         let checked = $mass_select_checkbox.prop('checked');
-        $content.find('input[type="checkbox"]').prop('checked', checked);
+        $content.find('input.message_select').prop('checked', checked);
+        update_bulk_button_enabled($content)
+        update_selected_count($content)
     })
 
-    // get list of selected message IDs
-    function get_selected() {
-        let selected = [];
-        $content.find('td input[type="checkbox"]:checked').each(function () {
-            let id = $(this).val();
-            selected.push(Number(id));
-        })
-        return selected;
+    let $show_no_summary = $content.find('#show_no_summary');
+    $show_no_summary.on('change', function () {  // when the show_no_summary checkbox is toggled, update the interface
+        update_memory_state_interface($content);
+    })
+
+    function toggle_selected(indexes) {
+        // toggle the selected state of the given message indexes
+        let $checkboxes = $content.find('input.message_select').filter((i, el) => indexes.includes(Number(el.value)))
+        let all_checked = $checkboxes.length === $checkboxes.filter(':checked').length;
+        $checkboxes.prop('checked', !all_checked);
+        update_bulk_button_enabled($content)
+        update_selected_count($content)
     }
 
+    // select subset buttons
+    $content.find('#select_no_summary').on('click', function () {
+        let indexes = []
+        for (let i=0; i<ctx.chat.length; i++) {
+            let message = ctx.chat[i];
+            if (!get_memory(message, 'memory')) {
+                indexes.push(i);
+            }
+        }
+        $("#show_no_summary").prop('checked', true)
+        update_memory_state_interface($content)
+        toggle_selected(indexes);
+    })
+    $content.find('#select_short_term').on('click', function () {
+        let indexes = []
+        for (let i=0; i<ctx.chat.length; i++) {
+            let message = ctx.chat[i];
+            if (get_memory(message, 'include') === "short") {
+                indexes.push(i);
+            }
+        }
+        toggle_selected(indexes);
+    })
+    $content.find('#select_long_term').on('click', function () {
+        let indexes = []
+        for (let i=0; i<ctx.chat.length; i++) {
+            let message = ctx.chat[i];
+            if (get_memory(message, 'remember')) {
+                indexes.push(i);
+            }
+        }
+        toggle_selected(indexes);
+    })
+    $content.find('#select_excluded').on('click', function () {
+        let indexes = []
+        for (let i=0; i<ctx.chat.length; i++) {
+            let message = ctx.chat[i];
+            if (get_memory(message, 'exclude')) {
+                indexes.push(i);
+            }
+        }
+        toggle_selected(indexes);
+    })
+    $content.find('#select_edited').on('click', function () {
+        let indexes = []
+        for (let i=0; i<ctx.chat.length; i++) {
+            let message = ctx.chat[i];
+            if (get_memory(message, 'edited')) {
+                indexes.push(i);
+            }
+        }
+        toggle_selected(indexes);
+    })
+
+    // bulk action buttons
     // bulk action buttons
     $content.find(`#bulk_remember`).on('click', function () {
-        let selected = get_selected();
+        let selected = get_memory_state_selected($content);
         let value = true;  // by default, set all selected messages to true
 
         // unless ALL messages are already true, then set them to false
@@ -1503,7 +1605,7 @@ async function show_memory_state_interface() {
         update_memory_state_interface($content)
     })
     $content.find(`#bulk_exclude`).on('click', function () {
-        let selected = get_selected();
+        let selected = get_memory_state_selected($content);
         let value = true;  // by default, set all selected messages to true
 
         // unless ALL messages are already true, then set them to false
@@ -1517,12 +1619,12 @@ async function show_memory_state_interface() {
         update_memory_state_interface($content)
     })
     $content.find(`#bulk_summarize`).on('click', function () {
-        let selected = get_selected();
+        let selected = get_memory_state_selected($content);
         summarize_messages(selected);
         update_memory_state_interface($content)
     })
     $content.find(`#bulk_delete`).on('click', function () {
-        let selected = get_selected();
+        let selected = get_memory_state_selected($content);
         for (let id of selected) {
             store_memory(ctx.chat[id], 'memory', null);
         }
@@ -1531,7 +1633,7 @@ async function show_memory_state_interface() {
     //bind_function('#preview_long_term_memory', async () => {display_text_modal("Long-Term Memory Preview", get_long_memory())})
     //bind_function('#preview_short_term_memory', async () => {display_text_modal("Short-Term Memory Preview", get_short_memory())})
     $content.find('#bulk_copy').on('click', function () {
-        let selected = get_selected()
+        let selected = get_memory_state_selected($content)
         copy_summaries_to_clipboard(selected)
     })
     $content.find('#preview_memory_state').on('click', () => {
@@ -1550,16 +1652,9 @@ async function show_memory_state_interface() {
         store_memory(message, "error", null)
         update_memory_state_interface($content)
     })
-    $content.on('click', 'input[type="checkbox"]', function () {
-        // enable/disable bulk action buttons
-        let selected = get_selected();
-        log("CLICKED")
-        let $buttons = $content.find('#bulk_remember, #bulk_exclude, #bulk_summarize, #bulk_delete, #bulk_copy');
-        if (selected.length > 0) {
-            $buttons.removeAttr('disabled');
-        } else {
-            $buttons.attr('disabled', true);
-        }
+    $content.on('click', 'input.message_select', function () {
+        update_bulk_button_enabled($content)
+        update_selected_count($content)
     })
     $content.on("click", `tr .${remember_button_class}`, function () {
         let message_id = Number($(this).closest('tr').attr('message_id'));  // get the message ID from the row's "message_id" attribute
@@ -1577,7 +1672,29 @@ async function show_memory_state_interface() {
         update_memory_state_interface($content)
     });
 
-    let input = await popup.show();
+    await popup.show();
+}
+function get_memory_state_selected($content) {
+    let selected = [];
+    $content.find('td input[type="checkbox"]:checked').each(function () {
+        let id = $(this).val();
+        selected.push(Number(id));
+    })
+    return selected;
+}
+function update_bulk_button_enabled($content) {
+    // enable/disable bulk action buttons
+    let selected = get_memory_state_selected($content);
+    let $bulk_buttons = $content.find('#bulk_remember, #bulk_exclude, #bulk_summarize, #bulk_delete, #bulk_copy');
+    if (selected.length > 0) {
+        $bulk_buttons.removeAttr('disabled');
+    } else {
+        $bulk_buttons.attr('disabled', true);
+    }
+}
+function update_selected_count($content) {
+    let $counter = $content.find("#selected_count")
+    $counter.text(get_memory_state_selected($content).length)
 }
 
 
@@ -1790,6 +1907,11 @@ function update_message_inclusion_flags() {
         }
 
         if (!short_limit_reached) {  // short-term limit hasn't been reached yet
+            if (!get_memory(message, 'memory')) {  // If it doesn't have a memory, mark it as excluded and move to the next
+                store_memory(message, 'include', null)
+                continue
+            }
+
             new_summary = concatenate_summary(summary, message)  // concatenate this summary
             let short_token_size = count_tokens(new_summary);
             if (short_token_size > get_short_token_limit()) {  // over context limit
@@ -1797,7 +1919,7 @@ function update_message_inclusion_flags() {
                 long_term_end_index = i;  // this is where long-term memory ends and short-term begins
                 summary = ""  // reset summary
             } else {  // under context limit
-                store_memory(message, 'include', 'short');  // mark the message as short-term
+                store_memory(message, 'include', 'short');
                 summary = new_summary
                 continue
             }
