@@ -1233,88 +1233,6 @@ async function get_user_setting_text_input(key, title, description="") {
         set_settings(key, input);
     }
 }
-async function summarize_chat_modal() {
-    // Let the user choose settings before summarizing the chat
-    let html = `
-<h2>Summarize Chat</h2>
-<p>Choose settings for the chat summarization. All message inclusion/exclusion settings from the main config profile are used, in addition to the following options.</p>
-<p>Currently preparing to summarize: <span id="number_to_summarize"></span></p>
-`
-
-    let custom_inputs = [
-        {
-            id: "include_no_summary",
-            label: "Summarize messages with no existing summary",
-            type: "checkbox",
-            defaultState: true,
-        },
-        {
-            id: "include_short",
-            label: "Re-summarize messages in short-term memory",
-            type: "checkbox",
-            defaultState: false,
-        },
-        {
-            id: "include_long",
-            label: "Re-summarize messages marked for long-term memory",
-            type: "checkbox",
-            defaultState: false,
-        },
-        {
-            id: "include_excluded",
-            label: "Re-summarize messages with existing memories, but which are currently excluded from short-term and long-term memory",
-            type: "checkbox",
-            defaultState: false,
-        },
-        {
-            id: "include_edited",
-            label: "Re-summarize messages with existing memories that have been manually edited.",
-            type: "checkbox",
-            defaultState: false,
-        },
-    ]
-
-    let ctx = getContext();
-    let popup = new ctx.Popup(html, ctx.POPUP_TYPE.CONFIRM, null, {rows: 20, okButton: 'Summarize', cancelButton: 'Cancel', customInputs: custom_inputs});
-
-    function get_messages_to_summarize() {
-        // get settings from the input
-        let settings = {};
-        for (let input of custom_inputs) {
-            settings[input.id] = $(popup.inputControls).find(`#${input.id}`).prop('checked');
-        }
-        log(settings)
-
-        // we don't just want those included in long-term memory, we want ALL that are marked for remembering
-        return collect_chat_messages(settings.include_no_summary, settings.include_short, true, settings.include_long, settings.include_edited, settings.include_excluded);
-    }
-
-
-    // remove the class "justifyCenter" from all inputs. Who thought that was a good idea?
-    let input_elements = popup.inputControls.children;
-    for (let child of input_elements) {
-        child.classList.remove('justifyCenter');
-    }
-
-    // shows the number of messages about to be summarized
-    let $number_to_summarize = $(popup.content).find('#number_to_summarize');
-
-    // set the number of messages to summarize whenever one of the inputs changes
-    for (let input of input_elements) {
-        $(input).on('change', function () {
-            let number = get_messages_to_summarize().length;
-            $number_to_summarize.text(number);
-        })
-    }
-    // set the initial number of messages to summarize
-    $number_to_summarize.text(get_messages_to_summarize().length);
-
-    let input = await popup.show();
-    if (input) {
-        let indexes = get_messages_to_summarize();
-        summarize_messages(indexes);
-    }
-}
 function progress_bar(id, progress, total, title) {
     // Display, update, or remove a progress bar
     id = `${PROGRESS_BAR_ID}_${id}`
@@ -1383,6 +1301,7 @@ function update_memory_state_interface($content) {
         let msg = ctx.chat[i];
         let memory = get_memory(msg, 'memory') || ""
         let error = get_memory(msg, 'error') || ""
+        let edited = get_memory(msg, 'edited')
         let row_id = `memory_${i}`
 
         // check if a row already exists for this memory
@@ -1396,7 +1315,7 @@ function update_memory_state_interface($content) {
                 if (!memory && !error) continue;  // if no memory and no error, skip
             }
 
-            $memory = $(`<textarea>${memory}</textarea>`)
+            $memory = $(`<textarea rows="1">${memory}</textarea>`)
             $select_checkbox = $(`<input class="interface_message_select" type="checkbox" value="${i}">`)
             $buttons = $(button_html)
 
@@ -1435,7 +1354,14 @@ function update_memory_state_interface($content) {
         if (!memory) {
             $memory.attr('placeholder', `${error}`);
         } else {
+            $memory[0].style.height = "auto";  // fixes some weird behavior that just using scrollHeight causes.
             $memory[0].style.height = $memory[0].scrollHeight + "px";  // set the initial height based on content
+        }
+
+        // If the memory was edited, add the icon
+        $memory.parent().find('i').remove()
+        if (edited) {
+            $memory.parent().append($('<i class="fa-solid fa-pencil" title="manually edited"></i>'))
         }
 
         // set style
@@ -1469,19 +1395,18 @@ async function show_memory_state_interface() {
 </label>
 </div>
 
-<div>
-    <div title="Select/deselect summaries">Select Subsets</div>
-    <div class="flex-container justifyspacebetween alignitemscenter">
-        <button id="select_no_summary" class="menu_button flex1" title="Select empty summaries">No Summary</button>
-        <button id="select_short_term" class="menu_button flex1" title="Select summaries currently in short-term memory">Short-Term</button>
-        <button id="select_long_term"  class="menu_button flex1" title="Select summaries marked for long-term memory (even if they currently in short-term or out of long-term context)">Long-Term</button>
-        <button id="select_excluded"   class="menu_button flex1" title="Select summaries currently force-excluded from all memory">Force-Excluded</button>
-        <button id="select_edited"     class="menu_button flex1" title="Select summaries that have been manually edited">Edited</button>
-    </div>
+<div title="Select/deselect summaries">Select Subsets</div>
+<div class="flex-container justifyspacebetween alignitemscenter">
+    <button id="select_no_summary"      class="menu_button flex1" title="Select empty summaries">No Summary</button>
+    <button id="select_short_term"      class="menu_button flex1" title="Select summaries currently in short-term memory">Short-Term</button>
+    <button id="select_long_term"       class="menu_button flex1" title="Select summaries marked for long-term memory (even if they currently in short-term or out of long-term context)">Long-Term</button>
+    <button id="select_excluded"        class="menu_button flex1" title="Select summaries currently not in short-term or long-term memory.">Excluded</button>
+    <button id="select_force_excluded"  class="menu_button flex1" title="Select summaries which are manually force-excluded from emory">Force-Excluded</button>
+    <button id="select_edited"          class="menu_button flex1" title="Select summaries that have been manually edited">Edited</button>
 </div>
 
 <hr>
-<table>
+<table cellspacing="0">
 <thead>
     <tr>
         <th class="mass_select" title="Select all/none"><input id="mass_select" type="checkbox"/></th>
@@ -1495,15 +1420,13 @@ async function show_memory_state_interface() {
 
 
 <hr>
-<div>
-    <div>Bulk Actions (Selected: <span id="selected_count"></span>)</div>
-    <div class="flex-container justifyspacebetween alignitemscenter">
-        <button id="bulk_remember"   disabled class="menu_button flex1" title="Toggle inclusion of selected summaries in long-term memory"> <i class="fa-solid fa-brain"></i>Remember</button>
-        <button id="bulk_exclude"    disabled class="menu_button flex1" title="Toggle inclusion of selected summaries from all memory">     <i class="fa-solid fa-ban"></i>Exclude</button>
-        <button id="bulk_summarize"  disabled class="menu_button flex1" title="Re-Summarize selected memories (AI)">                        <i class="fa-solid fa-quote-left"></i>Summarize</button>
-        <button id="bulk_delete"     disabled class="menu_button flex1" title="Delete selected memories">                                   <i class="fa-solid fa-trash"></i>Delete</button>
-        <button id="bulk_copy"       disabled class="menu_button flex1" title="Copy selected memories to clipboard">                        <i class="fa-solid fa-copy"></i>Copy</button>
-    </div>
+<div>Bulk Actions (Selected: <span id="selected_count"></span>)</div>
+<div class="flex-container justifyspacebetween alignitemscenter">
+    <button id="bulk_remember"   disabled class="menu_button flex1" title="Toggle inclusion of selected summaries in long-term memory"> <i class="fa-solid fa-brain"></i>Remember</button>
+    <button id="bulk_exclude"    disabled class="menu_button flex1" title="Toggle inclusion of selected summaries from all memory">     <i class="fa-solid fa-ban"></i>Exclude</button>
+    <button id="bulk_summarize"  disabled class="menu_button flex1" title="Re-Summarize selected memories (AI)">                        <i class="fa-solid fa-quote-left"></i>Summarize</button>
+    <button id="bulk_delete"     disabled class="menu_button flex1" title="Delete selected memories">                                   <i class="fa-solid fa-trash"></i>Delete</button>
+    <button id="bulk_copy"       disabled class="menu_button flex1" title="Copy selected memories to clipboard">                        <i class="fa-solid fa-copy"></i>Copy</button>
 </div>
 </div>
 `
@@ -1572,6 +1495,16 @@ async function show_memory_state_interface() {
         toggle_selected(indexes);
     })
     $content.find('#select_excluded').on('click', function () {
+        let indexes = []
+        for (let i=0; i<ctx.chat.length; i++) {
+            let message = ctx.chat[i];
+            if (!get_memory(message, 'include')) {
+                indexes.push(i);
+            }
+        }
+        toggle_selected(indexes);
+    })
+    $content.find('#select_force_excluded').on('click', function () {
         let indexes = []
         for (let i=0; i<ctx.chat.length; i++) {
             let message = ctx.chat[i];
@@ -1656,8 +1589,8 @@ async function show_memory_state_interface() {
         store_memory(message, "error", null)
         update_memory_state_interface($content)
     }).on("input", 'tr textarea', function () {
-      this.style.height = "auto";  // fixes some weird behavior that just using scrollHeight causes.
-      this.style.height = this.scrollHeight + "px";
+        this.style.height = "auto";  // fixes some weird behavior that just using scrollHeight causes.
+        this.style.height = this.scrollHeight + "px";
     });
     $content.on('click', 'input.interface_message_select', function () {
         update_bulk_button_enabled($content)
@@ -2628,7 +2561,6 @@ function initialize_settings_listeners() {
     bind_function('#delete_profile', delete_profile, false);
     bind_function('#character_profile', () => toggle_character_profile(), false);
 
-    bind_function('#rerun_memory', (e) => {summarize_chat_modal()})
     bind_function('#stop_summarization', stop_summarization);
     bind_function('#revert_settings', reset_settings);
 
@@ -2923,7 +2855,15 @@ function initialize_slash_commands() {
         callback: (args) => {
             toggle_popout()
         },
-        helpString: 'Toggle the config popout',
+        helpString: 'Toggle the extension config popout',
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'toggle_memory_edit_interface',
+        callback: (args) => {
+            show_memory_state_interface()
+        },
+        helpString: 'Toggle the memory editing interface',
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({

@@ -1,21 +1,23 @@
 # Changelog
 
-#### v0.8.1
+#### v0.8.4
 - **IMPORTANT #1:** The number of tokens used for your summaries will be broken and you will need to update your config.
 
 - **IMPORTANT #2:** You must be on the ST staging branch as it relies on the following PRs: 
   - https://github.com/SillyTavern/SillyTavern/pull/3544#issue-2873858897
   - https://github.com/SillyTavern/SillyTavern/pull/3592#issue-2889204530
 
-
-- **New feature**: You can now choose a connection profile to use for summaries. By default, your currently selected profile will be used.
 - **New Feature**: You can now choose a completion preset to use for summaries. Notably, this is how the max token length of summaries is now defined, and the previous "Summary Max Token Length" setting has been removed. By default, your currently selected preset will be used until changed. This means that **upon updating, your summaries will use the token length from your current preset** until you assign a custom preset which uses a different token length. The {{words}} macro also uses the value from the selected preset.
+- **New Feature**: You can now choose a connection profile to use for summaries. By default, your currently selected profile will be used.
+- **New Feature**: New "Edit Memory" interface, allowing compact access to all summaries in the chat where you can edit, delete, re-summarize, etc. With this, the "preview memory state" button has been moved to this interface, and the "mass re-summarize" button has been removed as the interface provides all the same functionality.
 - **New Feature**: You can now optionally specify short and long-term context limit directly with a number of tokens.
 - **New Feature**: You can now optionally set profiles to use a global toggle state between all chats that use this option. This means that if you toggle the extension off in one chat, it will be off in all chats that use this option. Chats that don't have this option enabled will not be affected, as is the current behavior.
+- **New Feature**: The advanced formatting setting "Trim Incomplete Sentences" now affects summaries.
+- **New Slash Command**: `/toggle_memory_edit_interface` will open the memory edit interface.
 - **New Slash Command**: `/get_memory <n>` will return the memory associated with the given message index.
 - **Fix**: Optimized loading the extension in huge chats (10k+ messages), no longer freezes.
 - **Fix**: The summaries used in the {{history}} macro now match the inclusion criteria of the summary injection. The *messages* included are not affected, just the associated summaries.
-- **Change**: The advanced formatting setting "Trim Incomplete Sentences" now affects summaries.
+
 
 #### v0.7.3
 - **IMPORTANT:** You must be on ST version 1.12.12 or above as it relies on the following PRs:

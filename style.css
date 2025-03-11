@@ -145,15 +145,26 @@ By default, text is greyed to indicate that is it not injected.
     top: 0;
 }
 #qvink_memory_state_interface table tr:has(input.interface_message_select:checked) {
-    background-color: red;
+    background-color: var(--white30a);
 }
 #qvink_memory_state_interface table td.interface_summary {
     width: 100%;
 }
+#qvink_memory_state_interface table td.interface_summary {
+    position: relative;  /* needed for the edit icon with absolute position */
+}
 #qvink_memory_state_interface table td.interface_summary textarea {
     margin: 0;
-    height: 2em;  /* just the default, which gets changed when there is content */
+    /*min-height: 2em;  /* just the default, which gets changed when there is content */
     overflow-y: hidden;
+}
+#qvink_memory_state_interface table td.interface_summary i {  /* edit icon */
+    position: absolute;
+    top: 0;
+    right: 0;
+    margin: 0.2em;
+    scale: 0.6;
+    color: var(--white20a);
 }
 #qvink_memory_state_interface table td div.interface_actions {
     display: flex;
