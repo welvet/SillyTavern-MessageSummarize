@@ -1276,7 +1276,16 @@ function remove_progress_bar(id) {
     }
 }
 
-function update_memory_state_interface($content) {
+
+// Memory State Interface
+function update_memory_state_interface() {
+    let $content = $('#qvink_memory_state_interface')
+
+    // If the interface isn't active, return
+    if ($content.length === 0) {
+        return;
+    }
+
     // Update the content of the memory state interface
     refresh_memory()  // make sure current memory state is up to date
 
@@ -1326,7 +1335,7 @@ function update_memory_state_interface($content) {
             if ($previous_row) {
                 $row.insertAfter($previous_row)
             } else {
-                $row.appendTo($table)
+                $row.prependTo($table)
             }
 
             // add each item
@@ -1431,13 +1440,11 @@ async function show_memory_state_interface() {
 </div>
 `
     let ctx = getContext();
-    let popup = new ctx.Popup(html_content, ctx.POPUP_TYPE.TEXT, undefined, {rows: 20, wider: true});
+    let popup = new ctx.Popup(html_content, ctx.POPUP_TYPE.TEXT, undefined, {wider: true});
     let $content = $(popup.content)
 
     // manually set a larger width
     $content.closest('dialog').css('min-width', '90%')
-
-    update_memory_state_interface($content)
 
     let $mass_select_checkbox = $content.find('#mass_select')
     $mass_select_checkbox.on('change', function () {  // when the mass checkbox is toggled, apply the change to all checkboxes
@@ -1449,7 +1456,7 @@ async function show_memory_state_interface() {
 
     let $show_no_summary = $content.find('#show_no_summary');
     $show_no_summary.on('change', function () {  // when the show_no_summary checkbox is toggled, update the interface
-        update_memory_state_interface($content);
+        update_memory_state_interface();
     })
 
     function toggle_selected(indexes) {
@@ -1471,7 +1478,7 @@ async function show_memory_state_interface() {
             }
         }
         $("#show_no_summary").prop('checked', true)
-        update_memory_state_interface($content)
+        update_memory_state_interface()
         toggle_selected(indexes);
     })
     $content.find('#select_short_term').on('click', function () {
@@ -1539,7 +1546,7 @@ async function show_memory_state_interface() {
         for (let id of selected) {
             remember_message_toggle(id, value);
         }
-        update_memory_state_interface($content)
+        update_memory_state_interface()
     })
     $content.find(`#bulk_exclude`).on('click', function () {
         let selected = get_memory_state_selected($content);
@@ -1553,19 +1560,19 @@ async function show_memory_state_interface() {
         for (let id of selected) {
             forget_message_toggle(id, value);
         }
-        update_memory_state_interface($content)
+        update_memory_state_interface()
     })
     $content.find(`#bulk_summarize`).on('click', function () {
         let selected = get_memory_state_selected($content);
         summarize_messages(selected);
-        update_memory_state_interface($content)
+        update_memory_state_interface()
     })
     $content.find(`#bulk_delete`).on('click', function () {
         let selected = get_memory_state_selected($content);
         for (let id of selected) {
             store_memory(ctx.chat[id], 'memory', null);
         }
-        update_memory_state_interface($content)
+        update_memory_state_interface()
     })
     //bind_function('#preview_long_term_memory', async () => {display_text_modal("Long-Term Memory Preview", get_long_memory())})
     //bind_function('#preview_short_term_memory', async () => {display_text_modal("Short-Term Memory Preview", get_short_memory())})
@@ -1587,7 +1594,7 @@ async function show_memory_state_interface() {
         store_memory(message, 'memory', new_memory);
         store_memory(message, "edited", true)  // mark as edited
         store_memory(message, "error", null)
-        update_memory_state_interface($content)
+        update_memory_state_interface()
     }).on("input", 'tr textarea', function () {
         this.style.height = "auto";  // fixes some weird behavior that just using scrollHeight causes.
         this.style.height = this.scrollHeight + "px";
@@ -1599,7 +1606,7 @@ async function show_memory_state_interface() {
     $content.on("click", `tr .${remember_button_class}`, function () {
         let message_id = Number($(this).closest('tr').attr('message_id'));  // get the message ID from the row's "message_id" attribute
         remember_message_toggle(message_id);
-        update_memory_state_interface($content)
+        update_memory_state_interface()
     });
     $content.on("click", `tr .${forget_button_class}`, function () {
         let message_id = Number($(this).closest('tr').attr('message_id'));  // get the message ID from the row's "message_id" attribute
@@ -1614,11 +1621,17 @@ async function show_memory_state_interface() {
 
     let result = popup.show();
 
+    update_memory_state_interface()
+
     // Now update the height of the textareas to set their initial height.
     // This has to happen after the popup is shown because when hidden the textareas have 0 scrollHeight.
     $content.find('tr textarea').each(function () {
         this.style.height = this.scrollHeight + "px";
     })
+
+    // scroll to bottom
+    // let $table = $content.find('table')
+    // $table.scrollTop($table[0].scrollHeight);
 
     await result  // wait for user to close
 }
@@ -2119,12 +2132,12 @@ async function summarize_message(index=null) {
         context.powerUserSettings.user_prompt_bias = current_prefill
     }
 
-
     if (summary) {
         debug("Message summarized: " + summary)
         store_memory(message, 'memory', summary);
         store_memory(message, 'hash', message_hash);  // store the hash of the message that we just summarized
         store_memory(message, 'error', null);  // clear the error message
+        store_memory(message, 'edited', false);  // clear the error message
     } else {  // generation failed
         error(`Failed to summarize message ${index} - generation failed.`);
         store_memory(message, 'error', err || "Summarization failed");  // store the error message
@@ -2138,6 +2151,9 @@ async function summarize_message(index=null) {
     if (index === chat.length - 1) {
         scrollChatToBottom()
     }
+
+    // Update the memory state interface if it's open
+    update_memory_state_interface()
 }
 async function summarize_text(prompt) {
     // get size of text
