@@ -1202,7 +1202,7 @@ async function display_text_modal(title, text="") {
     text = text.replace(/\n/g, '<br>');
     let html = `<h2>${title}</h2><div style="text-align: left; overflow: auto;">${text}</div>`
     //const popupResult = await ctx.callPopup(html, 'text', undefined, { okButton: `Close` });
-    let popup = new ctx.Popup(html, ctx.POPUP_TYPE.TEXT, undefined, {okButton: 'Close'});
+    let popup = new ctx.Popup(html, ctx.POPUP_TYPE.TEXT, undefined, {okButton: 'Close', allowVerticalScrolling: true});
     await popup.show()
 }
 async function get_user_setting_text_input(key, title, description="") {
@@ -1366,7 +1366,7 @@ function update_memory_state_interface($content) {
     let ctx = getContext();
 
     let button_html = `
-<div>
+<div class="interface_actions">
     <div title="Remember (toggle inclusion of summary in long-term memory)"     class="mes_button fa-solid fa-brain ${remember_button_class}"></div>
     <div title="Force Exclude (toggle inclusion of summary from all memory)"    class="mes_button fa-solid fa-ban ${forget_button_class}"></div>
     <div title="Re-Summarize (AI)"                                              class="mes_button fa-solid fa-quote-left ${summarize_button_class}"></div>
@@ -1385,8 +1385,6 @@ function update_memory_state_interface($content) {
         let error = get_memory(msg, 'error') || ""
         let row_id = `memory_${i}`
 
-        log("HERE")
-
         // check if a row already exists for this memory
         $row = $table.find(`tr#${row_id}`);
         let $memory;
@@ -1399,7 +1397,7 @@ function update_memory_state_interface($content) {
             }
 
             $memory = $(`<textarea>${memory}</textarea>`)
-            $select_checkbox = $(`<input class="message_select" type="checkbox" value="${i}">`)
+            $select_checkbox = $(`<input class="interface_message_select" type="checkbox" value="${i}">`)
             $buttons = $(button_html)
 
             // create the row. The "message_id" attribute tells all handlers what message ID this is.
@@ -1412,12 +1410,12 @@ function update_memory_state_interface($content) {
                 $row.appendTo($table)
             }
 
-
             // add each item
             $select_checkbox.wrap('<td></td>').parent().appendTo($row)
             $(`<td>${i}</td>`).appendTo($row)
-            $memory.wrap(`<td style="width: 83%;"></td>`).parent().appendTo($row)
+            $memory.wrap(`<td class="interface_summary"></td>`).parent().appendTo($row)
             $buttons.wrap(`<td></td>`).parent().appendTo($row)
+
         } else {  // already exists
 
             // if no memory and no error, remove it
@@ -1426,8 +1424,8 @@ function update_memory_state_interface($content) {
                 continue;
             }
 
-            $memory = $row.find('textarea')
             // update text if the memory changed
+            $memory = $row.find('textarea')
             if ($memory.val() !== memory) {
                 $memory.val(memory)
             }
@@ -1436,6 +1434,8 @@ function update_memory_state_interface($content) {
         // If no memory, set the placeholder text to the error
         if (!memory) {
             $memory.attr('placeholder', `${error}`);
+        } else {
+            $memory[0].style.height = $memory[0].scrollHeight + "px";  // set the initial height based on content
         }
 
         // set style
@@ -1445,7 +1445,7 @@ function update_memory_state_interface($content) {
         $previous_row = $row
     }
 
-    update_selected_count($content)
+    update_selected($content)
 
     update_bulk_button_enabled($content)
 }
@@ -1474,7 +1474,7 @@ async function show_memory_state_interface() {
     <div class="flex-container justifyspacebetween alignitemscenter">
         <button id="select_no_summary" class="menu_button flex1" title="Select empty summaries">No Summary</button>
         <button id="select_short_term" class="menu_button flex1" title="Select summaries currently in short-term memory">Short-Term</button>
-        <button id="select_long_term"  class="menu_button flex1" title="Select summaries marked for long-term memory (even if they are out of long-term context)">Long-Term</button>
+        <button id="select_long_term"  class="menu_button flex1" title="Select summaries marked for long-term memory (even if they currently in short-term or out of long-term context)">Long-Term</button>
         <button id="select_excluded"   class="menu_button flex1" title="Select summaries currently force-excluded from all memory">Force-Excluded</button>
         <button id="select_edited"     class="menu_button flex1" title="Select summaries that have been manually edited">Edited</button>
     </div>
@@ -1510,14 +1510,18 @@ async function show_memory_state_interface() {
     let ctx = getContext();
     let popup = new ctx.Popup(html_content, ctx.POPUP_TYPE.TEXT, undefined, {rows: 20, wider: true});
     let $content = $(popup.content)
+
+    // manually set a larger width
+    $content.closest('dialog').css('min-width', '90%')
+
     update_memory_state_interface($content)
 
     let $mass_select_checkbox = $content.find('#mass_select')
     $mass_select_checkbox.on('change', function () {  // when the mass checkbox is toggled, apply the change to all checkboxes
         let checked = $mass_select_checkbox.prop('checked');
-        $content.find('input.message_select').prop('checked', checked);
+        $content.find('input.interface_message_select').prop('checked', checked);
         update_bulk_button_enabled($content)
-        update_selected_count($content)
+        update_selected($content)
     })
 
     let $show_no_summary = $content.find('#show_no_summary');
@@ -1527,11 +1531,11 @@ async function show_memory_state_interface() {
 
     function toggle_selected(indexes) {
         // toggle the selected state of the given message indexes
-        let $checkboxes = $content.find('input.message_select').filter((i, el) => indexes.includes(Number(el.value)))
+        let $checkboxes = $content.find('input.interface_message_select').filter((i, el) => indexes.includes(Number(el.value)))
         let all_checked = $checkboxes.length === $checkboxes.filter(':checked').length;
         $checkboxes.prop('checked', !all_checked);
         update_bulk_button_enabled($content)
-        update_selected_count($content)
+        update_selected($content)
     }
 
     // select subset buttons
@@ -1651,10 +1655,13 @@ async function show_memory_state_interface() {
         store_memory(message, "edited", true)  // mark as edited
         store_memory(message, "error", null)
         update_memory_state_interface($content)
-    })
-    $content.on('click', 'input.message_select', function () {
+    }).on("input", 'tr textarea', function () {
+      this.style.height = "auto";  // fixes some weird behavior that just using scrollHeight causes.
+      this.style.height = this.scrollHeight + "px";
+    });
+    $content.on('click', 'input.interface_message_select', function () {
         update_bulk_button_enabled($content)
-        update_selected_count($content)
+        update_selected($content)
     })
     $content.on("click", `tr .${remember_button_class}`, function () {
         let message_id = Number($(this).closest('tr').attr('message_id'));  // get the message ID from the row's "message_id" attribute
@@ -1672,7 +1679,15 @@ async function show_memory_state_interface() {
         update_memory_state_interface($content)
     });
 
-    await popup.show();
+    let result = popup.show();
+
+    // Now update the height of the textareas to set their initial height.
+    // This has to happen after the popup is shown because when hidden the textareas have 0 scrollHeight.
+    $content.find('tr textarea').each(function () {
+        this.style.height = this.scrollHeight + "px";
+    })
+
+    await result  // wait for user to close
 }
 function get_memory_state_selected($content) {
     let selected = [];
@@ -1692,7 +1707,7 @@ function update_bulk_button_enabled($content) {
         $bulk_buttons.attr('disabled', true);
     }
 }
-function update_selected_count($content) {
+function update_selected($content) {
     let $counter = $content.find("#selected_count")
     $counter.text(get_memory_state_selected($content).length)
 }
@@ -1851,7 +1866,6 @@ function check_message_conditional(message, no_summary=true, short=true, long=tr
         return false
     }
 
-
     // if we don't want messages with short-term memories and this message has one, skip it
     let include_type = get_memory(message, 'include');
     if (include_type === "short" && !short && existing_memory) {
@@ -1952,7 +1966,7 @@ function collect_chat_messages(no_summary=false, short=false, long=false, rememb
     let indexes = []  // list of indexes of messages
 
     // iterate in reverse order, stopping when reaching the limit if given
-    for (let i = context.chat.length-1; i >= 0 ; i--) {
+    for (let i = context.chat.length-1; i >= 0; i--) {
         let message = context.chat[i];
         if (check_message_conditional(message, no_summary, short, long, remember, edited, excluded)) {
             indexes.push(i)
@@ -1993,7 +2007,7 @@ function concatenate_summaries(indexes) {
 }
 function get_long_memory() {
     // get the injection text for long-term memory
-    let indexes = collect_chat_messages(false, false, true, true, false, null)
+    let indexes = collect_chat_messages(false, false, true, true, true, null)
     let text = concatenate_summaries(indexes);
     let template = get_settings('long_template')
     let ctx = getContext();
@@ -2008,7 +2022,7 @@ function get_long_memory() {
 }
 function get_short_memory() {
     // get the injection text for short-term memory
-    let indexes = collect_chat_messages(false, true, false, true, false, null)
+    let indexes = collect_chat_messages(false, true, false, true, true, null)
     let text = concatenate_summaries(indexes);
     let template = get_settings('short_template')
     let ctx = getContext();

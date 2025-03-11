@@ -131,17 +131,34 @@ By default, text is greyed to indicate that is it not injected.
 #qvink_memory_state_interface {
     display: flex;
     flex-direction: column;
-    height: 80vh;
 }
 #qvink_memory_state_interface button.menu_button i {
     margin-right: 1em;  /* buttons with icon before text needs margin after the icon */
 }
 #qvink_memory_state_interface table {
-    display: block;
+    max-height: calc(80vh - 20em);
     overflow-y: auto;
+    display: block;
 }
 #qvink_memory_state_interface table thead {
     position: sticky;
     top: 0;
 }
+#qvink_memory_state_interface table tr:has(input.interface_message_select:checked) {
+    background-color: red;
+}
+#qvink_memory_state_interface table td.interface_summary {
+    width: 100%;
+}
+#qvink_memory_state_interface table td.interface_summary textarea {
+    margin: 0;
+    height: 2em;  /* just the default, which gets changed when there is content */
+    overflow-y: hidden;
+}
+#qvink_memory_state_interface table td div.interface_actions {
+    display: flex;
+    margin: 2px;
+}
+
+
 
