@@ -20,6 +20,11 @@
     pointer-events: none;
 }
 
+/* tables for formatting settings */
+.qvink_memory_settings_content table {
+    width: 100%;
+}
+
 /* add a scrollbar to the popout */
 #qmExtensionPopout {
     overflow: auto;
@@ -62,19 +67,19 @@ By default, text is greyed to indicate that is it not injected.
 }
 
 /* to style short-term memories. */
-.qvink_memory_display.qvink_short_memory {
+.qvink_short_memory {
     color: seagreen;
 }
 /* to style long-term memories. */
-.qvink_memory_display.qvink_long_memory {
+.qvink_long_memory {
     color: steelblue;
 }
 /* to style memories marked for long-term, but are past the context limit */
-.qvink_memory_display.qvink_remember_memory {
+.qvink_remember_memory {
     color: darkred;
 }
 /* to style memories that are force-excluded */
-.qvink_memory_display.qvink_exclude_memory {
+.qvink_exclude_memory {
     color: #555;
 }
 

@@ -44,19 +44,32 @@
                     <button id="stop_summarization" class="menu_button fa-solid fa-stop" title="Stop all summarization immediately."></button>
                 </div>
 
-                <div class="flex-container justifyspacebetween alignitemscenter">
-                    <label class="checkbox_label" title="The connection profile to use for summaries. Note that choosing a different profile will require temporarily switching to the profile during summarization, discarding any unsaved changes to the current profile.">
-                        <span>Connection Profile </span>
-                        <select id="connection_profile" class="text_pole flex2"></select>
-                    </label>
-                </div>
+                <table>
 
-                <div class="flex-container justifyspacebetween alignitemscenter">
-                    <label class="checkbox_label" title="The completion preset to use for summaries. Note that choosing a different preset will require temporarily switching to that preset during summarization, discarding any unsaved changes to the current preset. Also be aware that presets are not shared between connection APIs.">
-                        <span>Completion Preset </span>
-                        <select id="completion_preset" class="text_pole flex2"></select>
-                    </label>
-                </div>
+                    <tr title="The connection profile to use for summaries. Note that choosing a different profile will require temporarily switching to the profile during summarization, discarding any unsaved changes to the current profile.">
+                        <td><span>Connection Profile</span></td>
+                        <td><select id="connection_profile" class="text_pole"></select></td>
+                    </tr>
+
+                    <tr title="The completion preset to use for summaries. Note that choosing a different preset will require temporarily switching to that preset during summarization, discarding any unsaved changes to the current preset. Also be aware that presets are not shared between connection APIs.">
+                        <td><span>Completion Preset</span></td>
+                        <td><select id="completion_preset" class="text_pole"></select></td>
+                    </tr>
+
+                    <tr title="Start the summarization with this prefilled text.">
+                        <td><span>Summary Prefill</span></td>
+                        <td><input id="prefill" class="text_pole" type="text" placeholder="Start reply with..."></td>
+                    </tr>
+
+                </table>
+
+
+                <label title="Include the prefill in displayed memories and injections" class="checkbox_label">
+                    <input id="show_prefill" type="checkbox" />
+                    <span>Include Prefill In Memories</span>
+                </label>
+
+                <hr>
 
                 <label class="checkbox_label" title="New messages will be automatically summarized if they will be included in short-term memory.">
                     <input id="auto_summarize" type="checkbox" />
@@ -88,32 +101,7 @@
                     <span>Auto Summarize Message Limit</span>
                 </label>
 
-                <label class="checkbox_label" title="Time in seconds to wait between summarizations. May be needed if you are using a external API with a rate limit.">
-                    <input id="summarization_time_delay" class="text_pole widthUnset inline_setting" type="number" min="0" max="999" />
-                    <span>Summarization Time Delay</span>
-                </label>
-
-                <label title="Editing a message will automatically trigger a re-summarization if it has already been summarized." class="checkbox_label">
-                    <input id="auto_summarize_on_edit" type="checkbox" />
-                    <span>Re-summarize on Edit</span>
-                </label>
-
-                <label title="Swiping a message will automatically trigger a re-summarization if it has already been summarized." class="checkbox_label">
-                    <input id="auto_summarize_on_swipe" type="checkbox" />
-                    <span>Re-summarize on Swipe</span>
-                </label>
-
-                <label title="Block chat input while summarizing." class="checkbox_label">
-                    <input id="block_chat" type="checkbox" />
-                    <span>Block Chat</span>
-                </label>
-
-                <label title="Use your prompt prefill for summaries." class="checkbox_label">
-                    <input id="prompt_prefill" type="checkbox" />
-                    <span>Use Prompt Prefill</span>
-                </label>
-
-                <br>
+                <hr>
 
                 <div class="flex-container justifyspacebetween">
                     <label title="Whether to use messages and/or summaries as context for summarization. You must use {{history}} in the summary prompt. Summaries will follow configured inclusion criteria." class="checkbox_label">
@@ -136,6 +124,28 @@
                 <label title="When including previous messages, also include user messages." class="checkbox_label">
                     <input id="include_user_messages_in_history" type="checkbox" />
                     <span>Include Previous User Messages</span>
+                </label>
+
+                <hr>
+
+                <label class="checkbox_label" title="Time in seconds to wait between summarizations. May be needed if you are using a external API with a rate limit.">
+                    <input id="summarization_time_delay" class="text_pole widthUnset inline_setting" type="number" min="0" max="999" />
+                    <span>Summarization Time Delay</span>
+                </label>
+
+                <label title="Editing a message will automatically trigger a re-summarization if it has already been summarized." class="checkbox_label">
+                    <input id="auto_summarize_on_edit" type="checkbox" />
+                    <span>Re-summarize on Edit</span>
+                </label>
+
+                <label title="Swiping a message will automatically trigger a re-summarization if it has already been summarized." class="checkbox_label">
+                    <input id="auto_summarize_on_swipe" type="checkbox" />
+                    <span>Re-summarize on Swipe</span>
+                </label>
+
+                <label title="Block chat input while summarizing." class="checkbox_label">
+                    <input id="block_chat" type="checkbox" />
+                    <span>Block Chat</span>
                 </label>
 
 

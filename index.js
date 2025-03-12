@@ -36,6 +36,7 @@ const css_long_memory = "qvink_long_memory"
 const css_remember_memory = `qvink_remember_memory`
 const css_exclude_memory = `qvink_exclude_memory`
 const summary_div_class = `qvink_memory_text`  // class put on all added summary divs to identify them
+const summary_reasoning_class = 'qvink_memory_reasoning'
 const css_button_separator = `qvink_memory_button_separator`
 const css_edit_textarea = `qvink_memory_edit_textarea`
 const settings_div_id = `qvink_memory_settings`  // ID of the main settings div.
@@ -85,6 +86,8 @@ const default_settings = {
 
     // summarization settings
     prompt: default_prompt,
+    prefill: "",   // summary prompt prefill
+    show_prefill: false, // whether to show the prefill when memories are displayed
     completion_preset: "",  // completion preset to use for summarization. Empty ("") indicates the same as currently selected.
     auto_summarize: true,   // whether to automatically summarize new chat messages
     summarization_delay: 0,  // delay auto-summarization by this many messages (0 summarizes immediately after sending, 1 waits for one message, etc)
@@ -128,7 +131,6 @@ const default_settings = {
     display_memories: true,  // display memories in the chat below each message
     default_chat_enabled: true,  // whether memory is enabled by default for new chats
     use_global_toggle_state: false,  // whether the on/off state for this profile uses the global state
-    prompt_prefill: false,  // whether to add the prefill to the prompt
     limit_injected_messages: -1,  // limit the number of injected messages (-1 for no limit)
 };
 const global_settings = {
@@ -214,6 +216,18 @@ function get_extension_directory() {
     // get the directory of the extension
     let index_path = new URL(import.meta.url).pathname
     return index_path.substring(0, index_path.lastIndexOf('/'))  // remove the /index.js from the path
+}
+function clean_string_for_title(text) {
+    // clean a given string for use in a div title.
+    return text.replace(/["&'<>]/g, function(match) {
+        switch (match) {
+            case '"': return "&quot;";
+            case "&": return "&amp;";
+            case "'": return "&apos;";
+            case "<": return "&lt;";
+            case ">": return "&gt;";
+        }
+    })
 }
 
 
@@ -1107,6 +1121,7 @@ function update_message_visuals(i, style=true, text=null) {
     let message = chat[i];
     let memory = get_memory(message, 'memory');
     let error_message = get_memory(message, 'error');
+    let reasoning = get_memory(message, 'reasoning');
 
     // get the div holding the main message text
     let message_element = div_element.find('div.mes_text');
@@ -1128,7 +1143,15 @@ function update_message_visuals(i, style=true, text=null) {
     }
 
     // create the div element for the memory and add it to the message div
-    let memory_div = $(`<div class="${summary_div_class} ${css_message_div} ${style_class}">${text}</div>`)
+    let memory_div = $(`<div class="${summary_div_class} ${css_message_div}"><span class="${style_class}">${text}</span></div>`)
+    if (reasoning) {
+        log(reasoning)
+        reasoning = clean_string_for_title(reasoning)
+
+        log("REASONING: ")
+        log(reasoning)
+        memory_div.prepend($(`<span class="${summary_reasoning_class}" title="${reasoning}">[Reasoning] </span>`))
+    }
     message_element.after(memory_div);
 
     // add a click event to the memory div to edit the memory
@@ -1172,6 +1195,7 @@ function edit_memory(index) {
         store_memory(message, "edited", true)  // mark as edited
         store_memory(message, "memory", new_memory);
         store_memory(message, "error", null)
+        store_memory(message, 'reasoning', null)
         textarea.remove();  // remove the textarea
         memory_div.show();  // show the memory div
         refresh_memory();
@@ -2087,14 +2111,12 @@ async function summarize_message(index=null) {
     }
 
     // construct the full summary prompt for the message
-    let prompt = create_summary_prompt(index)
+    let prompt = await create_summary_prompt(index)
 
-    // optionally disable the prompt prefill
-    let current_prefill;
-    if (!get_settings('prompt_prefill')) {
-        current_prefill = context.powerUserSettings.user_prompt_bias
-        context.powerUserSettings.user_prompt_bias = ""
-    }
+    // summary prefill
+    let current_prefill = context.powerUserSettings.user_prompt_bias
+    let summary_prefill = get_settings('prefill')
+    context.powerUserSettings.user_prompt_bias = summary_prefill
 
     // Save the current completion preset (must happen before you set the connection profile because it changes the preset)
     let summary_preset = get_settings('completion_preset');
@@ -2128,20 +2150,37 @@ async function summarize_message(index=null) {
     await set_preset(current_preset);
 
     // restore the prompt prefill
-    if (!get_settings('prompt_prefill')) {
-        context.powerUserSettings.user_prompt_bias = current_prefill
-    }
+    context.powerUserSettings.user_prompt_bias = current_prefill
 
     if (summary) {
         debug("Message summarized: " + summary)
+
+        // optionally remove the prefill from the summary
+        if (!get_settings('show_prefill')) {
+            summary = summary.slice(summary_prefill.length);
+        }
+
+        // parse reasoning section and remove it, if applicable
+        let parsed_reasoning_object = context.parseReasoningFromString(summary)
+        let reasoning;
+        if (parsed_reasoning_object !== null) {
+            reasoning = parsed_reasoning_object.reasoning
+            summary = parsed_reasoning_object.content
+        } else {
+            reasoning = ""
+        }
+
         store_memory(message, 'memory', summary);
         store_memory(message, 'hash', message_hash);  // store the hash of the message that we just summarized
         store_memory(message, 'error', null);  // clear the error message
         store_memory(message, 'edited', false);  // clear the error message
+        store_memory(message, 'reasoning', reasoning)
     } else {  // generation failed
         error(`Failed to summarize message ${index} - generation failed.`);
         store_memory(message, 'error', err || "Summarization failed");  // store the error message
         store_memory(message, 'memory', null);  // clear the memory if generation failed
+        store_memory(message, 'edited', false);  // clear the error message
+        store_memory(message, 'reasoning', null)
     }
 
     // update the message summary text again now with the memory, still no styling
@@ -2192,7 +2231,7 @@ async function summarize_text(prompt) {
          * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
          * @returns {Promise<string>} Generated message
          */
-        result = await generateRaw(prompt, '', true, false, '');
+        result = await generateRaw(prompt, '', false, false, '');
     }
 
     // trim incomplete sentences if set in ST power user settings
@@ -2311,8 +2350,11 @@ function substitute_params(text, params) {
     })
     return formatted.join('')
 }
-function create_summary_prompt(index) {
-    // create the full summary prompt for the message at the given index
+async function create_summary_prompt(index, using_instruct_override=false) {
+    // create the full summary prompt for the message at the given index.
+    // the instruct template will automatically add an input sequence to the beginning and an output sequence to the end.
+    // Therefore, if we are NOT using instructOverride, we have to remove the first system sequence at the very beginning which gets added by format_system_prompt.
+    // If we ARE using instructOverride, we have to add a final trailing output sequence
 
     let ctx = getContext()
     let chat = ctx.chat
@@ -2327,8 +2369,9 @@ function create_summary_prompt(index) {
     // get the full prompt template from settings
     let prompt = get_settings('prompt');
 
-    // first substitute any global macros like {{words}}, {{persona}}, {{char}}, etc...
-    prompt = ctx.substituteParamsExtended(prompt)
+    // first substitute any global macros like {{persona}}, {{char}}, etc...
+    let words = await get_summary_preset_max_tokens()
+    prompt = ctx.substituteParamsExtended(prompt, {"words": words})
 
     // then substitute any {{#if macro}} ... {{/if}} blocks
     prompt = substitute_conditionals(prompt, {"message": message_text, "history": history_text})
@@ -2341,8 +2384,10 @@ function create_summary_prompt(index) {
         // substitute custom macros
         prompt = substitute_params(prompt, {"message": message_text, "history": history_text});  // substitute "message" and "history" macros
 
-        // then wrap it in the system prompt
-        prompt = formatInstructModeChat("", prompt, false, true, "", "", "", null)
+        // then wrap it in the system prompt (if using instructOverride)
+        if (using_instruct_override) {
+            prompt = formatInstructModeChat("", prompt, false, true, "", "", "", null)
+        }
     } else {  // otherwise
         // first make each prompt section its own system prompt
         prompt = format_system_prompt(prompt)
@@ -2351,9 +2396,14 @@ function create_summary_prompt(index) {
         prompt = substitute_params(prompt, {"message": message_text, "history": history_text});  // substitute "message" and "history" macros
     }
 
-    // append the assistant starting message template to the text, replacing the name with "assistant" if needed
-    let output_sequence = ctx.substituteParamsExtended(power_user.instruct.output_sequence, {name: "assistant"});
-    prompt = `${prompt}\n${output_sequence}\nSummary:`
+    // If using instructOverride, append the assistant starting message template to the text, replacing the name with "assistant" if needed
+    if (using_instruct_override) {
+        let output_sequence = ctx.substituteParamsExtended(power_user.instruct.output_sequence, {name: "assistant"});
+        prompt = `${prompt}\n${output_sequence}`
+    } else {    // remove starting sequence if NOT using instructOverride, because the instruct template will add it
+        let start_sequence = power_user.instruct.input_sequence
+        prompt = prompt.slice(start_sequence.length)
+    }
 
     return prompt
 }
@@ -2585,7 +2635,7 @@ function initialize_settings_listeners() {
     bind_function("#refresh_memory", () => refresh_memory());
 
     bind_function('#edit_summary_prompt', async () => {
-        let max_tokens = get_summary_preset_max_tokens()
+        let max_tokens = await get_summary_preset_max_tokens()
         let description = `
 Available Macros:
 <ul style="text-align: left; font-size: smaller;">
@@ -2597,7 +2647,7 @@ Available Macros:
         get_user_setting_text_input('prompt', 'Edit Summary Prompt', description)
     })
     bind_function('#preview_summary_prompt', async () => {
-        let text = create_summary_prompt(getContext().chat.length-1)
+        let text = await create_summary_prompt(getContext().chat.length-1)
         display_text_modal("Summary Prompt Preview (Last Message)", text);
     })
     bind_function('#edit_long_term_memory_prompt', async () => {
@@ -2623,7 +2673,8 @@ Available Macros:
     bind_setting('#auto_summarize_message_limit', 'auto_summarize_message_limit', 'number');
     bind_setting('#auto_summarize_progress', 'auto_summarize_progress', 'boolean');
     bind_setting('#auto_summarize_on_send', 'auto_summarize_on_send', 'boolean');
-    bind_setting('#prompt_prefill', 'prompt_prefill', 'boolean')
+    bind_setting('#prefill', 'prefill', 'text')
+    bind_setting('#show_prefill', 'show_prefill', 'boolean')
 
     bind_setting('#include_world_info', 'include_world_info', 'boolean');
     bind_setting('#block_chat', 'block_chat', 'boolean');
@@ -2774,6 +2825,7 @@ function initialize_slash_commands() {
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'qvink_log_chat',
         callback: (args) => {
+            log(getContext())
             log(getContext().chat)
         },
         helpString: 'log chat',
@@ -3105,6 +3157,4 @@ jQuery(async function () {
     eventSource.on('groupSelected', set_character_enabled_button_states)
     eventSource.on(event_types.GROUP_UPDATED, set_character_enabled_button_states)
 
-    // Macros
-    MacrosParser.registerMacro("words", () => get_summary_preset_max_tokens());
 });
