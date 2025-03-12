@@ -6,6 +6,7 @@
 - **IMPORTANT #2:** You must be on the ST staging branch as it relies on the following PRs: 
   - https://github.com/SillyTavern/SillyTavern/pull/3544#issue-2873858897
   - https://github.com/SillyTavern/SillyTavern/pull/3592#issue-2889204530
+  - https://github.com/SillyTavern/SillyTavern/pull/3673#issue-2915351656
 
 - **New Feature**: You can now choose a completion preset to use for summaries. Notably, this is how the max token length of summaries is now defined, and the previous "Summary Max Token Length" setting has been removed. By default, your currently selected preset will be used until changed. This means that **upon updating, your summaries will use the token length from your current preset** until you assign a custom preset which uses a different token length. The {{words}} macro also uses the value from the selected preset.
 - **New Feature**: You can now choose a connection profile to use for summaries. By default, your currently selected profile will be used.
