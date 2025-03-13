@@ -90,14 +90,6 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - When editing a message that already has a memory, the memory displayed below the message does not have the right color. This is just a visual bug, and it will correct itself after the next summarization.
 
 ### Todo
-- Ability to turn off summaries being displayed, but still view them on a given message.
-  - Button click to collapse/expand per message?
-- Ability to modify memory directly without visiting each message
-  - Need a new popup interface where summaries can be edited, excluded, marked, etc without having to go to each message in the chat.
-  - All summaries should be loaded in a giant scroll window
-  - Option to mass-delete summaries
-- ~~Remove prefill from summaries~~
-- ~~Sentence trimming for summaries.~~
 - ~~Ability to choose a connection profile for summarization~~
 - ~~Remove disabled group members from context~~
 - ~~Option to use a global toggle state for chats~~
@@ -136,5 +128,8 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Maybe add an option to use different completion presets for the summarization.~~
 - ~~Need to detect when more messages are loaded into the chat via the "load more message" button, and update the message visuals to display any memories on them. Annoyingly, no event seems to be fired when the chat updates this way (that I could find).~~
   - ~~PR for event that triggers when more messages are loaded [here](https://github.com/SillyTavern/SillyTavern/pull/3331#issue-2803412920)~~
-
+- ~~Ability to turn off summaries being displayed, but still view them on a given message.~~
+- ~~Ability to modify memory directly without visiting each message~~
+- ~~Add option for summary prefill~~
+- ~~Sentence trimming for summaries.~~
 

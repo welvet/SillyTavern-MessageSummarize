@@ -1,6 +1,6 @@
 # Changelog
 
-#### v0.8.4
+#### v0.8.5
 - **IMPORTANT #1:** The number of tokens used for your summaries will be broken and you will need to update your config.
 
 - **IMPORTANT #2:** You must be on the ST staging branch as it relies on the following PRs: 
@@ -20,6 +20,7 @@
 - **New Slash Command**: `/get_memory <n>` will return the memory associated with the given message index.
 - **Fix**: Optimized loading the extension in huge chats (10k+ messages), no longer freezes.
 - **Fix**: The summaries used in the {{history}} macro now match the inclusion criteria of the summary injection. The *messages* included are not affected, just the associated summaries.
+- **Fix**: Memories can still be edited from the main chat even when not displayed below each message.
 
 
 #### v0.7.3

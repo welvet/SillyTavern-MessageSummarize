@@ -1145,11 +1145,7 @@ function update_message_visuals(i, style=true, text=null) {
     // create the div element for the memory and add it to the message div
     let memory_div = $(`<div class="${summary_div_class} ${css_message_div}"><span class="${style_class}">${text}</span></div>`)
     if (reasoning) {
-        log(reasoning)
         reasoning = clean_string_for_title(reasoning)
-
-        log("REASONING: ")
-        log(reasoning)
         memory_div.prepend($(`<span class="${summary_reasoning_class}" title="${reasoning}">[Reasoning] </span>`))
     }
     message_element.after(memory_div);
@@ -1170,24 +1166,22 @@ function update_all_message_visuals() {
 function edit_memory(index) {
     // Allow the user to edit a message summary
     let message = getContext().chat[index];
-    let message_div = get_message_div(index);
+    let memory = get_memory(message, 'memory')?.trim() ?? '';  // get the current memory text
 
-    // get the current memory text
-    let memory = get_memory(message, 'memory')?.trim() ?? '';
+    let $message_div = get_message_div(index);  // top level div for this message
+    let $message_text_div = $message_div.find('.mes_text')  // holds message text
+    let $memory_div = $message_div.find(`div.${summary_div_class}`);  // div holding the memory text
 
-    // find the div holding the memory text
-    let memory_div = message_div.find(`div.${summary_div_class}`);
-
-    // Hide the memory div and add the textarea
-    let textarea = $(`<textarea class="${css_message_div} ${css_edit_textarea}" rows="1"></textarea>`);
-    memory_div.hide();
-    memory_div.after(textarea);
-    textarea.focus();  // focus on the textarea
-    textarea.val(memory);  // set the textarea value to the memory text (this is done after focus to keep the cursor at the end)
-    textarea.height(textarea[0].scrollHeight-10);  // set the height of the textarea to fit the text
+    // Hide the memory div and add the textarea after the main message text
+    let $textarea = $(`<textarea class="${css_message_div} ${css_edit_textarea}" rows="1"></textarea>`);
+    $memory_div.hide();
+    $message_text_div.after($textarea);
+    $textarea.focus();  // focus on the textarea
+    $textarea.val(memory);  // set the textarea value to the memory text (this is done after focus to keep the cursor at the end)
+    $textarea.height($textarea[0].scrollHeight-10);  // set the height of the textarea to fit the text
 
     function confirm_edit() {
-        let new_memory = textarea.val();
+        let new_memory = $textarea.val();
         if (new_memory === memory) {  // no change
             cancel_edit()
             return;
@@ -1196,20 +1190,20 @@ function edit_memory(index) {
         store_memory(message, "memory", new_memory);
         store_memory(message, "error", null)
         store_memory(message, 'reasoning', null)
-        textarea.remove();  // remove the textarea
-        memory_div.show();  // show the memory div
+        $textarea.remove();  // remove the textarea
+        $memory_div.show();  // show the memory div
         refresh_memory();
         debug(`Edited memory for message ${index}`);
     }
 
     function cancel_edit() {
-        textarea.remove();  // remove the textarea
-        memory_div.show();  // show the memory div
+        $textarea.remove();  // remove the textarea
+        $memory_div.show();  // show the memory div
     }
 
     // save when the textarea loses focus, or when enter is pressed
-    textarea.on('blur', confirm_edit);
-    textarea.on('keydown', function (event) {
+    $textarea.on('blur', confirm_edit);
+    $textarea.on('keydown', function (event) {
         if (event.key === 'Enter') {  // confirm edit
             event.preventDefault();
             confirm_edit();
