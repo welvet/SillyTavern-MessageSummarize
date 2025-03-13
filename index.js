@@ -1296,6 +1296,444 @@ function remove_progress_bar(id) {
 
 
 // Memory State Interface
+class MemoryEditInterface {
+
+    load_limit = 20;  // how many rows to load at a time
+    filters = {}
+    selected = []  // array for each message and whether they are selected
+
+    html_template = `
+<div id="qvink_memory_state_interface">
+<div class="flex-container justifyspacebetween alignitemscenter">
+    <h4>Memory State</h4>
+    <button id="preview_memory_state" class="menu_button fa-solid fa-eye margin0" title="Preview current memory state (the exact text that will be injected into your context)."></button>
+    <label class="checkbox_label" title="Show messages without summaries.">
+        <input id="show_no_summary" type="checkbox" />
+    <span>Show empty summaries</span>
+</label>
+</div>
+
+<div title="Select/deselect summaries">Select Subsets</div>
+<div class="flex-container justifyspacebetween alignitemscenter">
+    <button id="select_no_summary"      class="menu_button flex1" title="Select empty summaries">No Summary</button>
+    <button id="select_short_term"      class="menu_button flex1" title="Select summaries currently in short-term memory">Short-Term</button>
+    <button id="select_long_term"       class="menu_button flex1" title="Select summaries marked for long-term memory (even if they currently in short-term or out of long-term context)">Long-Term</button>
+    <button id="select_excluded"        class="menu_button flex1" title="Select summaries currently not in short-term or long-term memory.">Excluded</button>
+    <button id="select_force_excluded"  class="menu_button flex1" title="Select summaries which are manually force-excluded from emory">Force-Excluded</button>
+    <button id="select_edited"          class="menu_button flex1" title="Select summaries that have been manually edited">Edited</button>
+</div>
+
+<hr>
+<table cellspacing="0">
+<thead>
+    <tr>
+        <th class="mass_select" title="Select all/none"><input id="mass_select" type="checkbox"/></th>
+        <th title="Message ID associated with the memory">ID</th>
+        <th title="Memory text">Memory</th>
+        <th class="actions">Actions</th>
+    </tr>
+</thead>
+<tbody></tbody>
+</table>
+
+
+<hr>
+<div>Bulk Actions (Selected: <span id="selected_count"></span>)</div>
+<div class="flex-container justifyspacebetween alignitemscenter">
+    <button id="bulk_remember"   disabled class="menu_button flex1" title="Toggle inclusion of selected summaries in long-term memory"> <i class="fa-solid fa-brain"></i>Remember</button>
+    <button id="bulk_exclude"    disabled class="menu_button flex1" title="Toggle inclusion of selected summaries from all memory">     <i class="fa-solid fa-ban"></i>Exclude</button>
+    <button id="bulk_summarize"  disabled class="menu_button flex1" title="Re-Summarize selected memories (AI)">                        <i class="fa-solid fa-quote-left"></i>Summarize</button>
+    <button id="bulk_delete"     disabled class="menu_button flex1" title="Delete selected memories">                                   <i class="fa-solid fa-trash"></i>Delete</button>
+    <button id="bulk_copy"       disabled class="menu_button flex1" title="Copy selected memories to clipboard">                        <i class="fa-solid fa-copy"></i>Copy</button>
+</div>
+</div>
+`
+    html_button_template = `
+    <div class="interface_actions">
+        <div title="Remember (toggle inclusion of summary in long-term memory)"     class="mes_button fa-solid fa-brain ${remember_button_class}"></div>
+        <div title="Force Exclude (toggle inclusion of summary from all memory)"    class="mes_button fa-solid fa-ban ${forget_button_class}"></div>
+        <div title="Re-Summarize (AI)"                                              class="mes_button fa-solid fa-quote-left ${summarize_button_class}"></div>
+    </div>
+    `
+    ctx = getContext();
+
+
+    constructor() {
+        this.popup = new this.ctx.Popup(this.html_template, this.ctx.POPUP_TYPE.TEXT, undefined, {wider: true});
+        this.$content = $(this.popup.content)
+        this.$table = this.$content.find('tbody')
+
+        // handle table scroll
+        this.$table.scroll(() => {
+            this.update_scroll()
+        })
+
+        // manually set a larger width
+        this.$content.closest('dialog').css('min-width', '90%')
+
+        let $mass_select_checkbox = this.$content.find('#mass_select')
+        $mass_select_checkbox.on('change', () => {  // when the mass checkbox is toggled, apply the change to all checkboxes
+            let checked = $mass_select_checkbox.prop('checked');
+            this.$content.find('input.interface_message_select').prop('checked', checked);
+            this.update_bulk_buttons(this.$content)
+            this.update_selected(this.$content)
+        })
+
+        let $show_no_summary = this.$content.find('#show_no_summary');
+        $show_no_summary.on('change', () => {  // when the show_no_summary checkbox is toggled, update the interface
+            this.update();
+        })
+
+        // select subset buttons
+        this.$content.find('#select_no_summary').on('click', () => {
+            let indexes = []
+            for (let i = 0; i < this.ctx.chat.length; i++) {
+                let message = this.ctx.chat[i];
+                if (!get_memory(message, 'memory')) {
+                    indexes.push(i);
+                }
+            }
+            $("#show_no_summary").prop('checked', true)
+            this.update()
+            this.toggle_selected(indexes);
+        })
+        this.$content.find('#select_short_term').on('click', () => {
+            let indexes = []
+            for (let i = 0; i < this.ctx.chat.length; i++) {
+                let message = this.ctx.chat[i];
+                if (get_memory(message, 'include') === "short") {
+                    indexes.push(i);
+                }
+            }
+            this.toggle_selected(indexes);
+        })
+        this.$content.find('#select_long_term').on('click', () => {
+            let indexes = []
+            for (let i = 0; i < this.ctx.chat.length; i++) {
+                let message = this.ctx.chat[i];
+                if (get_memory(message, 'remember')) {
+                    indexes.push(i);
+                }
+            }
+            this.toggle_selected(indexes);
+        })
+        this.$content.find('#select_excluded').on('click', () => {
+            let indexes = []
+            for (let i = 0; i < this.ctx.chat.length; i++) {
+                let message = this.ctx.chat[i];
+                if (!get_memory(message, 'include')) {
+                    indexes.push(i);
+                }
+            }
+            this.toggle_selected(indexes);
+        })
+        this.$content.find('#select_force_excluded').on('click', () => {
+            let indexes = []
+            for (let i = 0; i < this.ctx.chat.length; i++) {
+                let message = this.ctx.chat[i];
+                if (get_memory(message, 'exclude')) {
+                    indexes.push(i);
+                }
+            }
+            this.toggle_selected(indexes);
+        })
+        this.$content.find('#select_edited').on('click', () => {
+            let indexes = []
+            for (let i = 0; i < this.ctx.chat.length; i++) {
+                let message = this.ctx.chat[i];
+                if (get_memory(message, 'edited')) {
+                    indexes.push(i);
+                }
+            }
+            this.toggle_selected(indexes);
+        })
+
+        // bulk action buttons
+        this.$content.find(`#bulk_remember`).on('click', () => {
+            let selected = this.get_selected();
+            let value = true;  // by default, set all selected messages to true
+
+            // unless ALL messages are already true, then set them to false
+            if (selected.every(id => get_memory(this.ctx.chat[id], 'remember'))) {
+                value = false
+            }
+
+            for (let id of selected) {
+                remember_message_toggle(id, value);
+            }
+            this.update()
+        })
+        this.$content.find(`#bulk_exclude`).on('click', () => {
+            let selected = this.get_selected();
+            let value = true;  // by default, set all selected messages to true
+
+            // unless ALL messages are already true, then set them to false
+            if (selected.every(id => get_memory(this.ctx.chat[id], 'exclude'))) {
+                value = false
+            }
+
+            for (let id of selected) {
+                forget_message_toggle(id, value);
+            }
+            this.update()
+        })
+        this.$content.find(`#bulk_summarize`).on('click', () => {
+            let selected = this.get_selected();
+            summarize_messages(selected);
+            update_memory_state_interface()
+        })
+        this.$content.find(`#bulk_delete`).on('click', () => {
+            let selected = this.get_selected();
+            for (let id of selected) {
+                store_memory(this.ctx.chat[id], 'memory', null);
+            }
+            this.update()
+        })
+        this.$content.find('#bulk_copy').on('click', () => {
+            this.copy_to_clipboard()
+        })
+        this.$content.find('#preview_memory_state').on('click', () => {
+            let text = refresh_memory()
+            text = `...\n\n${text}\n\n...`
+            display_text_modal("Memory State Preview", text);
+        })
+
+        // handlers for each memory
+        let self = this;
+        this.$content.on('change', 'tr textarea', function () {  // when a textarea changes, update the memory
+            let new_memory = $(this).val();
+            let message_id = Number($(this).closest('tr').attr('message_id'));  // get the message ID from the row's "message_id" attribute
+            let message = self.ctx.chat[message_id]
+            store_memory(message, 'memory', new_memory);
+            store_memory(message, "edited", true)  // mark as edited
+            store_memory(message, "error", null)
+            self.update()
+        }).on("input", 'tr textarea', function () {
+            this.style.height = "auto";  // fixes some weird behavior that just using scrollHeight causes.
+            this.style.height = this.scrollHeight + "px";
+        });
+        this.$content.on('click', 'input.interface_message_select', () => {
+            this.update_bulk_buttons()
+            this.update_selected()
+        })
+        this.$content.on("click", `tr .${remember_button_class}`, function () {
+            let message_id = Number($(this).closest('tr').attr('message_id'));  // get the message ID from the row's "message_id" attribute
+            remember_message_toggle(message_id);
+            self.update()
+        });
+        this.$content.on("click", `tr .${forget_button_class}`, function () {
+            let message_id = Number($(this).closest('tr').attr('message_id'));  // get the message ID from the row's "message_id" attribute
+            forget_message_toggle(message_id);
+            self.update()
+        })
+        this.$content.on("click", `tr .${summarize_button_class}`, async function () {
+            let message_id = Number($(this).closest('tr').attr('message_id'));  // get the message ID from the row's "message_id" attribute
+            await summarize_message(message_id);  // summarize the message, replacing the existing summary
+            self.update()
+        });
+    }
+
+    async show() {
+        let result = this.popup.show();
+
+        // initialize all rows as not selected
+        this.selected = Array(this.ctx.chat.length).fill(false);
+
+
+        this.update()
+
+        // Now update the height of the textareas to set their initial height.
+        // This has to happen after the popup is shown because when hidden the textareas have 0 scrollHeight.
+        this.$content.find('tr textarea').each(function () {
+            this.style.height = this.scrollHeight + "px";
+        })
+
+        this.scroll_to_bottom()
+        await result  // wait for user to close
+    }
+    update() {
+        // Update the content of the memory state interface
+        refresh_memory()  // make sure current memory state is up to date
+
+        debug("Updating memory interface...")
+
+        // whether to show messages with no summary
+        let show_no_summary = this.$content.find('#show_no_summary').is(':checked');
+
+        // add a table row for each memory in chat
+        let $row;
+        let $previous_row;
+        for (let i = 0; i < this.ctx.chat.length; i++) {
+            let msg = this.ctx.chat[i];
+            let memory = get_memory(msg, 'memory') || ""
+            let error = get_memory(msg, 'error') || ""
+            let edited = get_memory(msg, 'edited')
+            let row_id = `memory_${i}`
+
+            // check if a row already exists for this memory
+            $row = this.$table.find(`tr#${row_id}`);
+            let $memory;
+            let $select_checkbox;
+            let $buttons;
+            if ($row.length === 0) {  // doesn't exist
+
+                if (!show_no_summary && !memory && !error) {
+                    if (!memory && !error) continue;  // if no memory and no error, skip
+                }
+
+                $memory = $(`<textarea rows="1">${memory}</textarea>`)
+                $select_checkbox = $(`<input class="interface_message_select" type="checkbox" value="${i}">`)
+                $buttons = $(this.html_button_template)
+
+                // create the row. The "message_id" attribute tells all handlers what message ID this is.
+                $row = $(`<tr message_id="${i}" id="${row_id}"></tr>`)
+
+                // append this new row after the previous row
+                if ($previous_row) {
+                    $row.insertAfter($previous_row)
+                } else {
+                    $row.prependTo(this.$table)
+                }
+
+                // add each item
+                $select_checkbox.wrap('<td></td>').parent().appendTo($row)
+                $(`<td>${i}</td>`).appendTo($row)
+                $memory.wrap(`<td class="interface_summary"></td>`).parent().appendTo($row)
+                $buttons.wrap(`<td></td>`).parent().appendTo($row)
+
+            } else {  // already exists
+
+                // if no memory and no error, remove it
+                if (!show_no_summary && !memory && !error) {
+                    $row.remove();
+                    continue;
+                }
+
+                // update text if the memory changed
+                $memory = $row.find('textarea')
+                if ($memory.val() !== memory) {
+                    $memory.val(memory)
+                }
+            }
+
+            // If no memory, set the placeholder text to the error
+            if (!memory) {
+                $memory.attr('placeholder', `${error}`);
+            } else {
+                $memory[0].style.height = "auto";  // fixes some weird behavior that just using scrollHeight causes.
+                $memory[0].style.height = $memory[0].scrollHeight + "px";  // set the initial height based on content
+            }
+
+            // If the memory was edited, add the icon
+            $memory.parent().find('i').remove()
+            if (edited) {
+                $memory.parent().append($('<i class="fa-solid fa-pencil" title="manually edited"></i>'))
+            }
+
+            // set style
+            $memory.removeClass().addClass(`${css_message_div} ${get_summary_style_class(msg)}`)
+
+            // save as previous row
+            $previous_row = $row
+        }
+
+        this.update_selected()
+        this.update_bulk_buttons()
+    }
+    get_selected() {
+        let selected = [];
+        this.$content.find('td input[type="checkbox"]:checked').each(function () {
+            let id = $(this).val();
+            selected.push(Number(id));
+        })
+        return selected;
+    }
+    toggle_selected(indexes) {
+        // toggle the selected state of the given message indexes
+        let $checkboxes = this.$content.find('input.interface_message_select').filter((i, el) => indexes.includes(Number(el.value)))
+        let all_checked = this.$checkboxes.length === $checkboxes.filter(':checked').length;
+        $checkboxes.prop('checked', !all_checked);
+        this.update_bulk_buttons()
+        this.update_selected()
+    }
+    update_bulk_buttons() {
+        // enable/disable bulk action buttons
+        let selected = this.get_selected();
+        let $bulk_buttons = this.$content.find('#bulk_remember, #bulk_exclude, #bulk_summarize, #bulk_delete, #bulk_copy');
+        if (selected.length > 0) {
+            $bulk_buttons.removeAttr('disabled');
+        } else {
+            $bulk_buttons.attr('disabled', true);
+        }
+    }
+    update_selected() {
+        // Update the displayed counter of selected rows
+        let $counter = this.$content.find("#selected_count")
+        $counter.text(this.get_selected().length)
+    }
+    scroll_to_bottom() {
+        // scroll to bottom of the memory edit interface
+        this.$table.scrollTop(this.$table[0].scrollHeight);
+    }
+    copy_to_clipboard() {
+        // copy the summaries of the given messages to clipboard
+        let selected = this.get_selected()
+        let text = concatenate_summaries(selected);
+        copyText(text)
+        toastr.info("All memories copied to clipboard.")
+    }
+
+    update_scroll() {
+        log("UPDATE SCROLL")
+
+        // get the bottom-most row in view
+        let current_id = this.get_scrolled_row()
+
+        // get the start and end rows to render
+        // TODO account for filters
+        let load_start = Math.min(Math.floor(this.load_limit/2) * Math.floor(current_id/this.load_limit), this.ctx.chat.length-this.load_limit)
+        let load_end = Math.min(load_start + this.load_limit, this.ctx.chat.length-1)
+
+        // render those rows
+        for (let i=load_start; i<=load_end; i++) {
+
+        }
+
+    }
+    update_scroll_debounced = debounce(() => this.update_scroll(), debounce_timeout.relaxed);
+
+    get_scrolled_row() {
+        // get the memory ID currently at the bottom of the scroll window
+        var table_top = this.$table.scrollTop();
+        var table_bottom = table_top + this.$table.height();
+
+        // binary search to find the current row at the bottom of the view window
+        let total_rows = this.$context.chat.length
+        let start = 0;
+        let end = total_rows;
+        while (true) {
+            let id = Math.floor((start + end) / 2)  // check between start and end
+            log("START: "+start+" END: "+end+ " ID: "+id)
+            let $row = this.$table.find(`tr#${id}`);
+            let row_top = row.offset().top;
+            let row_bottom = row_top + $row.height();
+            //let in_view = ((table_top < row_top) && (table_bottom > row_bottom));
+
+            if (row_bottom > table_bottom) {  // row is below the visible window
+                end = id  // set end of range to current ID
+            } else if (row_bottom <= table_bottom) {  // row above the visible window
+                start = id  // set start of range to current ID
+            }
+
+            // Reached base case
+            if (start === end) {
+                return id
+            }
+        }
+
+
+    }
+}
 function update_memory_state_interface() {
     let $content = $('#qvink_memory_state_interface')
 
@@ -1475,6 +1913,7 @@ async function show_memory_state_interface() {
     let $show_no_summary = $content.find('#show_no_summary');
     $show_no_summary.on('change', function () {  // when the show_no_summary checkbox is toggled, update the interface
         update_memory_state_interface();
+        memory_edit_interface_scroll($content)
     })
 
     function toggle_selected(indexes) {
@@ -1647,10 +2086,7 @@ async function show_memory_state_interface() {
         this.style.height = this.scrollHeight + "px";
     })
 
-    // scroll to bottom
-    // let $table = $content.find('table')
-    // $table.scrollTop($table[0].scrollHeight);
-
+    memory_edit_interface_scroll($content)
     await result  // wait for user to close
 }
 function get_memory_state_selected($content) {
@@ -1675,6 +2111,18 @@ function update_selected($content) {
     let $counter = $content.find("#selected_count")
     $counter.text(get_memory_state_selected($content).length)
 }
+function memory_edit_interface_scroll($content) {
+    // scroll to bottom of the memory edit interface
+    let $table = $content.find('table')
+    log("SCROLL: "+$table[0].scrollHeight)
+    $table.scrollTop($table[0].scrollHeight);
+}
+function scroll_to_memory($content, id) {
+    let $table = $content.find('table')
+    let $row = $table.find(`tr#${id}`);
+    $table.scrollTop($row.offset().top - $table.offset().top + $table.scrollTop())
+}
+
 
 
 // Message functions
@@ -2625,7 +3073,7 @@ function initialize_settings_listeners() {
     bind_function('#revert_settings', reset_settings);
 
     bind_function('#toggle_chat_memory', () => toggle_chat_enabled(), false);
-    bind_function('#edit_memory_state', () => show_memory_state_interface())
+    bind_function('#edit_memory_state', () => memoryEditInterface.show())
     bind_function("#refresh_memory", () => refresh_memory());
 
     bind_function('#edit_summary_prompt', async () => {
@@ -2923,7 +3371,7 @@ function initialize_slash_commands() {
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'toggle_memory_edit_interface',
         callback: (args) => {
-            show_memory_state_interface()
+            memoryEditInterface.show()
         },
         helpString: 'Toggle the memory editing interface',
     }));
@@ -3114,6 +3562,7 @@ function toggle_popout() {
 }
 
 // Entry point
+let memoryEditInterface;
 jQuery(async function () {
     log(`Loading extension...`)
 
@@ -3124,6 +3573,8 @@ jQuery(async function () {
 
     // Load settings
     initialize_settings();
+
+    memoryEditInterface = new MemoryEditInterface()
 
     // load settings html
     await load_settings_html();
