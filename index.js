@@ -1455,37 +1455,33 @@ class MemoryEditInterface {
 
         // bulk action buttons
         this.$content.find(`#bulk_remember`).on('click', () => {
-            let value = true;  // by default, set all selected messages to true
-
             // unless ALL messages are already true, then set them to false
-            if (this.selected.every(id => get_memory(this.ctx.chat[id], 'remember'))) {
-                value = false
-            }
+            let selected = this.get_selected()
+            let all_true = selected.every((id) => get_memory(this.ctx.chat[id], 'remember'))
 
-            for (let id of this.selected) {
-                remember_message_toggle(id, value);
+            log("ALL TRUE: "+all_true)
+            for (let id of selected) {
+                remember_message_toggle(id, !all_true);
             }
             this.update()
         })
         this.$content.find(`#bulk_exclude`).on('click', () => {
-            let value = true;  // by default, set all selected messages to true
-
-            // unless ALL messages are already true, then set them to false
-            if (this.selected.every(id => get_memory(this.ctx.chat[id], 'exclude'))) {
-                value = false
-            }
-
-            for (let id of this.selected) {
-                forget_message_toggle(id, value);
+            let selected = this.get_selected()
+            let all_true = selected.every((id) => get_memory(this.ctx.chat[id], 'exclude'))
+            for (let id of selected) {
+                forget_message_toggle(id, !all_true);
             }
             this.update()
         })
         this.$content.find(`#bulk_summarize`).on('click', () => {
-            summarize_messages(this.selected);
-            update_memory_state_interface()
+            summarize_messages(this.get_selected());
+            this.update()
         })
         this.$content.find(`#bulk_delete`).on('click', () => {
-            for (let id of this.selected) {
+            for (let id in this.selected) {
+                if (!this.selected[id]) continue;
+                log("DELETING: "+id)
+                log(this.ctx.chat[id])
                 store_memory(this.ctx.chat[id], 'memory', null);
             }
             this.update()
@@ -1542,7 +1538,8 @@ class MemoryEditInterface {
         this.selected = Array(this.ctx.chat.length).fill(false);
         this.update_selected()
 
-        let result = this.popup.show();
+        let result = this.popup.show();  // gotta go before init_pagination so the update
+        this.update()
 
         // Now update the height of the textareas to set their initial height.
         // This has to happen after the popup is shown because when hidden the textareas have 0 scrollHeight.
@@ -1553,7 +1550,10 @@ class MemoryEditInterface {
         //this.scroll_to_bottom()
         await result  // wait for user to close
     }
-
+    is_open() {
+        if (!this.popup) return false
+        return this.$content.closest('dialog').attr('open');
+    }
     init_pagination() {
         // update list of indexes to show based on current filters
         let show_no_summary = this.$show_no_summary.is(':checked');
@@ -1590,6 +1590,11 @@ class MemoryEditInterface {
         }
     }
     update(indexes=null) {
+        // if the interface isn't open, do nothing
+        if (!this.is_open()) {
+            return
+        }
+
         // Update the content of the memory state interface, rendering the given indexes
         refresh_memory()  // make sure current memory state is up to date
 
@@ -1689,6 +1694,14 @@ class MemoryEditInterface {
 
         this.update_selected()
     }
+    get_selected() {
+        // get array of selected indexes
+        let indexes = []
+        for (let i in this.selected) {
+            if (this.selected[i]) indexes.push(i)
+        }
+        return indexes
+    }
     update_selected() {
         // Update the interface based on selected items
 
@@ -1721,7 +1734,7 @@ class MemoryEditInterface {
     }
     copy_to_clipboard() {
         // copy the summaries of the given messages to clipboard
-        let text = concatenate_summaries(this.selected);
+        let text = concatenate_summaries(this.get_selected());
         copyText(text)
         toastr.info("All memories copied to clipboard.")
     }
@@ -2237,7 +2250,7 @@ async function summarize_message(index=null) {
     }
 
     // Update the memory state interface if it's open
-    update_memory_state_interface()
+    memoryEditInterface.update()
 }
 async function summarize_text(prompt) {
     // get size of text
