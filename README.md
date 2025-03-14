@@ -132,6 +132,7 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Ability to modify memory directly without visiting each message~~
 - ~~Add option for summary prefill~~
 - ~~Sentence trimming for summaries.~~
-- Fix edit interface lag
 - Allow customizing the memory injection separators
+- Allow locking profile to specific chat, not just character.
+- Option to remove redundant memory injections while messages are in context.
 
