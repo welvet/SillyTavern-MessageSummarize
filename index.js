@@ -21,7 +21,7 @@ import { dragElement } from '../../../RossAscends-mods.js';
 import { debounce_timeout } from '../../../constants.js';
 import { MacrosParser } from '../../../macros.js';
 import { commonEnumProviders } from '../../../slash-commands/SlashCommandCommonEnumsProvider.js';
-//import { CHAT_COMPLETION_SOURCES, TEXTGEN_TYPES } from '../../../constants.js';
+
 export { MODULE_NAME };
 
 // THe module name modifies where settings are stored, where information is stored on message objects, macros, etc.
@@ -1357,8 +1357,11 @@ class MemoryEditInterface {
     `
     ctx = getContext();
 
+    // If you define the popup in the constructor so you don't have to recreate it every time, then clicking the "ok" button has like a .5-second lang before closing the popup.
+    // If you instead re-create it every time in show(), there is no lag.
+    constructor() {}
 
-    constructor() {
+    init() {
         this.popup = new this.ctx.Popup(this.html_template, this.ctx.POPUP_TYPE.TEXT, undefined, {wider: true});
         this.$content = $(this.popup.content)
         this.$table = this.$content.find('tbody')
@@ -1375,12 +1378,11 @@ class MemoryEditInterface {
         this.$mass_select_checkbox.on('change', () => {  // when the mass checkbox is toggled, apply the change to all checkboxes
             let checked = this.$mass_select_checkbox.prop('checked');
             this.toggle_selected(this.displayed, checked)
-            this.update_selected()
         })
 
         let $show_no_summary = this.$content.find('#show_no_summary');
         $show_no_summary.on('change', () => {  // when the show_no_summary checkbox is toggled, update the interface
-            this.init_pagination()
+            this.init_pagination()  // pagination needs to be regenerated
             this.update();
         })
 
@@ -1514,7 +1516,6 @@ class MemoryEditInterface {
         this.$content.on('click', 'input.interface_message_select', function () {
             let index = $(this).val();
             self.toggle_selected([index])
-            self.update_selected()
         })
         this.$content.on("click", `tr .${remember_button_class}`, function () {
             let message_id = Number($(this).closest('tr').attr('message_id'));  // get the message ID from the row's "message_id" attribute
@@ -1534,19 +1535,14 @@ class MemoryEditInterface {
     }
 
     async show() {
-
+        this.init()
         this.init_pagination()
 
         // start with no rows selected
         this.selected = Array(this.ctx.chat.length).fill(false);
         this.update_selected()
 
-
         let result = this.popup.show();
-
-
-
-        //this.update()
 
         // Now update the height of the textareas to set their initial height.
         // This has to happen after the popup is shown because when hidden the textareas have 0 scrollHeight.
@@ -1554,7 +1550,7 @@ class MemoryEditInterface {
             this.style.height = this.scrollHeight + "px";
         })
 
-        this.scroll_to_bottom()
+        //this.scroll_to_bottom()
         await result  // wait for user to close
     }
 
@@ -1573,7 +1569,6 @@ class MemoryEditInterface {
             indexes.push(i)
         }
         this.displayed = indexes
-        log("updated displayed: "+this.displayed.length)
 
         this.$pagination.pagination({
             dataSource: this.displayed,
@@ -1702,7 +1697,7 @@ class MemoryEditInterface {
         for (let i in this.selected) {
             let $checkbox = this.$table.find(`input.interface_message_select[value=${i}]`)
             let selected = this.selected[i]
-            $checkbox.prop('checked', selected)
+            $checkbox.prop('checked', selected)  // check the corresponding checkbox if present
             if (selected) {
                 count++
             }
@@ -1720,7 +1715,6 @@ class MemoryEditInterface {
             this.$bulk_buttons.attr('disabled', true);
         }
     }
-
     scroll_to_bottom() {
         // scroll to bottom of the memory edit interface
         this.$table.scrollTop(this.$table[0].scrollHeight);
@@ -2480,7 +2474,7 @@ function refresh_memory() {
     ctx.setExtensionPrompt(`${MODULE_NAME}_long`,  long_injection,  get_settings('long_term_position'), get_settings('long_term_depth'), get_settings('long_term_scan'), get_settings('long_term_role'));
     ctx.setExtensionPrompt(`${MODULE_NAME}_short`, short_injection, get_settings('short_term_position'), get_settings('short_term_depth'), get_settings('short_term_scan'), get_settings('short_term_role'));
 
-    return `${long_injection}\n${short_injection}`  // return the concatenated memory text
+    return `${long_injection}\n\n...\n\n${short_injection}`  // return the concatenated memory text
 }
 const refresh_memory_debounced = debounce(refresh_memory, debounce_timeout.relaxed);
 
