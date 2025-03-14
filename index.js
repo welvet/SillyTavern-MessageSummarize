@@ -1297,8 +1297,13 @@ function remove_progress_bar(id) {
 
 // Memory State Interface
 class MemoryEditInterface {
-    displayed = []  // array for each message index to show in the interface
-    selected = []   // array for each message index and whether they are selected
+
+    // Array with each message index to show in the interface.
+    // Affected by filters
+    displayed = []
+
+    // selected message indexes
+    selected = new Set()
 
     html_template = `
 <div id="qvink_memory_state_interface">
@@ -1372,7 +1377,7 @@ class MemoryEditInterface {
         this.$show_no_summary = this.$content.find('#show_no_summary')
 
         // manually set a larger width
-        this.$content.closest('dialog').css('min-width', '90%')
+        this.$content.closest('dialog').css('min-width', '80%')
 
         this.$mass_select_checkbox = this.$content.find('#mass_select')
         this.$mass_select_checkbox.on('change', () => {  // when the mass checkbox is toggled, apply the change to all checkboxes
@@ -1455,35 +1460,22 @@ class MemoryEditInterface {
 
         // bulk action buttons
         this.$content.find(`#bulk_remember`).on('click', () => {
-            // unless ALL messages are already true, then set them to false
-            let selected = this.get_selected()
-            let all_true = selected.every((id) => get_memory(this.ctx.chat[id], 'remember'))
-
-            log("ALL TRUE: "+all_true)
-            for (let id of selected) {
-                remember_message_toggle(id, !all_true);
-            }
+            remember_message_toggle(Array.from(this.selected))
             this.update()
         })
         this.$content.find(`#bulk_exclude`).on('click', () => {
-            let selected = this.get_selected()
-            let all_true = selected.every((id) => get_memory(this.ctx.chat[id], 'exclude'))
-            for (let id of selected) {
-                forget_message_toggle(id, !all_true);
-            }
+            forget_message_toggle(Array.from(this.selected))
             this.update()
         })
         this.$content.find(`#bulk_summarize`).on('click', () => {
-            summarize_messages(this.get_selected());
+            summarize_messages(Array.from(this.selected));
             this.update()
         })
         this.$content.find(`#bulk_delete`).on('click', () => {
-            for (let id in this.selected) {
-                if (!this.selected[id]) continue;
-                log("DELETING: "+id)
-                log(this.ctx.chat[id])
+            this.selected.forEach(id => {
+                log("DELETING: " + id)
                 store_memory(this.ctx.chat[id], 'memory', null);
-            }
+            })
             this.update()
         })
         this.$content.find('#bulk_copy').on('click', () => {
@@ -1510,7 +1502,7 @@ class MemoryEditInterface {
             this.style.height = this.scrollHeight + "px";
         });
         this.$content.on('click', 'input.interface_message_select', function () {
-            let index = $(this).val();
+            let index = Number(this.value);
             self.toggle_selected([index])
         })
         this.$content.on("click", `tr .${remember_button_class}`, function () {
@@ -1535,15 +1527,19 @@ class MemoryEditInterface {
         this.init_pagination()
 
         // start with no rows selected
-        this.selected = Array(this.ctx.chat.length).fill(false);
+        this.selected.clear()
         this.update_selected()
 
         let result = this.popup.show();  // gotta go before init_pagination so the update
         this.update()
 
-        // Now update the height of the textareas to set their initial height.
-        // This has to happen after the popup is shown because when hidden the textareas have 0 scrollHeight.
+        // Set initial height for text areas.
+        // I know that update() also does this, but for some reason the first time it's called it doesn't set it right.
+        // Some have the right height, but some longer texts don't. It's like the width of the popup is smaller,
+        //  so when the scrollHeight is found in update(), the lines wrap sooner. Not sure where this could be happening.
+        // It's not the stylesheet getting set late, as putting `width: 100%` on the html itself doesn't help.
         this.$content.find('tr textarea').each(function () {
+            this.style.height = 'auto'
             this.style.height = this.scrollHeight + "px";
         })
 
@@ -1671,59 +1667,52 @@ class MemoryEditInterface {
         this.update_selected()
     }
     toggle_selected(indexes, value=null) {
-        // toggle the selected state of the given message indexes
+        // set the selected state of the given message indexes
         if (value === null) {  // no value given - toggle
             let all_selected = true
             for (let i of indexes) {
-                if (!this.selected[i]) {  // if not currently selected
-                    this.selected[i] = true  // select
+                if (all_selected && !this.selected.has(i)) {  // if at least one not selected
                     all_selected = false
                 }
+                this.selected.add(i)
             }
             if (all_selected) {  // if all are selected, deselect all
                 for (let i of indexes) {
-                    this.selected[i] = false
+                    this.selected.delete(i)
                 }
             }
 
-        } else {  // value given - select/deselect all
+        } else if (value === true) {  // select all
             for (let i of indexes) {
-                this.selected[i] = value
+                this.selected.add(i)
+            }
+        } else if (value === false) {  // deselect all
+            for (let i of indexes) {
+                this.selected.delete(i)
             }
         }
 
         this.update_selected()
     }
-    get_selected() {
-        // get array of selected indexes
-        let indexes = []
-        for (let i in this.selected) {
-            if (this.selected[i]) indexes.push(i)
-        }
-        return indexes
-    }
     update_selected() {
         // Update the interface based on selected items
 
         // check/uncheck the rows according to which are selected
-        let count = 0
-        for (let i in this.selected) {
-            let $checkbox = this.$table.find(`input.interface_message_select[value=${i}]`)
-            let selected = this.selected[i]
-            $checkbox.prop('checked', selected)  // check the corresponding checkbox if present
-            if (selected) {
-                count++
-            }
+        let $checkboxes = this.$table.find(`input.interface_message_select`)
+        for (let checkbox of $checkboxes) {
+            $(checkbox).prop('checked', this.selected.has(Number(checkbox.value)))
         }
 
         // update counter
-        this.$counter.text(count)
+        this.$counter.text(this.selected.size)
 
         // if any are selected, check the mass selection checkbox and enable the bulk action buttons
-        if (count > 0) {
+        if (this.selected.size > 0) {
+            this.$counter.css('color', 'red')
             this.$mass_select_checkbox.prop('checked', true)
             this.$bulk_buttons.removeAttr('disabled');
         } else {
+            this.$counter.css('color', 'unset')
             this.$mass_select_checkbox.prop('checked', false)
             this.$bulk_buttons.attr('disabled', true);
         }
@@ -1734,7 +1723,7 @@ class MemoryEditInterface {
     }
     copy_to_clipboard() {
         // copy the summaries of the given messages to clipboard
-        let text = concatenate_summaries(this.get_selected());
+        let text = concatenate_summaries(Array.from(this.selected));
         copyText(text)
         toastr.info("All memories copied to clipboard.")
     }
@@ -1768,6 +1757,32 @@ function get_memory(message, key) {
     // get information from the message object
     return message?.extra?.[MODULE_NAME]?.[key];
 }
+function toggle_memory_value(indexes, value, check_value, set_value) {
+    // For each message index, call set_value(index, value) function on each.
+    // If no value given, toggle the values. Only toggle false if ALL are true.
+
+    if (value === null) {  // no value - toggle
+        let all_true = true
+        for (let index of indexes) {
+            if (!check_value(index)) {
+                all_true = false
+                set_value(index, true)
+            }
+        }
+
+        if (all_true) {  // set to false only if all are true
+            for (let index of indexes) {
+                set_value(index, false)
+            }
+        }
+
+    } else {  // value given
+        for (let index of indexes) {
+            set_value(index, value)
+        }
+    }
+
+}
 function get_previous_swipe_memory(message, key) {
     // get information from the message's previous swipe
     if (!message.swipe_id) {
@@ -1775,52 +1790,65 @@ function get_previous_swipe_memory(message, key) {
     }
     return message?.swipe_info?.[message.swipe_id-1]?.extra?.[MODULE_NAME]?.[key];
 }
-async function remember_message_toggle(index=null, value=null) {
-    // Toggle the "remember" status of a message
+async function remember_message_toggle(indexes=null, value=null) {
+    // Toggle the "remember" status of a set of messages
     let context = getContext();
 
-    // Default to the last message, min 0
-    index = Math.max(index ?? context.chat.length-1, 0)
-    let message = context.chat[index]
-
-    if (value === null) {  // If no value provided, toggle
-        value = !get_memory(message, 'remember')
-    } else if (value === get_memory(message, 'remember')) {  // if a value given and didn't change it, do nothing.
-        return;
+    if (!Array.isArray(indexes)) {  // only one index given
+        indexes = [indexes]
+    } else if (indexes === null) {  // Default to the last message, min 0
+        indexes = [Math.max(context.chat.length-1, 0)]
     }
 
-    // Set to new value
-    store_memory(message, 'remember', value);
-    store_memory(message, 'exclude', false);  // regardless, remove excluded flag
+    // messages without a summary
+    let summarize = [];
 
-    let memory = get_memory(message, 'memory')
-    debug(`Set message ${index} remembered status: ${value}`);
+    function set(index, value) {
+        let message = context.chat[index]
+        store_memory(message, 'remember', value);
+        store_memory(message, 'exclude', false);  // regardless, remove excluded flag
 
-    // if it was marked as remembered and no summary, summarize it
-    if (value && !memory) {
-        await summarize_message(index);
+        let memory = get_memory(message, 'memory')
+        if (value && !memory) {
+            summarize.push()
+        }
+        debug(`Set message ${index} remembered status: ${value}`);
+    }
+
+    function check(index) {
+        return get_memory(context.chat[index], 'remember')
+    }
+
+    toggle_memory_value(indexes, value, check, set)
+
+    // summarize any messages that have no summary
+    if (summarize.length > 0) {
+        await summarize_messages(summarize);
     }
     refresh_memory();
 }
-function forget_message_toggle(index=null, value=null) {
+function forget_message_toggle(indexes=null, value=null) {
     // Toggle the "forget" status of a message
     let context = getContext();
 
-    // Default to the last message, min 0
-    index = Math.max(index ?? context.chat.length-1, 0)
-    let message = context.chat[index]
-
-    if (value === null) {  // If no value provided, toggle
-        value = !get_memory(message, 'exclude')
-    } else if (value === get_memory(message, 'exclude')) {  // if a value given and didn't change it, do nothing.
-        return;
+    if (!Array.isArray(indexes)) {  // only one index given
+        indexes = [indexes]
+    } else if (indexes === null) {  // Default to the last message, min 0
+        indexes = [Math.max(context.chat.length-1, 0)]
     }
 
-    // Set to new value
-    store_memory(message, 'exclude', value);
-    store_memory(message, 'remember', false);  // regardless, remove remember tag
+    function set(index, value) {
+        let message = context.chat[index]
+        store_memory(message, 'exclude', value);
+        store_memory(message, 'remember', false);  // regardless, remove excluded flag
+        debug(`Set message ${index} exclude status: ${value}`);
+    }
 
-    debug(`Set message ${index} exclude status: ${value}`);
+    function check(index) {
+        return get_memory(context.chat[index], 'exclude')
+    }
+
+    toggle_memory_value(indexes, value, check, set)
     refresh_memory()
 }
 function get_character_key(message) {

@@ -137,31 +137,32 @@ By default, text is greyed to indicate that is it not injected.
     display: flex;
     flex-direction: column;
 }
-#qvink_memory_state_interface button.menu_button i {
-    margin-right: 1em;  /* buttons with icon before text needs margin after the icon */
-}
 #qvink_memory_state_interface table {
     max-height: calc(90vh - 20em);
     overflow-y: auto;
     display: block;
 }
+#qvink_memory_state_interface button.menu_button i {
+    margin-right: 1em;  /* buttons with icon before text needs margin after the icon */
+}
 #qvink_memory_state_interface table thead {
     position: sticky;
     top: 0;
+    z-index: 1;  /* to be above the body when scrolling */
+    background: var(--SmartThemeBlurTintColor)
 }
-#qvink_memory_state_interface table tr:has(input.interface_message_select:checked) {
-    background-color: var(--white30a);
+#qvink_memory_state_interface table tbody td {
+    position: relative;  /* to be under the head when scrolling */
 }
 #qvink_memory_state_interface table td.interface_summary {
     width: 100%;
 }
-#qvink_memory_state_interface table td.interface_summary {
-    position: relative;  /* needed for the edit icon with absolute position */
-}
 #qvink_memory_state_interface table td.interface_summary textarea {
     margin: 0;
-    /*min-height: 2em;  /* just the default, which gets changed when there is content */
     overflow-y: hidden;
+}
+#qvink_memory_state_interface table tr:has(input.interface_message_select:checked) {
+    background-color: var(--white30a);  /* highlight selected rows */
 }
 #qvink_memory_state_interface table td.interface_summary i {  /* edit icon */
     position: absolute;
@@ -175,9 +176,8 @@ By default, text is greyed to indicate that is it not injected.
     display: flex;
     margin: 2px;
 }
-
-#qvink_memory_state_interface table tr.test {
-    color: red;
+#qvink_memory_state_interface #selected_count {
+    font-weight: bold;
 }
 
 
