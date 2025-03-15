@@ -14,10 +14,15 @@
 }
 
 /* disabled buttons aren't properly styled by default */
-.settings_input:disabled {
+.settings_input:disabled, #qvink_memory_state_interface *:disabled {
     cursor: not-allowed;
     opacity: 0.5;
     pointer-events: none;
+}
+
+/* tables for formatting settings */
+.qvink_memory_settings_content table {
+    width: 100%;
 }
 
 /* add a scrollbar to the popout */
@@ -62,20 +67,19 @@ By default, text is greyed to indicate that is it not injected.
 }
 
 /* to style short-term memories. */
-.qvink_memory_display.qvink_short_memory {
+.qvink_short_memory {
     color: seagreen;
 }
 /* to style long-term memories. */
-.qvink_memory_display.qvink_long_memory {
+.qvink_long_memory {
     color: steelblue;
 }
 /* to style memories marked for long-term, but are past the context limit */
-.qvink_memory_display.qvink_remember_memory {
+.qvink_remember_memory {
     color: darkred;
 }
-
 /* to style memories that are force-excluded */
-.qvink_memory_display.qvink_exclude_memory {
+.qvink_exclude_memory {
     color: #555;
 }
 
@@ -127,4 +131,54 @@ By default, text is greyed to indicate that is it not injected.
     opacity: inherit;
     filter: drop-shadow(0px 0px 5px rgb(65, 210, 243));
 }
+
+/* Memory state interface */
+#qvink_memory_state_interface {
+    display: flex;
+    flex-direction: column;
+}
+#qvink_memory_state_interface table {
+    max-height: calc(90vh - 20em);
+    overflow-y: auto;
+    display: block;
+}
+#qvink_memory_state_interface button.menu_button i {
+    margin-right: 1em;  /* buttons with icon before text needs margin after the icon */
+}
+#qvink_memory_state_interface table thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;  /* to be above the body when scrolling */
+    background: var(--SmartThemeBlurTintColor)
+}
+#qvink_memory_state_interface table tbody td {
+    position: relative;  /* to be under the head when scrolling */
+}
+#qvink_memory_state_interface table td.interface_summary {
+    width: 100%;
+}
+#qvink_memory_state_interface table td.interface_summary textarea {
+    margin: 0;
+    overflow-y: hidden;
+}
+#qvink_memory_state_interface table tr:has(input.interface_message_select:checked) {
+    background-color: var(--white30a);  /* highlight selected rows */
+}
+#qvink_memory_state_interface table td.interface_summary i {  /* edit icon */
+    position: absolute;
+    top: 0;
+    right: 0;
+    margin: 0.2em;
+    scale: 0.6;
+    color: var(--white20a);
+}
+#qvink_memory_state_interface table td div.interface_actions {
+    display: flex;
+    margin: 2px;
+}
+#qvink_memory_state_interface #selected_count {
+    font-weight: bold;
+}
+
+
 
