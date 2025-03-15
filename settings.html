@@ -96,7 +96,7 @@
                     <span>Auto Summarize Batch Size</span>
                 </label>
 
-                <label class="checkbox_label" title="The maximum number of messages back that auto-summarization will apply (-1 to disable).">
+                <label class="checkbox_label" title="The maximum amount of lookback when checking for messages to summarize (-1 to disable). For example, 10 means that when auto-summarizing, the 10 most recent valid summarization targets will be checked, and those without summaries will be summarized.">
                     <input id="auto_summarize_message_limit" class="text_pole widthUnset inline_setting" type="number" min="-1" max="999" />
                     <span>Auto Summarize Message Limit</span>
                 </label>
@@ -175,8 +175,13 @@
                     <span>Include User Messages</span>
                 </label>
 
-                <label title="Auto-summarize system messages and include summaries in memory." class="checkbox_label">
+                <label title="Auto-summarize hidden messages and include summaries in memory (messages excluded from context)." class="checkbox_label">
                     <input id="include_system_messages" type="checkbox" />
+                    <span>Include Hidden Messages</span>
+                </label>
+
+                <label title="Auto-summarize system messages and include summaries in memory (e.g. messages from the /sys command)." class="checkbox_label">
+                    <input id="include_narrator_messages" type="checkbox" />
                     <span>Include System Messages</span>
                 </label>
 

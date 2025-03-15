@@ -11,7 +11,8 @@ import {
     getMaxContextSize,
     streamingProcessor,
     amount_gen,
-    CONNECT_API_MAP
+    system_message_types,
+    CONNECT_API_MAP,
 } from '../../../../script.js';
 import { getPresetManager } from '../../../preset-manager.js'
 import { formatInstructModeChat } from '../../../instruct-mode.js';
@@ -81,7 +82,8 @@ const default_settings = {
     // inclusion criteria
     message_length_threshold: 10,  // minimum message token length for summarization
     include_user_messages: false,  // include user messages in summarization
-    include_system_messages: false,  // include system messages in summarization
+    include_system_messages: false,  // include system messages in summarization (hidden messages)
+    include_narrator_messages: false,  // include narrator messages in summarization (like from the /sys command)
     include_thought_messages: false,  // include thought messages in summarization (Stepped Thinking extension)
 
     // summarization settings
@@ -93,7 +95,7 @@ const default_settings = {
     summarization_delay: 0,  // delay auto-summarization by this many messages (0 summarizes immediately after sending, 1 waits for one message, etc)
     summarization_time_delay: 0, // time in seconds to delay between summarizations
     auto_summarize_batch_size: 1,  // number of messages to summarize at once when auto-summarizing
-    auto_summarize_message_limit: 100,  // maximum number of messages to go back for auto-summarization.
+    auto_summarize_message_limit: 10,  // maximum number of messages to go back for auto-summarization.
     auto_summarize_on_edit: true,  // whether to automatically re-summarize edited chat messages
     auto_summarize_on_swipe: true,  // whether to automatically summarize new message swipes
     auto_summarize_progress: true,  // display a progress bar for auto-summarization
@@ -1927,9 +1929,14 @@ function check_message_exclusion(message) {
         return false
     }
 
-    // check if it's a system (hidden) message and exclude if the setting is disabled
+    // check if it's a hidden message and exclude if the setting is disabled
     if (!get_settings('include_system_messages') && message.is_system) {
         return false;
+    }
+
+    // check if it's a narrator message
+    if (!get_settings('include_narrator_messages') && message.extra.type === system_message_types.NARRATOR) {
+        return false
     }
 
     // check if the character is disabled
@@ -2575,7 +2582,10 @@ async function auto_summarize_chat() {
 
     // iterate through the chat in chronological order and check which messages need to be summarized.
     let messages_to_summarize = []  // list of indexes of messages to summarize
-    for (let i = 0; i < context.chat.length; i++) {
+    let depth_limit = get_settings('auto_summarize_message_limit')  // how many valid messages back we can go
+    let lag = get_settings('summarization_delay');  // number of messages to delay summarization for
+    let depth = 0
+    for (let i = context.chat.length-1; i >= 0; i--) {
         // get current message
         let message = context.chat[i];
 
@@ -2583,6 +2593,12 @@ async function auto_summarize_chat() {
         let include = check_message_exclusion(message);  // check if the message should be included due to current settings
         if (!include) {
             continue;
+        }
+
+        // increment depth and check limit
+        depth++
+        if (depth >= depth_limit + lag) {
+            break;
         }
 
         // skip messages that already have a summary
@@ -2593,21 +2609,7 @@ async function auto_summarize_chat() {
         // this message can be summarized
         messages_to_summarize.push(i)
     }
-    debug(`Messages to summarize - inclusion (${messages_to_summarize.length}): ${messages_to_summarize}`)
-
-    // remove a number of messages from the end equal to the desired delay setting
-    let messages_to_delay = get_settings('summarization_delay');  // number of messages to delay summarization for
-    if (messages_to_delay > 0) {
-        messages_to_summarize = messages_to_summarize.slice(0, -messages_to_delay)
-    }
-    debug(`Messages to summarize - delay (${messages_to_summarize.length}): ${messages_to_summarize}`)
-
-    // account for the auto-summarization max message limit
-    let message_limit = get_settings('auto_summarize_message_limit');  // max number of messages to go back for auto-summarization
-    if (message_limit > 0) {
-        messages_to_summarize = messages_to_summarize.slice(-message_limit)
-    }
-    debug(`Messages to summarize - limit (${messages_to_summarize.length}): ${messages_to_summarize}`)
+    debug(`Messages to summarize (${messages_to_summarize.length}): ${messages_to_summarize}`)
 
     // If we don't have enough messages to batch, don't summarize
     let messages_to_batch = get_settings('auto_summarize_batch_size');  // number of messages to summarize in a batch
@@ -2617,6 +2619,9 @@ async function auto_summarize_chat() {
     }
 
     let show_progress = get_settings('auto_summarize_progress');
+
+    // reverse the list so the messages are in chronological order
+    messages_to_summarize.reverse()
 
     // summarize the messages
     await summarize_messages(messages_to_summarize, show_progress);
@@ -2801,6 +2806,7 @@ Available Macros:
     bind_setting('#block_chat', 'block_chat', 'boolean');
     bind_setting('#include_user_messages', 'include_user_messages', 'boolean');
     bind_setting('#include_system_messages', 'include_system_messages', 'boolean');
+    bind_setting('#include_narrator_messages', 'include_narrator_messages', 'boolean')
     bind_setting('#include_thought_messages', 'include_thought_messages', 'boolean');
 
     bind_setting('#message_length_threshold', 'message_length_threshold', 'number');

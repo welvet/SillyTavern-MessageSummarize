@@ -22,6 +22,7 @@
 - **Fix**: Optimized loading the extension in huge chats (10k+ messages), no longer freezes.
 - **Fix**: The summaries used in the {{history}} macro now match the inclusion criteria of the summary injection. The *messages* included are not affected, just the associated summaries.
 - **Fix**: Memories can still be edited from the main chat even when not displayed below each message.
+- **Change**: The old "Include System Messages" option has been renamed to "Include Hidden Messages", as it refers to messages which are hidden from context. A new option now called "Include System Messages" has been added which instead refers to narrator messages, like those from the /sys command.
 
 
 #### v0.7.3
