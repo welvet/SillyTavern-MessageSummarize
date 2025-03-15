@@ -760,9 +760,7 @@ function update_profile_section() {
 
 
     // When in a group chat, the character profile lock is disabled
-    log("GROUP ID: "+context.groupId)
     if (context.groupId) {
-        log("DISABLED")
         $character.prop('disabled', true)
     }
 
@@ -2691,8 +2689,14 @@ async function auto_summarize_chat() {
             continue;
         }
 
-        // increment depth and check limit
         depth++
+
+        // don't include if below the lag value
+        if (depth <= lag) {
+            continue
+        }
+
+        // Check depth limit
         if (depth >= depth_limit + lag) {
             break;
         }
