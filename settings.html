@@ -25,13 +25,20 @@
 
                 <h4 class="textAlignCenter">Active Settings Profile <i class="fa-solid fa-info-circle" title="Create, edit, and save configuration profiles for this extension."></i></h4>
                 <div class="flex-container justifyspacebetween alignitemscenter">
-                    <select id="profile" class="flex1 text_pole" title="The currently selected profile"></select>
-                    <button id="save_profile" class="menu_button fa-solid fa-save interactable" title="Save current profile" tabindex="0"></button>
-                    <button id="rename_profile" class="menu_button fa-solid fa-pencil interactable" title="Rename current profile" tabindex="0"></button>
-                    <button id="new_profile" class="menu_button fa-solid fa-file-circle-plus interactable" title="Create new profile" tabindex="0"></button>
-                    <button id="restore_profile" class="menu_button fa-solid fa-recycle interactable" title="Restore current profile" tabindex="0"></button>
-                    <button id="delete_profile" class="menu_button fa-solid fa-trash-can interactable" title="Delete current profile" tabindex="0"></button>
-                    <button id="character_profile" class="menu_button fa-solid fa-lock interactable" title="Set as default profile for current character" tabindex="0"></button>
+                    <select id="profile"            class="flex1 text_pole"                                 title="The currently selected profile"></select>
+                    <button id="save_profile"       class="menu_button fa-solid fa-save interactable"       title="Save current profile" tabindex="0"></button>
+                    <button id="rename_profile"     class="menu_button fa-solid fa-pencil interactable"     title="Rename current profile" tabindex="0"></button>
+                    <button id="new_profile"        class="menu_button fa-solid fa-file-circle-plus interactable" title="Create new profile" tabindex="0"></button>
+                    <button id="restore_profile"    class="menu_button fa-solid fa-recycle interactable"    title="Restore current profile" tabindex="0"></button>
+                    <button id="delete_profile"     class="menu_button fa-solid fa-trash-can interactable"  title="Delete current profile" tabindex="0"></button>
+                </div>
+                <div class="flex-container justifyspacebetween alignitemscenter">
+                    <button id="character_profile" class="menu_button interactable" title="Auto-load profile for current character" tabindex="0"><i class="fa-solid fa-unlock" style="margin-right: 1em"></i>Character</button>
+                    <button id="chat_profile"      class="menu_button interactable" title="Auto-load profile for current chat"      tabindex="0"><i class="fa-solid fa-unlock" style="margin-right: 1em"></i>Chat</button>
+                    <label class="checkbox_label" title="Show a notification upon switching profiles">
+                        <input id="notify_on_profile_switch" type="checkbox" />
+                        <span>Notify on Switch</span>
+                    </label>
                 </div>
 
 

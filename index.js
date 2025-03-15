@@ -139,7 +139,9 @@ const default_settings = {
 const global_settings = {
     profiles: {},  // dict of profiles by name
     character_profiles: {},  // dict of character identifiers to profile names
+    chat_profiles: {},  // dict of chat identifiers to profile names
     profile: 'Default', // Current profile
+    notify_on_profile_switch: false,
     chats_enabled: {},  // dict of chat IDs to whether memory is enabled
     global_toggle_state: true,  // global state of memory (used when a profile uses the global state)
     disabled_group_characters: {}  // group chat IDs mapped to a list of disabled character keys
@@ -204,16 +206,25 @@ function get_current_character_identifier() {
     // You have to use the character's avatar image path to uniquely identify them
     let context = getContext();
     if (context.groupId) {
-        return context.groupId;  // if a group is selected, use the group ID
+        return  // if a group is selected, return
     }
 
     // otherwise get the avatar image path of the current character
     let index = context.characterId;
-    if (!index) {  // not a group or a character
+    if (!index) {  // not a character
         return null;
     }
 
     return context.characters[index].avatar;
+}
+function get_current_chat_identifier() {
+    // uniquely identify the current chat
+    let context = getContext();
+    if (context.groupId) {
+        return context.groupId;
+    }
+    return context.chatId
+
 }
 function get_extension_directory() {
     // get the directory of the extension
@@ -716,6 +727,71 @@ function update_save_icon_highlight() {
         $('#save_profile').removeClass('button_highlight');
     }
 }
+function update_profile_section() {
+    let context = getContext()
+
+    let current_profile = get_settings('profile')
+    let current_character_profile = get_character_profile();
+    let current_chat_profile = get_chat_profile();
+    let profile_options = Object.keys(get_settings('profiles'));
+
+    let $choose_profile_dropdown = $(`.${settings_content_class} #profile`).empty();
+    let $character = $('button#character_profile')
+    let $chat = $('button#chat_profile')
+    let $character_icon = $character.find('i')
+    let $chat_icon = $chat.find('i')
+
+
+    // Set the profile dropdowns to reflect the available profiles and the currently chosen one
+    for (let profile of profile_options) {
+        // if the current character/chat has a default profile, indicate as such
+        let text = profile
+        if (profile === current_character_profile) {
+            text = `${profile} (character)`
+        } else if (profile === current_chat_profile) {
+            text = `${profile} (chat)`
+        }
+        $choose_profile_dropdown.append(`<option value="${profile}">${text}</option>`);
+    }
+
+    // if (current_character_profile) {  // set the current chosen profile in the dropdown
+    //     choose_profile_dropdown.val(current_character_profile);
+    // }
+
+
+    // When in a group chat, the character profile lock is disabled
+    log("GROUP ID: "+context.groupId)
+    if (context.groupId) {
+        log("DISABLED")
+        $character.prop('disabled', true)
+    }
+
+    // button highlights and icons
+
+    let lock_class = 'fa-lock'
+    let unlock_class = 'fa-unlock'
+    let highlight_class = 'button_highlight'
+
+    if (current_character_profile === current_profile) {
+        $character.addClass(highlight_class);
+        $character_icon.removeClass(unlock_class)
+        $character_icon.addClass(lock_class)
+    } else {
+        $character.removeClass(highlight_class)
+        $character_icon.removeClass(lock_class)
+        $character_icon.addClass(unlock_class)
+    }
+
+    if (current_chat_profile === current_profile) {
+        $chat.addClass(highlight_class);
+        $chat_icon.removeClass(unlock_class)
+        $chat_icon.addClass(lock_class)
+    } else {
+        $chat.removeClass(highlight_class)
+        $chat_icon.removeClass(lock_class)
+        $chat_icon.addClass(unlock_class)
+    }
+}
 async function update_preset_dropdown() {
     // set the completion preset dropdown
     let $preset_select = $(`.${settings_content_class} #completion_preset`);
@@ -751,32 +827,13 @@ function refresh_settings() {
     // Refresh all settings UI elements according to the current settings
     debug("Refreshing settings...")
 
-    // Set the UI profile dropdowns to reflect the available profiles and the currently chosen one
-    let profile_options = Object.keys(get_settings('profiles'));
-    let choose_profile_dropdown = $(`.${settings_content_class} #profile`).empty();
-    let current_character_profile = get_character_profile();
-    for (let profile of profile_options) {
-
-        // if the current character has a default profile, set the "locked" icon to show it
-        if (profile === current_character_profile) {
-            choose_profile_dropdown.append(`<option value="${profile}">${profile} (locked)</option>`);
-        } else {
-            choose_profile_dropdown.append(`<option value="${profile}">${profile}</option>`);
-        }
-
-    }
-
-    if (current_character_profile) {  // set the current chosen profile in the dropdown
-        choose_profile_dropdown.val(current_character_profile);
-    }
-
     // connection profiles
     if (check_connection_profiles_active()) {
         update_connection_profile_dropdown()
         check_connection_profile_valid()
     } else { // if connection profiles extension isn't active, hide the connection profile dropdown
         $(`.${settings_content_class} #connection_profile`).parent().hide()
-        log("Connection profiles extension not active. Hiding connection profile dropdown.")
+        debug("Connection profiles extension not active. Hiding connection profile dropdown.")
     }
 
     // completion presets
@@ -786,13 +843,13 @@ function refresh_settings() {
     // if prompt doesn't have {{message}}, insert it
     if (!get_settings('prompt').includes("{{message}}")) {
         set_settings('prompt', get_settings('prompt') + "\n{{message}}")
-        //toastr.warning("You did not have the {{message}} macro in your summary prompt. It has been added automatically.")
+        debug("{{message}} macro not found in summary prompt. It has been added automatically.")
     }
 
     // auto_summarize_message_limit must be >= auto_summarize_batch_size
     if (get_settings('auto_summarize_message_limit') < get_settings('auto_summarize_batch_size')) {
         set_settings('auto_summarize_message_limit', get_settings('auto_summarize_batch_size'));
-        toastr.warning("The auto-summarize message limit must be greater than or equal to the batch size.")
+        toast("The auto-summarize message limit must be greater than or equal to the batch size.", "warning")
     }
 
     // enable or disable settings based on others
@@ -824,6 +881,9 @@ function refresh_settings() {
 
     // update the save icon highlight
     update_save_icon_highlight();
+
+    // update the profile section
+    update_profile_section()
 
     // iterate through the settings map and set each element to the current setting value
     for (let [key, [element, type]] of Object.entries(settings_ui_map)) {
@@ -985,8 +1045,9 @@ function save_profile(profile=null) {
 }
 function load_profile(profile=null) {
     // load a given settings profile
+    let current_profile = get_settings('profile')
     if (!profile) {  // if none provided, reload the current profile
-        profile = get_settings('profile');
+        profile = current_profile
     }
 
     let settings = copy_settings(profile);  // copy the settings from the profile
@@ -998,6 +1059,9 @@ function load_profile(profile=null) {
     log("Loading Configuration Profile: "+profile);
     Object.assign(extension_settings[MODULE_NAME], settings);  // update the settings
     set_settings('profile', profile);  // set the current profile
+    if (get_settings("notify_on_profile_switch") && current_profile !== profile) {
+        toast(`Switched to profile "${profile}"`, 'info')
+    }
     refresh_settings();
 }
 async function rename_profile() {
@@ -1062,10 +1126,10 @@ function delete_profile() {
     load_profile('Default');
 }
 function toggle_character_profile() {
-    // Toggle whether the current profile is set to the default for the current character (or group)
+    // Toggle whether the current profile is set to the default for the current character
     let key = get_current_character_identifier();  // uniquely identify the current character or group chat
-    log("KEY: "+key)
-    if (!key) {  // no character or group selected
+    log("Character Key: "+key)
+    if (!key) {  // no character selected
         return;
     }
 
@@ -1075,6 +1139,21 @@ function toggle_character_profile() {
     // if the character profile is already set to the current profile, unset it.
     // otherwise, set it to the current profile.
     set_character_profile(key, profile === get_character_profile() ? null : profile);
+}
+function toggle_chat_profile() {
+    // Toggle whether the current profile is set to the default for the current character
+    let key = get_current_chat_identifier();  // uniquely identify the current chat
+    log("Chat ID: "+key)
+    if (!key) {  // no chat selected
+        return;
+    }
+
+    // current profile
+    let profile = get_settings('profile');
+
+    // if the chat profile is already set to the current profile, unset it.
+    // otherwise, set it to the current profile.
+    set_chat_profile(key, profile === get_chat_profile() ? null : profile);
 }
 function get_character_profile(key) {
     // Get the profile for a given character
@@ -1099,16 +1178,33 @@ function set_character_profile(key, profile=null) {
     set_settings('character_profiles', character_profiles);
     refresh_settings()
 }
-function load_character_profile() {
-    // Load the settings profile for the current character
-    let profile = get_character_profile();
+function get_chat_profile(id) {
+    // Get the profile for a given chat
+    if (!id) {  // if none given, assume the current character
+        id = get_current_chat_identifier();
+    }
+    let profiles = get_settings('chat_profiles');
+    return profiles[id]
+}
+function set_chat_profile(id, profile=null) {
+    // Set the profile for a given chat (or unset it if no profile provided)
+    let chat_profiles = get_settings('chat_profiles');
+
+    if (profile) {
+        chat_profiles[id] = profile;
+        log(`Set chat [${id}] to use profile [${profile}]`);
+    } else {
+        delete chat_profiles[id];
+        log(`Unset chat [${id}] default profile`);
+    }
+
+    set_settings('chat_profiles', chat_profiles);
+    refresh_settings()
+}
+function auto_load_profile() {
+    // Load the settings profile for the current chat or character
+    let profile = get_chat_profile() || get_character_profile();
     load_profile(profile || 'Default');
-
-    // this is to keep the current profile when switching characters
-    //    if (profile) {  // if a default profile is set, load it
-    //         load_profile(profile);
-    //     }
-
     refresh_settings()
 }
 
@@ -2639,7 +2735,7 @@ async function on_chat_event(event=null, data=null) {
     switch (event) {
         case 'chat_changed':  // chat was changed
             last_message_swiped = null;
-            load_character_profile();  // load the profile for the current character
+            auto_load_profile();  // load the profile for the current chat or character
             refresh_memory();  // refresh the memory state
             if (context?.chat?.length) {
                 scrollChatToBottom();  // scroll to the bottom of the chat (area is added due to memories)
@@ -2751,7 +2847,10 @@ function initialize_settings_listeners() {
     bind_function('#rename_profile', () => rename_profile(), false)
     bind_function('#new_profile', new_profile, false);
     bind_function('#delete_profile', delete_profile, false);
-    bind_function('#character_profile', () => toggle_character_profile(), false);
+
+    bind_function('#character_profile', () => toggle_character_profile());
+    bind_function('#chat_profile', () => toggle_chat_profile());
+    bind_setting('#notify_on_profile_switch', 'notify_on_profile_switch', 'boolean')
 
     bind_function('#stop_summarization', stop_summarization);
     bind_function('#revert_settings', reset_settings);

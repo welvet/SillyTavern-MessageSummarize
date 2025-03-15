@@ -11,18 +11,19 @@
 - **New Feature**: You can now choose a completion preset to use for summaries. Notably, this is how the max token length of summaries is now defined, and the previous "Summary Max Token Length" setting has been removed. By default, your currently selected preset will be used until changed. This means that **upon updating, your summaries will use the token length from your current preset** until you assign a custom preset which uses a different token length. The {{words}} macro also uses the value from the selected preset.
 - **New Feature**: You can now choose a connection profile to use for summaries. By default, your currently selected profile will be used.
 - **New Feature**: New "Edit Memory" interface, allowing compact access to all summaries in the chat where you can edit, delete, re-summarize, etc. With this, the "preview memory state" button has been moved to this interface, and the "mass re-summarize" button has been removed as the interface provides all the same functionality.
+- **New Feature**: You can now separately lock a profile to the current character OR chat, and there is an option to show a notification when switching profiles.
+- **New Feature**: The advanced formatting setting "Trim Incomplete Sentences" now affects summaries.
+- **New Feature**: You can now specify the separator string between summaries when they are injected.
 - **New Feature**: Support for reasoning models. Reasoning portion of a summary generation is removed from the response.
 - **New Feature**: You can now optionally provide a prefill for summary generations.
-- **New Feature**: You can now specify the separator string between summaries when they are injected.
 - **New Feature**: You can now optionally specify short and long-term context limit directly with a number of tokens.
-- **New Feature**: You can now optionally set profiles to use a global toggle state between all chats that use this option. This means that if you toggle the extension off in one chat with this option, it will be off in all chats that also use this option. Chats that don't have this option enabled will not be affected, as is the current behavior.
-- **New Feature**: The advanced formatting setting "Trim Incomplete Sentences" now affects summaries.
+- **New Feature**: You can now optionally make profiles use a global toggle state between all chats that use this option. This means that if you toggle the extension off in one chat with this option, it will be off in all chats that also use this option. Chats that don't have this option enabled will not be affected, as is the current behavior.
 - **New Slash Command**: `/toggle_memory_edit_interface` will open the memory edit interface.
 - **New Slash Command**: `/get_memory <n>` will return the memory associated with the given message index.
 - **Fix**: Optimized loading the extension in huge chats (10k+ messages), no longer freezes.
 - **Fix**: The summaries used in the {{history}} macro now match the inclusion criteria of the summary injection. The *messages* included are not affected, just the associated summaries.
 - **Fix**: Memories can still be edited from the main chat even when not displayed below each message.
-- **Change**: The old "Include System Messages" option has been renamed to "Include Hidden Messages", as it refers to messages which are hidden from context. A new option now called "Include System Messages" has been added which instead refers to narrator messages, like those from the /sys command.
+- **Change**: The old "Include System Messages" option has been renamed to "Include Hidden Messages", as it really refers to messages which are hidden from context. A new option now called "Include System Messages" has been added which instead refers to *narrator* messages, like those from the `/sys` command.
 
 
 #### v0.7.3
