@@ -1,6 +1,6 @@
 # Changelog
 
-#### v0.8.5
+#### v0.8.7
 - **IMPORTANT #1:** The number of tokens used for your summaries will be broken and you will need to update your config.
 
 - **IMPORTANT #2:** You must be on the ST staging branch as it relies on the following PRs: 
@@ -13,6 +13,7 @@
 - **New Feature**: New "Edit Memory" interface, allowing compact access to all summaries in the chat where you can edit, delete, re-summarize, etc. With this, the "preview memory state" button has been moved to this interface, and the "mass re-summarize" button has been removed as the interface provides all the same functionality.
 - **New Feature**: Support for reasoning models. Reasoning portion of a summary generation is removed from the response.
 - **New Feature**: You can now optionally provide a prefill for summary generations.
+- **New Feature**: You can now specify the separator string between summaries when they are injected.
 - **New Feature**: You can now optionally specify short and long-term context limit directly with a number of tokens.
 - **New Feature**: You can now optionally set profiles to use a global toggle state between all chats that use this option. This means that if you toggle the extension off in one chat with this option, it will be off in all chats that also use this option. Chats that don't have this option enabled will not be affected, as is the current behavior.
 - **New Feature**: The advanced formatting setting "Trim Incomplete Sentences" now affects summaries.

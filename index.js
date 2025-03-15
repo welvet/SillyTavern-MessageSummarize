@@ -132,6 +132,7 @@ const default_settings = {
     default_chat_enabled: true,  // whether memory is enabled by default for new chats
     use_global_toggle_state: false,  // whether the on/off state for this profile uses the global state
     limit_injected_messages: -1,  // limit the number of injected messages (-1 for no limit)
+    summary_injection_separator: "\n* "  // separator when concatenating summaries
 };
 const global_settings = {
     profiles: {},  // dict of profiles by name
@@ -228,6 +229,40 @@ function clean_string_for_title(text) {
             case ">": return "&gt;";
         }
     })
+}
+function escape_string(text) {
+    // escape control characters in the text
+    return text.replace(/[\x00-\x1F\x7F]/g, function(match) {
+        // Escape control characters
+        switch (match) {
+          case '\n': return '\\n';
+          case '\t': return '\\t';
+          case '\r': return '\\r';
+          case '\b': return '\\b';
+          case '\f': return '\\f';
+          default: return '\\x' + match.charCodeAt(0).toString(16).padStart(2, '0');
+        }
+    });
+}
+function unescape_string(text) {
+    // given a string with escaped characters, unescape them
+    return text.replace(/\\[ntrbf0x][0-9a-f]{2}|\\[ntrbf]/g, function(match) {
+        switch (match) {
+          case '\\n': return '\n';
+          case '\\t': return '\t';
+          case '\\r': return '\r';
+          case '\\b': return '\b';
+          case '\\f': return '\f';
+          default: {
+            // Handle escaped hexadecimal characters like \\xNN
+            const hexMatch = match.match(/\\x([0-9a-f]{2})/i);
+            if (hexMatch) {
+              return String.fromCharCode(parseInt(hexMatch[1], 16));
+            }
+            return match; // Return as is if no match
+          }
+        }
+    });
 }
 
 
@@ -592,8 +627,9 @@ function bind_setting(selector, key, type=null, callback=null, disable=true) {
             value = Number($(this).val());
         } else if (type === 'boolean') {  // checkbox
             value = Boolean($(this).prop('checked'));
-        } else {  // text input, dropdown, select2
+        } else {  // text, dropdown, select2
             value = $(this).val();
+            value = unescape_string(value)  // ensures values like "\n" are NOT escaped from input
         }
 
         // update the setting
@@ -650,6 +686,9 @@ function set_setting_ui_element(key, element, type) {
 
     // get the setting value
     let setting_value = get_settings(key);
+    if (type === "text") {
+        setting_value = escape_string(setting_value)  // escape values like "\n"
+    }
 
     // initialize the UI element with the setting value
     if (radio) {  // if a radio group, select the one that matches the setting value
@@ -2043,7 +2082,8 @@ function concatenate_summary(existing_text, message) {
     if (!summary) {  // if there's no summary, do nothing
         return existing_text
     }
-    return existing_text + `\n* ${summary}`
+    let separator = get_settings('summary_injection_separator')
+    return existing_text + separator + summary
 }
 function concatenate_summaries(indexes) {
     // concatenate the summaries of the messages with the given indexes
@@ -2797,6 +2837,7 @@ Available Macros:
     bind_setting('#default_chat_enabled', 'default_chat_enabled', 'boolean');
     bind_setting('#use_global_toggle_state', 'use_global_toggle_state', 'boolean');
     bind_setting('#limit_injected_messages', 'limit_injected_messages', 'number');
+    bind_setting('#summary_injection_separator', 'summary_injection_separator', 'text')
 
     // trigger the change event once to update the display at start
     $('#long_term_context_limit').trigger('change');
