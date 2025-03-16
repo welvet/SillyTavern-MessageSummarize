@@ -1571,9 +1571,7 @@ class MemoryEditInterface {
     <button id="bulk_summarize"  class="menu_button flex1" title="Re-Summarize selected memories">                             <i class="fa-solid fa-quote-left"></i>Summarize</button>
     <button id="bulk_delete"     class="menu_button flex1" title="Delete selected memories">                                   <i class="fa-solid fa-trash"></i>Delete</button>
     <button id="bulk_regex"      class="menu_button flex1" title="Run the selected regex script on selected memories">         <i class="fa-solid fa-shuffle"></i>Regex Replace</button>
-    <label title="Choose regex script">
-        <select id="regex_selector" class="flex1"></select>
-    </label>
+    <select id="regex_selector"  title="Choose regex script"></select>
 </div>
 </div>
 `
