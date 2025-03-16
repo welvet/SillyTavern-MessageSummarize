@@ -1539,6 +1539,15 @@ class MemoryEditInterface {
     <button id="bulk_summarize"  disabled class="menu_button flex1" title="Re-Summarize selected memories (AI)">                        <i class="fa-solid fa-quote-left"></i>Summarize</button>
     <button id="bulk_delete"     disabled class="menu_button flex1" title="Delete selected memories">                                   <i class="fa-solid fa-trash"></i>Delete</button>
     <button id="bulk_copy"       disabled class="menu_button flex1" title="Copy selected memories to clipboard">                        <i class="fa-solid fa-copy"></i>Copy</button>
+    <div id="find_replace">
+        <label title="Replace the given matched string in all selected summaries.">
+            <span>Regex Replace</span>
+            <button id="test_regex_button" class="menu_button">Test</button>
+            <button id="replace_button" class="menu_button">Replace</button>
+            <textarea id="search_text" placeholder="search"></textarea>
+            <textarea id="replace_text" placeholder="replace>"></textarea>
+        </label>
+    </div>
 </div>
 </div>
 `
@@ -1564,6 +1573,10 @@ class MemoryEditInterface {
 
         this.$counter = this.$content.find("#selected_count")  // counter for selected rows
         this.$bulk_buttons = this.$content.find('#bulk_remember, #bulk_exclude, #bulk_summarize, #bulk_delete, #bulk_copy');
+        this.$search_text = this.$content.find('#search_text')
+        this.$replace_text = this.$content.find('#replace_text')
+        this.$replace_button = this.$content.find('#replace_button')
+        this.$test_regex_button = this.$content.find('#test_regex_button')
 
         this.$global_selection_checkbox = this.$content.find("#global_selection")
         this.$global_selection_checkbox.prop('checked', this.settings.global_selection ?? false)
@@ -1685,6 +1698,29 @@ class MemoryEditInterface {
             await summarize_message(message_id);  // summarize the message, replacing the existing summary
             self.update()
         });
+
+        // search replace
+        this.$replace_button.on('click', () => {
+            let regex = this.$search_text.val()
+            let replace = this.$replace_text.val()
+            for (let i of this.selected) {
+                let text = get_memory(this.ctx.chat[i], 'memory')
+                log("TEXT: "+text)
+                let new_text = text.replace(regex, replace)
+                log("REPLACE: "+new_text)
+            }
+        })
+        this.$test_regex_button.on('click', () => {
+            let regex = this.$search_text.val()
+            let replace = this.$replace_text.val()
+            for (let i of this.selected) {
+                let textarea = this.$table.find(`tr#message_${i}`);
+                let text = get_memory(this.ctx.chat[i], 'memory')
+                log("TEXT: "+text)
+                let new_text = text.replace(regex, replace)
+                log("REPLACE: "+new_text)
+            }
+        })
     }
 
     async show() {
