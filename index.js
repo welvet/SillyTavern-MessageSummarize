@@ -1439,6 +1439,11 @@ function edit_memory(message, text) {
 
     debug(`Edited memory`);
 }
+function display_injection_preview() {
+    let text = refresh_memory()
+    text = `...\n\n${text}\n\n...`
+    display_text_modal("Memory State Preview", text);
+}
 
 async function display_text_modal(title, text="") {
     // Display a modal with the given title and text
@@ -1758,11 +1763,7 @@ class MemoryEditInterface {
         this.$content.find('#bulk_copy').on('click', () => {
             this.copy_to_clipboard()
         })
-        this.$content.find('#preview_memory_state').on('click', () => {
-            let text = refresh_memory()
-            text = `...\n\n${text}\n\n...`
-            display_text_modal("Memory State Preview", text);
-        })
+        this.$content.find('#preview_memory_state').on('click', () => display_injection_preview())
 
         // handlers for each memory
         let self = this;
@@ -3412,6 +3413,14 @@ function initialize_slash_commands() {
             memoryEditInterface.show()
         },
         helpString: 'Toggle the memory editing interface',
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'toggle_memory_injection_preview',
+        callback: (args) => {
+            display_injection_preview()
+        },
+        helpString: 'Toggle a preview of the current memory injection',
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({

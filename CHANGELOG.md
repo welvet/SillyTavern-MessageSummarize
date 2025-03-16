@@ -20,6 +20,7 @@
 - **New Feature**: You can now optionally specify short and long-term context limit directly with a number of tokens.
 - **New Feature**: You can now optionally make profiles use a global toggle state between all chats that use this option. This means that if you toggle the extension off in one chat with this option, it will be off in all chats that also use this option. Chats that don't have this option enabled will not be affected, as is the current behavior.
 - **New Slash Command**: `/toggle_memory_edit_interface` will open the memory edit interface.
+- **New Slash Command**: `/toggle_memory_injection_preview` will open a preview of what will be injected into context (same as the "Preview Memory State" button).
 - **New Slash Command**: `/get_memory <n>` will return the memory associated with the given message index.
 - **Fix**: Optimized loading the extension in huge chats (10k+ messages), no longer freezes.
 - **Fix**: The summaries used in the {{history}} macro now match the inclusion criteria of the summary injection. The *messages* included are not affected, just the associated summaries.
