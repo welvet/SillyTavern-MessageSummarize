@@ -91,6 +91,7 @@ const default_settings = {
     prefill: "",   // summary prompt prefill
     show_prefill: false, // whether to show the prefill when memories are displayed
     completion_preset: "",  // completion preset to use for summarization. Empty ("") indicates the same as currently selected.
+    connection_profile: "",
     auto_summarize: true,   // whether to automatically summarize new chat messages
     summarization_delay: 0,  // delay auto-summarization by this many messages (0 summarizes immediately after sending, 1 waits for one message, etc)
     summarization_time_delay: 0, // time in seconds to delay between summarizations
@@ -246,6 +247,7 @@ function clean_string_for_title(text) {
 }
 function escape_string(text) {
     // escape control characters in the text
+    if (!text) return text
     return text.replace(/[\x00-\x1F\x7F]/g, function(match) {
         // Escape control characters
         switch (match) {
@@ -260,6 +262,7 @@ function escape_string(text) {
 }
 function unescape_string(text) {
     // given a string with escaped characters, unescape them
+    if (!text) return text
     return text.replace(/\\[ntrbf0x][0-9a-f]{2}|\\[ntrbf]/g, function(match) {
         switch (match) {
           case '\\n': return '\n';
@@ -373,7 +376,20 @@ async function get_connection_profile_api(name) {
     if (name === undefined) name = await get_summary_connection_profile()
     let ctx = getContext();
     let result = await ctx.executeSlashCommandsWithOptions(`/profile-get ${name}`)
-    let data = JSON.parse(result.pipe)
+
+    if (!result.pipe) {
+        debug(`/profile-get ${name} returned nothing - no connection profile selected`)
+        return
+    }
+
+    let data;
+    try {
+        data = JSON.parse(result.pipe)
+    } catch {
+        error(`Failed to parse JSON from /profile-get for \"${name}\". Result:`)
+        error(result)
+        return
+    }
 
     // need to map the API type to a completion API
     if (CONNECT_API_MAP[data.api] === undefined) {
@@ -413,7 +429,13 @@ async function get_connection_profiles() {
     if (!check_connection_profiles_active()) return;  // if the extension isn't active, return
     let ctx = getContext();
     let result = await ctx.executeSlashCommandsWithOptions(`/profile-list`)
-    return JSON.parse(result.pipe)
+    try {
+        return JSON.parse(result.pipe)
+    } catch {
+        error("Failed to parse JSON from /profile-list. Result:")
+        error(result)
+    }
+
 }
 async function verify_connection_profile(name) {
     // check if the given connection profile name is valid
@@ -1461,43 +1483,50 @@ class MemoryEditInterface {
             "title": "Summaries currently in short-term memory",
             "display": "Short-Term",
             "check": (msg) => get_memory(msg, 'include') === "short",
-            "default": true
+            "default": true,
+            "count": 0
         },
         "long_term": {
-            "title": "Summaries marked for long-term memory (even if they currently in short-term or out of long-term context)",
+            "title": "Summaries marked for long-term memory, even if they are currently in short-term memory or out of context",
             "display": "Long-Term",
-            "check": (msg) => get_memory(msg, 'include') === "long",
-            "default": true
+            "check": (msg) => get_memory(msg, 'remember'),
+            "default": true,
+            "count": 0
         },
         "excluded": {
-            "title": "Summaries currently not in short-term or long-term memory",
+            "title": "Summaries not in short-term or long-term memory",
             "display": "Excluded",
             "check": (msg) => !get_memory(msg, 'include') && get_memory(msg, 'memory'),
-            "default": true
+            "default": false,
+            "count": 0
         },
         "force_excluded": {
-            "title": "Summaries that have been manually force-excluded from emory",
+            "title": "Summaries that have been manually force-excluded from memory",
             "display": "Force-Excluded",
             "check":  (msg) => get_memory(msg, 'exclude'),
-            "default": true
+            "default": false,
+            "count": 0
         },
         "edited": {
             "title": "Summaries that have been manually edited",
             "display": "Edited",
             "check": (msg) => get_memory(msg, 'edited'),
-            "default": true
+            "default": false,
+            "count": 0
         },
         "errors": {
             "title": "Summaries that failed during generation",
             "display": "Errors",
             "check": (msg) => get_memory(msg, 'error'),
-            "default": true
+            "default": false,
+            "count": 0
         },
         "no_summary": {
             "title": "Messages without a summary",
             "display": "No Summary",
-            "check": (msg) => !get_memory(msg, 'memory') && !get_memory(msg, 'error'),
-            "default": false
+            "check": (msg) => !get_memory(msg, 'memory'),
+            "default": false,
+            "count": 0
         },
 
     }
@@ -1590,6 +1619,7 @@ class MemoryEditInterface {
         })
 
         // add filter section
+        this.update_filter_counts()
         for (let [id, data] of Object.entries(this.filter_bar)) {
             let select_button_id = `select_${id}`
             let filter_checkbox_id = `filter_${id}`
@@ -1600,6 +1630,7 @@ class MemoryEditInterface {
     <label class="checkbox_label" title="${data.title}">
         <input id="${filter_checkbox_id}" type="checkbox" ${checked ? "checked" : ""}/>
         <span>${data.display}</span>
+        <span>(${data.count})</span>
     </label>
     <button id="${select_button_id}" class="menu_button flex1" title="Mass select">Select</button>
 </div>
@@ -1619,8 +1650,6 @@ class MemoryEditInterface {
 
             // callback for the select button
             $select.on('click', () => {
-                // force checking the filter when selecting
-                if (!$filter.is(':checked')) $filter.click()
                 let all_indexes = this.global_selection() ? this.filtered : this.displayed
                 let select = []
                 for (let i of all_indexes) {
@@ -1641,22 +1670,22 @@ class MemoryEditInterface {
         // bulk action buttons
         this.$content.find(`#bulk_remember`).on('click', () => {
             remember_message_toggle(Array.from(this.selected))
-            this.update()
+            this.update_table()
         })
         this.$content.find(`#bulk_exclude`).on('click', () => {
             forget_message_toggle(Array.from(this.selected))
-            this.update()
+            this.update_table()
         })
         this.$content.find(`#bulk_summarize`).on('click', () => {
             summarize_messages(Array.from(this.selected));
-            this.update()
+            this.update_table()
         })
         this.$content.find(`#bulk_delete`).on('click', () => {
             this.selected.forEach(id => {
                 log("DELETING: " + id)
                 store_memory(this.ctx.chat[id], 'memory', null);
             })
-            this.update()
+            this.update_table()
         })
         this.$content.find('#bulk_copy').on('click', () => {
             this.copy_to_clipboard()
@@ -1674,7 +1703,7 @@ class MemoryEditInterface {
             let message_id = Number($(this).closest('tr').attr('message_id'));  // get the message ID from the row's "message_id" attribute
             let message = self.ctx.chat[message_id]
             edit_memory(message, new_memory)
-            self.update()
+            self.update_table()
         }).on("input", 'tr textarea', function () {
             this.style.height = "auto";  // fixes some weird behavior that just using scrollHeight causes.
             this.style.height = this.scrollHeight + "px";
@@ -1686,17 +1715,17 @@ class MemoryEditInterface {
         this.$content.on("click", `tr .${remember_button_class}`, function () {
             let message_id = Number($(this).closest('tr').attr('message_id'));  // get the message ID from the row's "message_id" attribute
             remember_message_toggle(message_id);
-            self.update()
+            self.update_table()
         });
         this.$content.on("click", `tr .${forget_button_class}`, function () {
             let message_id = Number($(this).closest('tr').attr('message_id'));  // get the message ID from the row's "message_id" attribute
             forget_message_toggle(message_id);
-            self.update()
+            self.update_table()
         })
         this.$content.on("click", `tr .${summarize_button_class}`, async function () {
             let message_id = Number($(this).closest('tr').attr('message_id'));  // get the message ID from the row's "message_id" attribute
             await summarize_message(message_id);  // summarize the message, replacing the existing summary
-            self.update()
+            self.update_table()
         });
 
         // search replace
@@ -1732,7 +1761,7 @@ class MemoryEditInterface {
         this.update_selected()
 
         let result = this.popup.show();  // gotta go before init_pagination so the update
-        this.update()
+        this.update_table()
 
         // Set initial height for text areas.
         // I know that update() also does this, but for some reason the first time it's called it doesn't set it right.
@@ -1763,7 +1792,7 @@ class MemoryEditInterface {
             row.remove()
         }
     }
-    update() {
+    update_table() {
         // Update the content of the interface
 
         // if the interface isn't open, do nothing
@@ -1859,15 +1888,15 @@ class MemoryEditInterface {
         this.filtered = []
         for (let i = this.ctx.chat.length-1; i >= 0; i--) {
             let msg = this.ctx.chat[i]
-            let include = true
+            let include =  false
 
-            if (!filter_short_term      && this.filter_bar.short_term.check(msg)) include = false;
-            else if (!filter_long_term       && this.filter_bar.long_term.check(msg)) include = false;
-            else if (!filter_no_summary      && this.filter_bar.no_summary.check(msg)) include = false;
-            else if (!filter_errors          && this.filter_bar.errors.check(msg)) include = false;
-            else if (!filter_excluded        && this.filter_bar.excluded.check(msg)) include = false;
-            else if (!filter_edited          && this.filter_bar.edited.check(msg)) include = false;
-            else if (!filter_force_excluded  && this.filter_bar.force_excluded.check(msg)) include = false;
+            if (filter_short_term           && this.filter_bar.short_term.check(msg)) include = true;
+            else if (filter_long_term       && this.filter_bar.long_term.check(msg)) include = true;
+            else if (filter_no_summary      && this.filter_bar.no_summary.check(msg)) include = true;
+            else if (filter_errors          && this.filter_bar.errors.check(msg)) include = true;
+            else if (filter_excluded        && this.filter_bar.excluded.check(msg)) include = true;
+            else if (filter_edited          && this.filter_bar.edited.check(msg)) include = true;
+            else if (filter_force_excluded  && this.filter_bar.force_excluded.check(msg)) include = true;
 
             // Any indexes not in the filtered list should also not be selected
             if (include) {
@@ -1878,6 +1907,7 @@ class MemoryEditInterface {
 
         }
 
+        // re-initialize paginator with new data
         this.$pagination.pagination({
             dataSource: this.filtered,
             pageSize: 100,
@@ -1886,7 +1916,7 @@ class MemoryEditInterface {
             callback: (data, pagination) => {
                 this.displayed = data
                 this.clear()
-                this.update()
+                this.update_table()
             }
         })
     }
@@ -1911,6 +1941,18 @@ class MemoryEditInterface {
             this.$counter.css('color', 'unset')
             this.$mass_select_checkbox.prop('checked', false)
             this.$bulk_buttons.attr('disabled', true);
+        }
+    }
+    update_filter_counts() {
+        // count the number of messages in each filter
+        for (let [id, data] of Object.entries(this.filter_bar)) {
+            data.count = 0
+        }
+
+        for (let msg of this.ctx.chat) {
+            for (let [id, data] of Object.entries(this.filter_bar)) {
+                if (data.check(msg)) data.count++
+            }
         }
     }
     toggle_selected(indexes, value=null) {
