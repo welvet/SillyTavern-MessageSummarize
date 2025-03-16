@@ -1486,7 +1486,7 @@ class MemoryEditInterface {
             "default": true
         },
         "long_term": {
-            "title": "Summaries marked for long-term memory (even if they currently in short-term or out of long-term context)",
+            "title": "Summaries currently in long-term memory",
             "display": "Long-Term",
             "check": (msg) => get_memory(msg, 'include') === "long",
             "default": true
