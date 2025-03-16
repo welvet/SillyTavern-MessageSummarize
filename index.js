@@ -388,6 +388,7 @@ async function get_connection_profile_api(name) {
     } catch {
         error(`Failed to parse JSON from /profile-get for \"${name}\". Result:`)
         error(result)
+        return
     }
 
     // need to map the API type to a completion API
