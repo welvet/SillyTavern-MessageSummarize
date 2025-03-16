@@ -376,6 +376,12 @@ async function get_connection_profile_api(name) {
     if (name === undefined) name = await get_summary_connection_profile()
     let ctx = getContext();
     let result = await ctx.executeSlashCommandsWithOptions(`/profile-get ${name}`)
+
+    if (!result.pipe) {
+        debug(`/profile-get ${name} returned nothing - no connection profile selected`)
+        return
+    }
+
     let data;
     try {
         data = JSON.parse(result.pipe)
