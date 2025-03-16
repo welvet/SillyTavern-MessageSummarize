@@ -1871,9 +1871,9 @@ class MemoryEditInterface {
                 $select_checkbox = $(`<input class="interface_message_select" type="checkbox" value="${i}">`)
                 $buttons = $(this.html_button_template)
                 if (msg.is_user) {
-                    $sender = $(`<i class="fa-solid" title="User message"></i>`)
+                    $sender = $(`<i class="fa-solid fa-user" title="User message"></i>`)
                 } else {
-                    $sender = $(`<i class="fa-solid fa-user" title="Character message"></i>`)
+                    $sender = $(`<i class="fa-solid" title="Character message"></i>`)
                 }
 
 
