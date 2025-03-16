@@ -22,6 +22,8 @@ import { dragElement } from '../../../RossAscends-mods.js';
 import { debounce_timeout } from '../../../constants.js';
 import { MacrosParser } from '../../../macros.js';
 import { commonEnumProviders } from '../../../slash-commands/SlashCommandCommonEnumsProvider.js';
+import { getRegexScripts } from '../../../../scripts/extensions/regex/index.js'
+import { runRegexScript } from '../../../../scripts/extensions/regex/engine.js'
 
 export { MODULE_NAME };
 
@@ -1562,21 +1564,16 @@ class MemoryEditInterface {
 
 <hr>
 <div>Bulk Actions (Selected: <span id="selected_count"></span>)</div>
-<div class="flex-container justifyspacebetween alignitemscenter">
-    <button id="bulk_remember"   disabled class="menu_button flex1" title="Toggle inclusion of selected summaries in long-term memory"> <i class="fa-solid fa-brain"></i>Remember</button>
-    <button id="bulk_exclude"    disabled class="menu_button flex1" title="Toggle inclusion of selected summaries from all memory">     <i class="fa-solid fa-ban"></i>Exclude</button>
-    <button id="bulk_summarize"  disabled class="menu_button flex1" title="Re-Summarize selected memories (AI)">                        <i class="fa-solid fa-quote-left"></i>Summarize</button>
-    <button id="bulk_delete"     disabled class="menu_button flex1" title="Delete selected memories">                                   <i class="fa-solid fa-trash"></i>Delete</button>
-    <button id="bulk_copy"       disabled class="menu_button flex1" title="Copy selected memories to clipboard">                        <i class="fa-solid fa-copy"></i>Copy</button>
-    <div id="find_replace">
-        <label title="Replace the given matched string in all selected summaries.">
-            <span>Regex Replace</span>
-            <button id="test_regex_button" class="menu_button">Test</button>
-            <button id="replace_button" class="menu_button">Replace</button>
-            <textarea id="search_text" placeholder="search"></textarea>
-            <textarea id="replace_text" placeholder="replace>"></textarea>
-        </label>
-    </div>
+<div id="bulk_actions" class="flex-container justifyspacebetween alignitemscenter">
+    <button id="bulk_remember"   class="menu_button flex1" title="Toggle inclusion of selected summaries in long-term memory"> <i class="fa-solid fa-brain"></i>Remember</button>
+    <button id="bulk_exclude"    class="menu_button flex1" title="Toggle inclusion of selected summaries from all memory">     <i class="fa-solid fa-ban"></i>Exclude</button>
+    <button id="bulk_copy"       class="menu_button flex1" title="Copy selected memories to clipboard">                        <i class="fa-solid fa-copy"></i>Copy</button>
+    <button id="bulk_summarize"  class="menu_button flex1" title="Re-Summarize selected memories">                             <i class="fa-solid fa-quote-left"></i>Summarize</button>
+    <button id="bulk_delete"     class="menu_button flex1" title="Delete selected memories">                                   <i class="fa-solid fa-trash"></i>Delete</button>
+    <button id="bulk_regex"      class="menu_button flex1" title="Run the selected regex script on selected memories">         <i class="fa-solid fa-shuffle"></i>Regex Replace</button>
+    <label title="Choose regex script">
+        <select id="regex_selector" class="flex1"></select>
+    </label>
 </div>
 </div>
 `
@@ -1601,11 +1598,7 @@ class MemoryEditInterface {
         this.$pagination = this.$content.find('#pagination')
 
         this.$counter = this.$content.find("#selected_count")  // counter for selected rows
-        this.$bulk_buttons = this.$content.find('#bulk_remember, #bulk_exclude, #bulk_summarize, #bulk_delete, #bulk_copy');
-        this.$search_text = this.$content.find('#search_text')
-        this.$replace_text = this.$content.find('#replace_text')
-        this.$replace_button = this.$content.find('#replace_button')
-        this.$test_regex_button = this.$content.find('#test_regex_button')
+        this.$bulk_actions = this.$content.find("#bulk_actions button, #bulk_actions select")
 
         this.$global_selection_checkbox = this.$content.find("#global_selection")
         this.$global_selection_checkbox.prop('checked', this.settings.global_selection ?? false)
@@ -1617,6 +1610,8 @@ class MemoryEditInterface {
             let indexes = this.global_selection() ? this.filtered : this.displayed
             this.toggle_selected(indexes, checked)
         })
+
+        this.update_regex_section()
 
         // add filter section
         this.update_filter_counts()
@@ -1727,29 +1722,6 @@ class MemoryEditInterface {
             await summarize_message(message_id);  // summarize the message, replacing the existing summary
             self.update_table()
         });
-
-        // search replace
-        this.$replace_button.on('click', () => {
-            let regex = this.$search_text.val()
-            let replace = this.$replace_text.val()
-            for (let i of this.selected) {
-                let text = get_memory(this.ctx.chat[i], 'memory')
-                log("TEXT: "+text)
-                let new_text = text.replace(regex, replace)
-                log("REPLACE: "+new_text)
-            }
-        })
-        this.$test_regex_button.on('click', () => {
-            let regex = this.$search_text.val()
-            let replace = this.$replace_text.val()
-            for (let i of this.selected) {
-                let textarea = this.$table.find(`tr#message_${i}`);
-                let text = get_memory(this.ctx.chat[i], 'memory')
-                log("TEXT: "+text)
-                let new_text = text.replace(regex, replace)
-                log("REPLACE: "+new_text)
-            }
-        })
     }
 
     async show() {
@@ -1936,11 +1908,11 @@ class MemoryEditInterface {
         if (this.selected.size > 0) {
             this.$counter.css('color', 'red')
             this.$mass_select_checkbox.prop('checked', true)
-            this.$bulk_buttons.removeAttr('disabled');
+            this.$bulk_actions.removeAttr('disabled');
         } else {
             this.$counter.css('color', 'unset')
             this.$mass_select_checkbox.prop('checked', false)
-            this.$bulk_buttons.attr('disabled', true);
+            this.$bulk_actions.attr('disabled', true);
         }
     }
     update_filter_counts() {
@@ -1954,6 +1926,44 @@ class MemoryEditInterface {
                 if (data.check(msg)) data.count++
             }
         }
+    }
+    update_regex_section() {
+        this.$regex_selector = this.$content.find('#regex_selector')
+        this.$replace_button = this.$content.find('#bulk_regex')
+
+        // populate regex dropdown
+        let script_list = getRegexScripts()
+        let scripts = {}
+        Object.keys(script_list).forEach(function(i) {
+            let script = script_list[i]
+            scripts[script.scriptName] = script
+        });
+
+        this.$regex_selector.empty();
+        this.$regex_selector.append(`<option value="">Select Script</option>`)
+        for (let name of Object.keys(scripts)) {  // construct the dropdown options
+            this.$regex_selector.append(`<option value="${name}">${name}</option>`)
+        }
+        this.$regex_selector.val(this.settings.regex_script || "")
+        this.$regex_selector.on('change', () => {
+            this.settings.regex_script = this.$regex_selector.val()
+            this.save_settings()
+        })
+
+        // search replace
+        this.$replace_button.on('click', () => {
+            let script_name = this.$regex_selector.val()
+            let script = scripts[script_name]
+            log(`Running regex script \"${script_name}\" on selected memories`)
+            for (let i of this.selected) {
+                let message = this.ctx.chat[i]
+                let text = get_memory(message, 'memory')
+                let new_text = runRegexScript(script, text)
+                store_memory(message, 'memory', new_text)
+            }
+            this.update_table()
+        })
+
     }
     toggle_selected(indexes, value=null) {
         // set the selected state of the given message indexes

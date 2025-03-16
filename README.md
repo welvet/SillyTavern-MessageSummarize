@@ -137,5 +137,3 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Allow locking profile to specific chat, not just character.~~
 - Option to remove redundant memory injections while messages are in context.
 - import/export profiles
-- Edit interface
-  - find-replace
