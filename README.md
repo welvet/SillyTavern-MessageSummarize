@@ -135,5 +135,6 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~fix using is_system instead of extra.type === system_message_types.NARRATOR~~
 - ~~Allow customizing the memory injection separators~~
 - ~~Allow locking profile to specific chat, not just character.~~
+- ~~import/export profiles~~
 - Option to remove redundant memory injections while messages are in context.
-- import/export profiles
+

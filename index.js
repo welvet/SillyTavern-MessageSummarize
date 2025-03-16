@@ -1,4 +1,4 @@
-import { getStringHash, debounce, copyText, trimToEndSentence } from '../../../utils.js';
+import { getStringHash, debounce, copyText, trimToEndSentence, download, parseJsonFile, waitUntilCondition } from '../../../utils.js';
 import { getContext, getApiUrl, extension_settings } from '../../../extensions.js';
 import {
     animation_duration,
@@ -1087,6 +1087,41 @@ function load_profile(profile=null) {
     }
     refresh_settings();
 }
+function export_profile(profile=null) {
+    // export a settings profile
+    if (!profile) {  // if none provided, reload the current profile
+        profile = get_settings('profile')
+    }
+
+    let settings = copy_settings(profile);  // copy the settings from the profile
+    if (!settings) {
+        error("Profile not found: "+profile);
+        return;
+    }
+
+    log("Exporting Configuration Profile: "+profile);
+    const data = JSON.stringify(settings, null, 4);
+    download(data, `${profile}.json`, 'application/json');
+}
+async function import_profile(e) {
+    let file = e.target.files[0];
+    if (!file) {
+        return;
+    }
+
+    const name = file.name.replace('.json', '')
+    const data = await parseJsonFile(file);
+
+    // save to the profile
+    let profiles = get_settings('profiles');
+    profiles[name] = data
+    set_settings('profiles', profiles);
+
+    toast(`Qvink Memory profile \"${name}\" imported`, 'success')
+    e.target.value = null;
+
+    refresh_settings()
+}
 async function rename_profile() {
     // Rename the current profile via user input
     let ctx = getContext();
@@ -1143,10 +1178,29 @@ function delete_profile() {
     }
     let profile = get_settings('profile');
     let profiles = get_settings('profiles');
-    log(`Deleting Configuration Profile: ${profile}`);
+
+    // delete the profile
     delete profiles[profile];
     set_settings('profiles', profiles);
-    load_profile('Default');
+    toast(`Deleted Configuration Profile: \"${profile}\"`, "success");
+
+    // remove any references to this profile connected to characters or chats
+    let character_profiles = get_settings('character_profiles')
+    let chat_profiles = get_settings('chat_profiles')
+    for (let [id, name] of Object.entries(character_profiles)) {
+        if (name === profile) {
+            delete character_profiles[id]
+        }
+    }
+    for (let [id, name] of Object.entries(chat_profiles)) {
+        if (name === profile) {
+            delete chat_profiles[id]
+        }
+    }
+    set_settings('character_profiles', character_profiles)
+    set_settings('chat_profiles', chat_profiles)
+
+    auto_load_profile()
 }
 function toggle_character_profile() {
     // Toggle whether the current profile is set to the default for the current character
@@ -2997,6 +3051,15 @@ function initialize_settings_listeners() {
     bind_function('#rename_profile', () => rename_profile(), false)
     bind_function('#new_profile', new_profile, false);
     bind_function('#delete_profile', delete_profile, false);
+
+    bind_function('#export_profile', () => export_profile(), false)
+    bind_function('#import_profile', (e) => {
+
+        log($(e.target))
+        log($(e.target).parent().find("#import_file"))
+        $(e.target).parent().find("#import_file").click()
+    }, false)
+    bind_function('#import_file', async (e) => await import_profile(e), false)
 
     bind_function('#character_profile', () => toggle_character_profile());
     bind_function('#chat_profile', () => toggle_chat_profile());

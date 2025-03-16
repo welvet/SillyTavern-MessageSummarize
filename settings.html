@@ -23,7 +23,15 @@
 
                 <hr>
 
-                <h4 class="textAlignCenter">Active Settings Profile <i class="fa-solid fa-info-circle" title="Create, edit, and save configuration profiles for this extension."></i></h4>
+                <div>
+                    <div class="flex-container justifyspacebetween alignitemscenter" style="margin: auto; width: fit-content;">
+                        <h4 class="textAlignCenter">Configuration Profiles</h4>
+                        <button id="import_profile"     class="menu_button fa-solid fa-file-import"    title="Import a config profile"></button>
+                        <button id="export_profile"     class="menu_button fa-solid fa-file-export"    title="Export the current config profile"></button>
+                        <input id="import_file" type="file" hidden="" accept=".json">
+                    </div>
+                </div>
+
                 <div class="flex-container justifyspacebetween alignitemscenter">
                     <select id="profile"            class="flex1 text_pole"                                 title="The currently selected profile"></select>
                     <button id="save_profile"       class="menu_button fa-solid fa-save interactable"       title="Save current profile" tabindex="0"></button>

@@ -12,6 +12,7 @@
 - **New Feature**: You can now choose a connection profile to use for summaries. By default, your currently selected profile will be used.
 - **New Feature**: New "Edit Memory" interface, allowing compact access to all summaries in the chat where you can edit, delete, re-summarize, etc. With this, the "preview memory state" button has been moved to this interface, and the "mass re-summarize" button has been removed as the interface provides all the same functionality.
 - **New Feature**: You can now separately lock a profile to the current character OR chat, and there is an option to show a notification when switching profiles.
+- **New Feature**: You can now import and export config profiles.
 - **New Feature**: The advanced formatting setting "Trim Incomplete Sentences" now affects summaries.
 - **New Feature**: You can now specify the separator string between summaries when they are injected.
 - **New Feature**: Support for reasoning models. Reasoning portion of a summary generation is removed from the response.
