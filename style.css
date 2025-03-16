@@ -133,18 +133,20 @@ By default, text is greyed to indicate that is it not injected.
 }
 
 /* Memory state interface */
+dialog:has(#qvink_memory_state_interface) {
+    height: 90vh;  /* make the memory edit dialog always full height */
+}
 #qvink_memory_state_interface {
+    height: 100%;
     display: flex;
     flex-direction: column;
 }
-
-/* Filter bar */
 #qvink_memory_state_interface #filter_bar {
-    margin: 1em 0;
+    margin: 1em 0;  /* Filter bar vertical margins */
 }
 #qvink_memory_state_interface #filter_bar .filter_box {
-    margin: 0 1em;
-    padding: 0.2em 1em;
+    margin: 0 0.5em;
+    padding: 0.2em 0.5em;
     border: 1px black solid;
     border-radius: 5px;
     box-shadow: 1px 1px 5px black;
@@ -158,7 +160,6 @@ By default, text is greyed to indicate that is it not injected.
 }
 
 #qvink_memory_state_interface table {
-    max-height: calc(90vh - 20em);
     overflow-y: auto;
     display: block;
 }
