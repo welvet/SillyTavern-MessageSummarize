@@ -1551,15 +1551,22 @@ class MemoryEditInterface {
         },
         "excluded": {
             "title": "Summaries not in short-term or long-term memory",
-            "display": "Excluded",
+            "display": "Forgot",
             "check": (msg) => !get_memory(msg, 'include') && get_memory(msg, 'memory'),
             "default": false,
             "count": 0
         },
         "force_excluded": {
-            "title": "Summaries that have been manually force-excluded from memory",
-            "display": "Force-Excluded",
+            "title": "Summaries that have been manually excluded from memory",
+            "display": "Excluded",
             "check":  (msg) => get_memory(msg, 'exclude'),
+            "default": false,
+            "count": 0
+        },
+        "user": {
+            "title": "User messages with or without summaries",
+            "display": "User",
+            "check":  (msg) => msg.is_user,
             "default": false,
             "count": 0
         },
@@ -1596,6 +1603,10 @@ class MemoryEditInterface {
         <input id="global_selection" type="checkbox" />
         <span>Global Selection</span>
     </label>
+    <label class="checkbox_label" title="Reverse the sort order of each page.">
+        <input id="reverse_page_sort" type="checkbox" />
+        <span>Reverse page sort</span>
+    </label>
 </div>
 
 <div id="filter_bar" class="flex-container justifyspacebetween alignitemscenter"></div>
@@ -1607,7 +1618,8 @@ class MemoryEditInterface {
 <thead>
     <tr>
         <th class="mass_select" title="Select all/none"><input id="mass_select" type="checkbox"/></th>
-        <th title="Message ID associated with the memory">ID</th>
+        <th title="Message ID associated with the memory"><i class="fa-solid fa-hashtag"></i></th>
+        <th title="Sender"><i class="fa-solid fa-comment"></i></th>
         <th title="Memory text">Memory</th>
         <th class="actions">Actions</th>
     </tr>
@@ -1646,7 +1658,8 @@ class MemoryEditInterface {
     init() {
         this.popup = new this.ctx.Popup(this.html_template, this.ctx.POPUP_TYPE.TEXT, undefined, {wider: true});
         this.$content = $(this.popup.content)
-        this.$table = this.$content.find('tbody')
+        this.$table = this.$content.find('table')
+        this.$table_body = this.$table.find('tbody')
         this.$pagination = this.$content.find('#pagination')
 
         this.$counter = this.$content.find("#selected_count")  // counter for selected rows
@@ -1655,6 +1668,14 @@ class MemoryEditInterface {
         this.$global_selection_checkbox = this.$content.find("#global_selection")
         this.$global_selection_checkbox.prop('checked', this.settings.global_selection ?? false)
         this.$global_selection_checkbox.on('change', () => this.save_settings())
+
+        this.$reverse_page_sort = this.$content.find('#reverse_page_sort')
+        this.$reverse_page_sort.prop('checked', this.settings.reverse_page_sort ?? false)
+        this.$reverse_page_sort.on('change', () => {
+            this.save_settings()
+            this.update_filters()
+            this.update_table()
+        })
 
         this.$mass_select_checkbox = this.$content.find('#mass_select')
         this.$mass_select_checkbox.on('change', () => {  // when the mass checkbox is toggled, apply the change to all checkboxes
@@ -1811,7 +1832,7 @@ class MemoryEditInterface {
 
     clear() {
         // clear all displayed rows in the table
-        let $rows = this.$table.find('tr')
+        let $rows = this.$table_body.find('tr')
         for (let row of $rows) {
             row.remove()
         }
@@ -1840,14 +1861,22 @@ class MemoryEditInterface {
             let row_id = `memory_${i}`
 
             // check if a row already exists for this memory
-            $row = this.$table.find(`tr#${row_id}`);
+            $row = this.$table_body.find(`tr#${row_id}`);
             let $memory;
             let $select_checkbox;
             let $buttons;
+            let $sender;
             if ($row.length === 0) {  // doesn't exist
                 $memory = $(`<textarea rows="1">${memory}</textarea>`)
                 $select_checkbox = $(`<input class="interface_message_select" type="checkbox" value="${i}">`)
                 $buttons = $(this.html_button_template)
+                if (msg.is_user) {
+                    $sender = $(`<i class="fa-solid" title="User message"></i>`)
+                } else {
+                    $sender = $(`<i class="fa-solid fa-user" title="Character message"></i>`)
+                }
+
+
 
                 // create the row. The "message_id" attribute tells all handlers what message ID this is.
                 $row = $(`<tr message_id="${i}" id="${row_id}"></tr>`)
@@ -1856,12 +1885,13 @@ class MemoryEditInterface {
                 if ($previous_row) {
                     $row.insertAfter($previous_row)
                 } else {  // or put it at the top
-                    $row.prependTo(this.$table)
+                    $row.prependTo(this.$table_body)
                 }
 
                 // add each item
                 $select_checkbox.wrap('<td></td>').parent().appendTo($row)
                 $(`<td>${i}</td>`).appendTo($row)
+                $sender.wrap('<td></td>').parent().appendTo($row)
                 $memory.wrap(`<td class="interface_summary"></td>`).parent().appendTo($row)
                 $buttons.wrap(`<td></td>`).parent().appendTo($row)
 
@@ -1894,6 +1924,10 @@ class MemoryEditInterface {
             $previous_row = $row
         }
 
+        if (this.settings.reverse_page_sort) {
+            this.scroll_to_bottom()
+        }
+
         this.update_selected()
     }
     update_filters() {
@@ -1907,6 +1941,7 @@ class MemoryEditInterface {
         let filter_force_excluded = this.filter_bar.force_excluded.filtered()
         let filter_edited = this.filter_bar.edited.filtered()
         let filter_errors = this.filter_bar.errors.filtered()
+        let filter_user = this.filter_bar.user.filtered()
 
         // message indexes in reverse
         this.filtered = []
@@ -1921,6 +1956,7 @@ class MemoryEditInterface {
             else if (filter_excluded        && this.filter_bar.excluded.check(msg)) include = true;
             else if (filter_edited          && this.filter_bar.edited.check(msg)) include = true;
             else if (filter_force_excluded  && this.filter_bar.force_excluded.check(msg)) include = true;
+            else if (filter_user            && this.filter_bar.user.check(msg)) include = true;
 
             // Any indexes not in the filtered list should also not be selected
             if (include) {
@@ -1938,6 +1974,9 @@ class MemoryEditInterface {
             sizeChangerOptions: [10, 50, 100, 500, 1000],
             showSizeChanger: true,
             callback: (data, pagination) => {
+                if (this.settings.reverse_page_sort) {
+                    data.reverse()
+                }
                 this.displayed = data
                 this.clear()
                 this.update_table()
@@ -1948,7 +1987,7 @@ class MemoryEditInterface {
         // Update the interface based on selected items
 
         // check/uncheck the rows according to which are selected
-        let $checkboxes = this.$table.find(`input.interface_message_select`)
+        let $checkboxes = this.$table_body.find(`input.interface_message_select`)
         for (let checkbox of $checkboxes) {
             $(checkbox).prop('checked', this.selected.has(Number(checkbox.value)))
         }
@@ -2057,6 +2096,7 @@ class MemoryEditInterface {
     }
     save_settings() {
         this.settings.global_selection = this.$global_selection_checkbox.is(':checked')
+        this.settings.reverse_page_sort = this.$reverse_page_sort.is(':checked')
         for (let [id, data] of Object.entries(this.filter_bar)) {
             this.settings[id] = data.filtered()
         }
@@ -2619,7 +2659,7 @@ async function summarize_message(index=null) {
     }
 
     // Update the memory state interface if it's open
-    memoryEditInterface.update()
+    memoryEditInterface.update_table()
 }
 async function summarize_text(prompt) {
     // get size of text
@@ -2736,8 +2776,9 @@ function format_system_prompt(text) {
     let parts = text.split(/(\{\{#if.*?\/if}})|(\{\{.*?}})/gs);
 
     let formatted = parts.map((part) => {
-        if (!part) return ""
+        if (!part) return ""  // some parts are undefined
         part = part.trim()  // trim whitespace
+        if (!part) return ""  // if empty after trimming
         if (part.startsWith('{{') && part.endsWith('}}')) {
             return part  // don't format macros
         }
@@ -2822,13 +2863,12 @@ async function create_summary_prompt(index, using_instruct_override=false) {
         // now substitute the custom macros
         prompt = substitute_params(prompt, {"message": message_text, "history": history_text});  // substitute "message" and "history" macros
     }
-
     // If using instructOverride, append the assistant starting message template to the text, replacing the name with "assistant" if needed
     if (using_instruct_override) {
         let output_sequence = ctx.substituteParamsExtended(power_user.instruct.output_sequence, {name: "assistant"});
         prompt = `${prompt}\n${output_sequence}`
-    } else {    // remove starting sequence if NOT using instructOverride, because the instruct template will add it
-        let start_sequence = power_user.instruct.input_sequence
+    } else {    // remove system starting sequence if NOT using instructOverride, because the instruct template will add it
+        let start_sequence = power_user.instruct.system_sequence
         prompt = prompt.slice(start_sequence.length)
     }
 
