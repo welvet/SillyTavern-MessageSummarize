@@ -376,7 +376,13 @@ async function get_connection_profile_api(name) {
     if (name === undefined) name = await get_summary_connection_profile()
     let ctx = getContext();
     let result = await ctx.executeSlashCommandsWithOptions(`/profile-get ${name}`)
-    let data = JSON.parse(result.pipe)
+    let data;
+    try {
+        data = JSON.parse(result.pipe)
+    } catch {
+        error(`Failed to parse JSON from /profile-get for \"${name}\". Result:`)
+        error(result)
+    }
 
     // need to map the API type to a completion API
     if (CONNECT_API_MAP[data.api] === undefined) {
@@ -416,7 +422,13 @@ async function get_connection_profiles() {
     if (!check_connection_profiles_active()) return;  // if the extension isn't active, return
     let ctx = getContext();
     let result = await ctx.executeSlashCommandsWithOptions(`/profile-list`)
-    return JSON.parse(result.pipe)
+    try {
+        return JSON.parse(result.pipe)
+    } catch {
+        error("Failed to parse JSON from /profile-list. Result:")
+        error(result)
+    }
+
 }
 async function verify_connection_profile(name) {
     // check if the given connection profile name is valid
