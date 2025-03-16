@@ -246,6 +246,7 @@ function clean_string_for_title(text) {
 }
 function escape_string(text) {
     // escape control characters in the text
+    if (!text) return text
     return text.replace(/[\x00-\x1F\x7F]/g, function(match) {
         // Escape control characters
         switch (match) {
@@ -260,6 +261,7 @@ function escape_string(text) {
 }
 function unescape_string(text) {
     // given a string with escaped characters, unescape them
+    if (!text) return text
     return text.replace(/\\[ntrbf0x][0-9a-f]{2}|\\[ntrbf]/g, function(match) {
         switch (match) {
           case '\\n': return '\n';
