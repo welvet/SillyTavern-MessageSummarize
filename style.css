@@ -137,6 +137,26 @@ By default, text is greyed to indicate that is it not injected.
     display: flex;
     flex-direction: column;
 }
+
+/* Filter bar */
+#qvink_memory_state_interface #filter_bar {
+    margin: 1em 0;
+}
+#qvink_memory_state_interface #filter_bar .filter_box {
+    margin: 0 1em;
+    padding: 0.2em 1em;
+    border: 1px black solid;
+    border-radius: 5px;
+    box-shadow: 1px 1px 5px black;
+}
+#qvink_memory_state_interface #filter_bar .filter_box button {
+    width: 100%;
+}
+#qvink_memory_state_interface #filter_bar .filter_box label {
+    width: fit-content;
+    margin: auto;
+}
+
 #qvink_memory_state_interface table {
     max-height: calc(90vh - 20em);
     overflow-y: auto;
@@ -161,7 +181,7 @@ By default, text is greyed to indicate that is it not injected.
     margin: 0;
     overflow-y: hidden;
 }
-#qvink_memory_state_interface table tr:has(input.interface_message_select:checked) {
+#qvink_memory_state_interface table tr:has(input.interface_message_select:checked, textarea:focus) {
     background-color: var(--white30a);  /* highlight selected rows */
 }
 #qvink_memory_state_interface table td.interface_summary i {  /* edit icon */
@@ -176,6 +196,7 @@ By default, text is greyed to indicate that is it not injected.
     display: flex;
     margin: 2px;
 }
+
 #qvink_memory_state_interface #selected_count {
     font-weight: bold;
 }

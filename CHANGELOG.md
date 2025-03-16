@@ -3,7 +3,7 @@
 #### v0.8.7
 - **IMPORTANT #1:** The number of tokens used for your summaries will be broken and you will need to update your config.
 
-- **IMPORTANT #2:** You must be on the ST staging branch as it relies on the following PRs: 
+- **IMPORTANT #2:** You must be on ST version 1.12.13 or above as it relies on the following PRs: 
   - https://github.com/SillyTavern/SillyTavern/pull/3544#issue-2873858897
   - https://github.com/SillyTavern/SillyTavern/pull/3592#issue-2889204530
   - https://github.com/SillyTavern/SillyTavern/pull/3673#issue-2915351656

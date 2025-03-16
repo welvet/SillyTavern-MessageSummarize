@@ -144,7 +144,8 @@ const global_settings = {
     notify_on_profile_switch: false,
     chats_enabled: {},  // dict of chat IDs to whether memory is enabled
     global_toggle_state: true,  // global state of memory (used when a profile uses the global state)
-    disabled_group_characters: {}  // group chat IDs mapped to a list of disabled character keys
+    disabled_group_characters: {},  // group chat IDs mapped to a list of disabled character keys
+    memory_edit_interface_settings: {}  // settings last used in the memory edit interface
 }
 const settings_ui_map = {}  // map of settings to UI elements
 
@@ -1287,7 +1288,7 @@ function update_message_visuals(i, style=true, text=null) {
 
     // add a click event to the memory div to edit the memory
     memory_div.on('click', function () {
-        edit_memory(i);
+        open_edit_memory_input(i);
     })
 }
 function update_all_message_visuals() {
@@ -1298,7 +1299,7 @@ function update_all_message_visuals() {
         update_message_visuals(i, true);
     }
 }
-function edit_memory(index) {
+function open_edit_memory_input(index) {
     // Allow the user to edit a message summary
     let message = getContext().chat[index];
     let memory = get_memory(message, 'memory')?.trim() ?? '';  // get the current memory text
@@ -1321,14 +1322,10 @@ function edit_memory(index) {
             cancel_edit()
             return;
         }
-        store_memory(message, "edited", true)  // mark as edited
-        store_memory(message, "memory", new_memory);
-        store_memory(message, "error", null)
-        store_memory(message, 'reasoning', null)
+        edit_memory(message, new_memory)
         $textarea.remove();  // remove the textarea
         $memory_div.show();  // show the memory div
         refresh_memory();
-        debug(`Edited memory for message ${index}`);
     }
 
     function cancel_edit() {
@@ -1348,6 +1345,23 @@ function edit_memory(index) {
         }
     })
 }
+function edit_memory(message, text) {
+    // edit the text of a memory
+    let current_text = get_memory(message, 'memory')
+    if (text === current_text) return;  // no change
+    store_memory(message, "memory", text);
+    store_memory(message, "error", null)  // remove any errors
+    store_memory(message, "reasoning", null)  // remove any reasoning
+    store_memory(message, "edited", Boolean(text))  // mark as edited if not deleted
+
+    // deleting or adding text to a deleted memory, remove some other flags
+    if (!text || !current_text) {
+        store_memory(message, "exclude", false)
+    }
+
+    debug(`Edited memory`);
+}
+
 async function display_text_modal(title, text="") {
     // Display a modal with the given title and text
     // replace newlines in text with <br> for HTML
@@ -1435,31 +1449,71 @@ class MemoryEditInterface {
 
     // Array with each message index to show in the interface.
     // Affected by filters
-    displayed = []
+    filtered = []  // current indexes filtered
+    displayed = []  // indexes on current page
 
     // selected message indexes
     selected = new Set()
+
+    // Available filters with a function to check a given message against the filter.
+    filter_bar = {
+        "short_term": {
+            "title": "Summaries currently in short-term memory",
+            "display": "Short-Term",
+            "check": (msg) => get_memory(msg, 'include') === "short",
+            "default": true
+        },
+        "long_term": {
+            "title": "Summaries marked for long-term memory (even if they currently in short-term or out of long-term context)",
+            "display": "Long-Term",
+            "check": (msg) => get_memory(msg, 'include') === "long",
+            "default": true
+        },
+        "excluded": {
+            "title": "Summaries currently not in short-term or long-term memory",
+            "display": "Excluded",
+            "check": (msg) => !get_memory(msg, 'include') && get_memory(msg, 'memory'),
+            "default": true
+        },
+        "force_excluded": {
+            "title": "Summaries that have been manually force-excluded from emory",
+            "display": "Force-Excluded",
+            "check":  (msg) => get_memory(msg, 'exclude'),
+            "default": true
+        },
+        "edited": {
+            "title": "Summaries that have been manually edited",
+            "display": "Edited",
+            "check": (msg) => get_memory(msg, 'edited'),
+            "default": true
+        },
+        "errors": {
+            "title": "Summaries that failed during generation",
+            "display": "Errors",
+            "check": (msg) => get_memory(msg, 'error'),
+            "default": true
+        },
+        "no_summary": {
+            "title": "Messages without a summary",
+            "display": "No Summary",
+            "check": (msg) => !get_memory(msg, 'memory') && !get_memory(msg, 'error'),
+            "default": false
+        },
+
+    }
 
     html_template = `
 <div id="qvink_memory_state_interface">
 <div class="flex-container justifyspacebetween alignitemscenter">
     <h4>Memory State</h4>
     <button id="preview_memory_state" class="menu_button fa-solid fa-eye margin0" title="Preview current memory state (the exact text that will be injected into your context)."></button>
-    <label class="checkbox_label" title="Show messages without summaries.">
-        <input id="show_no_summary" type="checkbox" />
-    <span>Show empty summaries</span>
-</label>
+    <label class="checkbox_label" title="Selecting message subsets applies to the entire chat history. When unchecked, it only applies to the current page.">
+        <input id="global_selection" type="checkbox" />
+        <span>Global Selection</span>
+    </label>
 </div>
 
-<div title="Select/deselect summaries">Select Subsets</div>
-<div class="flex-container justifyspacebetween alignitemscenter">
-    <button id="select_no_summary"      class="menu_button flex1" title="Select empty summaries">No Summary</button>
-    <button id="select_short_term"      class="menu_button flex1" title="Select summaries currently in short-term memory">Short-Term</button>
-    <button id="select_long_term"       class="menu_button flex1" title="Select summaries marked for long-term memory (even if they currently in short-term or out of long-term context)">Long-Term</button>
-    <button id="select_excluded"        class="menu_button flex1" title="Select summaries currently not in short-term or long-term memory.">Excluded</button>
-    <button id="select_force_excluded"  class="menu_button flex1" title="Select summaries which are manually force-excluded from emory">Force-Excluded</button>
-    <button id="select_edited"          class="menu_button flex1" title="Select summaries that have been manually edited">Edited</button>
-</div>
+<div id="filter_bar" class="flex-container justifyspacebetween alignitemscenter"></div>
 
 <hr>
 <div id="pagination" style="margin: 0.5em 0"></div>
@@ -1499,8 +1553,9 @@ class MemoryEditInterface {
 
     // If you define the popup in the constructor so you don't have to recreate it every time, then clicking the "ok" button has like a .5-second lang before closing the popup.
     // If you instead re-create it every time in show(), there is no lag.
-    constructor() {}
-
+    constructor() {
+        this.settings = get_settings('memory_edit_interface_settings')
+    }
     init() {
         this.popup = new this.ctx.Popup(this.html_template, this.ctx.POPUP_TYPE.TEXT, undefined, {wider: true});
         this.$content = $(this.popup.content)
@@ -1509,89 +1564,66 @@ class MemoryEditInterface {
 
         this.$counter = this.$content.find("#selected_count")  // counter for selected rows
         this.$bulk_buttons = this.$content.find('#bulk_remember, #bulk_exclude, #bulk_summarize, #bulk_delete, #bulk_copy');
-        this.$show_no_summary = this.$content.find('#show_no_summary')
 
-        // manually set a larger width
-        this.$content.closest('dialog').css('min-width', '80%')
+        this.$global_selection_checkbox = this.$content.find("#global_selection")
+        this.$global_selection_checkbox.prop('checked', this.settings.global_selection ?? false)
+        this.$global_selection_checkbox.on('change', () => this.save_settings())
 
         this.$mass_select_checkbox = this.$content.find('#mass_select')
         this.$mass_select_checkbox.on('change', () => {  // when the mass checkbox is toggled, apply the change to all checkboxes
-            let checked = this.$mass_select_checkbox.prop('checked');
-            this.toggle_selected(this.displayed, checked)
+            let checked = this.$mass_select_checkbox.is(':checked')
+            let indexes = this.global_selection() ? this.filtered : this.displayed
+            this.toggle_selected(indexes, checked)
         })
 
-        let $show_no_summary = this.$content.find('#show_no_summary');
-        $show_no_summary.on('change', () => {  // when the show_no_summary checkbox is toggled, update the interface
-            this.init_pagination()  // pagination needs to be regenerated
-            this.update();
-        })
+        // add filter section
+        for (let [id, data] of Object.entries(this.filter_bar)) {
+            let select_button_id = `select_${id}`
+            let filter_checkbox_id = `filter_${id}`
+            let checked = this.settings[id] ?? data.default
 
-        // select subset buttons
-        this.$content.find('#select_no_summary').on('click', () => {
-            let indexes = []
-            for (let i = 0; i < this.ctx.chat.length; i++) {
-                let message = this.ctx.chat[i];
-                if (!get_memory(message, 'memory')) {
-                    indexes.push(i);
-                }
-            }
+            let $el = $(`
+<div class="filter_box flex1">
+    <label class="checkbox_label" title="${data.title}">
+        <input id="${filter_checkbox_id}" type="checkbox" ${checked ? "checked" : ""}/>
+        <span>${data.display}</span>
+    </label>
+    <button id="${select_button_id}" class="menu_button flex1" title="Mass select">Select</button>
+</div>
+            `)
 
-            // force showing no summaries, since that's what we're selecting
-            $show_no_summary.prop('checked', true).trigger('change')
+            this.$content.find('#filter_bar').append($el)  // append to filter bar
 
-            this.update()
-            this.toggle_selected(indexes);
-        })
-        this.$content.find('#select_short_term').on('click', () => {
-            let indexes = []
-            for (let i = 0; i < this.ctx.chat.length; i++) {
-                let message = this.ctx.chat[i];
-                if (get_memory(message, 'include') === "short") {
-                    indexes.push(i);
+            let $select = $el.find("#"+select_button_id)
+            let $filter = $el.find("#"+filter_checkbox_id)
+
+            data.filtered = () => $filter.is(':checked')
+
+            $filter.on('change', () => {
+                this.update_filters()
+                this.save_settings();
+            })
+
+            // callback for the select button
+            $select.on('click', () => {
+                // force checking the filter when selecting
+                if (!$filter.is(':checked')) $filter.click()
+                let all_indexes = this.global_selection() ? this.filtered : this.displayed
+                let select = []
+                for (let i of all_indexes) {
+                    let message = this.ctx.chat[i];
+                    if (data.check(message)) {
+                        select.push(i);
+                    }
                 }
-            }
-            this.toggle_selected(indexes);
-        })
-        this.$content.find('#select_long_term').on('click', () => {
-            let indexes = []
-            for (let i = 0; i < this.ctx.chat.length; i++) {
-                let message = this.ctx.chat[i];
-                if (get_memory(message, 'remember')) {
-                    indexes.push(i);
-                }
-            }
-            this.toggle_selected(indexes);
-        })
-        this.$content.find('#select_excluded').on('click', () => {
-            let indexes = []
-            for (let i = 0; i < this.ctx.chat.length; i++) {
-                let message = this.ctx.chat[i];
-                if (!get_memory(message, 'include')) {
-                    indexes.push(i);
-                }
-            }
-            this.toggle_selected(indexes);
-        })
-        this.$content.find('#select_force_excluded').on('click', () => {
-            let indexes = []
-            for (let i = 0; i < this.ctx.chat.length; i++) {
-                let message = this.ctx.chat[i];
-                if (get_memory(message, 'exclude')) {
-                    indexes.push(i);
-                }
-            }
-            this.toggle_selected(indexes);
-        })
-        this.$content.find('#select_edited').on('click', () => {
-            let indexes = []
-            for (let i = 0; i < this.ctx.chat.length; i++) {
-                let message = this.ctx.chat[i];
-                if (get_memory(message, 'edited')) {
-                    indexes.push(i);
-                }
-            }
-            this.toggle_selected(indexes);
-        })
+
+                this.toggle_selected(select);
+            })
+
+        }
+
+        // manually set a larger width
+        this.$content.closest('dialog').css('min-width', '80%')
 
         // bulk action buttons
         this.$content.find(`#bulk_remember`).on('click', () => {
@@ -1628,9 +1660,7 @@ class MemoryEditInterface {
             let new_memory = $(this).val();
             let message_id = Number($(this).closest('tr').attr('message_id'));  // get the message ID from the row's "message_id" attribute
             let message = self.ctx.chat[message_id]
-            store_memory(message, 'memory', new_memory);
-            store_memory(message, "edited", true)  // mark as edited
-            store_memory(message, "error", null)
+            edit_memory(message, new_memory)
             self.update()
         }).on("input", 'tr textarea', function () {
             this.style.height = "auto";  // fixes some weird behavior that just using scrollHeight causes.
@@ -1659,7 +1689,7 @@ class MemoryEditInterface {
 
     async show() {
         this.init()
-        this.init_pagination()
+        this.update_filters()
 
         // start with no rows selected
         this.selected.clear()
@@ -1681,38 +1711,15 @@ class MemoryEditInterface {
         //this.scroll_to_bottom()
         await result  // wait for user to close
     }
+
     is_open() {
         if (!this.popup) return false
         return this.$content.closest('dialog').attr('open');
     }
-    init_pagination() {
-        // update list of indexes to show based on current filters
-        let show_no_summary = this.$show_no_summary.is(':checked');
-
-        // message indexes in reverse
-        let indexes = []
-        for (let i = this.ctx.chat.length-1; i >= 0; i--) {
-            let msg = this.ctx.chat[i]
-            let memory = get_memory(msg, 'memory')
-            let error = get_memory(msg, 'error')
-            let edited = get_memory(msg, 'edited')
-            if (!show_no_summary && !memory && !error) continue;  // skip if not showing memories and it doesn't have a memory or an error
-            indexes.push(i)
-        }
-        this.displayed = indexes
-
-        this.$pagination.pagination({
-            dataSource: this.displayed,
-            pageSize: 100,
-            sizeChangerOptions: [10, 50, 100, 500, 1000],
-            //pageNumber: Math.floor(this.displayed.length / ,
-            showSizeChanger: true,
-            callback: (data, pagination) => {
-                this.clear()
-                this.update(data)
-            }
-        })
+    global_selection() {
+        return this.$global_selection_checkbox.is(':checked');
     }
+
     clear() {
         // clear all displayed rows in the table
         let $rows = this.$table.find('tr')
@@ -1720,7 +1727,9 @@ class MemoryEditInterface {
             row.remove()
         }
     }
-    update(indexes=null) {
+    update() {
+        // Update the content of the interface
+
         // if the interface isn't open, do nothing
         if (!this.is_open()) {
             return
@@ -1730,14 +1739,11 @@ class MemoryEditInterface {
         refresh_memory()  // make sure current memory state is up to date
 
         debug("Updating memory interface...")
-        if (indexes === null) {  // if indexes not given, get from paginator
-            indexes = this.$pagination.pagination('getCurrentPageData')  // get current indexes on the page
-        }
 
         // add a table row for each message index
         let $row;
         let $previous_row;
-        for (let i of indexes) {
+        for (let i of this.displayed) {
             let msg = this.ctx.chat[i];
             let memory = get_memory(msg, 'memory') || ""
             let error = get_memory(msg, 'error') || ""
@@ -1801,6 +1807,76 @@ class MemoryEditInterface {
 
         this.update_selected()
     }
+    update_filters() {
+        // update list of indexes to include based on current filters
+        log("Updating interface filters...")
+
+        let filter_no_summary = this.filter_bar.no_summary.filtered()
+        let filter_short_term = this.filter_bar.short_term.filtered()
+        let filter_long_term = this.filter_bar.long_term.filtered()
+        let filter_excluded = this.filter_bar.excluded.filtered()
+        let filter_force_excluded = this.filter_bar.force_excluded.filtered()
+        let filter_edited = this.filter_bar.edited.filtered()
+        let filter_errors = this.filter_bar.errors.filtered()
+
+        // message indexes in reverse
+        this.filtered = []
+        for (let i = this.ctx.chat.length-1; i >= 0; i--) {
+            let msg = this.ctx.chat[i]
+            let include = true
+
+            if (!filter_short_term      && this.filter_bar.short_term.check(msg)) include = false;
+            else if (!filter_long_term       && this.filter_bar.long_term.check(msg)) include = false;
+            else if (!filter_no_summary      && this.filter_bar.no_summary.check(msg)) include = false;
+            else if (!filter_errors          && this.filter_bar.errors.check(msg)) include = false;
+            else if (!filter_excluded        && this.filter_bar.excluded.check(msg)) include = false;
+            else if (!filter_edited          && this.filter_bar.edited.check(msg)) include = false;
+            else if (!filter_force_excluded  && this.filter_bar.force_excluded.check(msg)) include = false;
+
+            // Any indexes not in the filtered list should also not be selected
+            if (include) {
+                this.filtered.push(i)
+            } else {
+                this.selected.delete(i)
+            }
+
+        }
+
+        this.$pagination.pagination({
+            dataSource: this.filtered,
+            pageSize: 100,
+            sizeChangerOptions: [10, 50, 100, 500, 1000],
+            showSizeChanger: true,
+            callback: (data, pagination) => {
+                this.displayed = data
+                this.clear()
+                this.update()
+            }
+        })
+    }
+    update_selected() {
+        // Update the interface based on selected items
+
+        // check/uncheck the rows according to which are selected
+        let $checkboxes = this.$table.find(`input.interface_message_select`)
+        for (let checkbox of $checkboxes) {
+            $(checkbox).prop('checked', this.selected.has(Number(checkbox.value)))
+        }
+
+        // update counter
+        this.$counter.text(this.selected.size)
+
+        // if any are selected, check the mass selection checkbox and enable the bulk action buttons
+        if (this.selected.size > 0) {
+            this.$counter.css('color', 'red')
+            this.$mass_select_checkbox.prop('checked', true)
+            this.$bulk_buttons.removeAttr('disabled');
+        } else {
+            this.$counter.css('color', 'unset')
+            this.$mass_select_checkbox.prop('checked', false)
+            this.$bulk_buttons.attr('disabled', true);
+        }
+    }
     toggle_selected(indexes, value=null) {
         // set the selected state of the given message indexes
         if (value === null) {  // no value given - toggle
@@ -1829,29 +1905,6 @@ class MemoryEditInterface {
 
         this.update_selected()
     }
-    update_selected() {
-        // Update the interface based on selected items
-
-        // check/uncheck the rows according to which are selected
-        let $checkboxes = this.$table.find(`input.interface_message_select`)
-        for (let checkbox of $checkboxes) {
-            $(checkbox).prop('checked', this.selected.has(Number(checkbox.value)))
-        }
-
-        // update counter
-        this.$counter.text(this.selected.size)
-
-        // if any are selected, check the mass selection checkbox and enable the bulk action buttons
-        if (this.selected.size > 0) {
-            this.$counter.css('color', 'red')
-            this.$mass_select_checkbox.prop('checked', true)
-            this.$bulk_buttons.removeAttr('disabled');
-        } else {
-            this.$counter.css('color', 'unset')
-            this.$mass_select_checkbox.prop('checked', false)
-            this.$bulk_buttons.attr('disabled', true);
-        }
-    }
     scroll_to_bottom() {
         // scroll to bottom of the memory edit interface
         this.$table.scrollTop(this.$table[0].scrollHeight);
@@ -1861,6 +1914,13 @@ class MemoryEditInterface {
         let text = concatenate_summaries(Array.from(this.selected));
         copyText(text)
         toastr.info("All memories copied to clipboard.")
+    }
+    save_settings() {
+        this.settings.global_selection = this.$global_selection_checkbox.is(':checked')
+        for (let [id, data] of Object.entries(this.filter_bar)) {
+            this.settings[id] = data.filtered()
+        }
+        set_settings('memory_edit_interface_settings', this.settings)
     }
 }
 
@@ -2989,7 +3049,7 @@ function initialize_message_buttons() {
     $chat.on("click", `.${edit_button_class}`, async function () {
         const message_block = $(this).closest(".mes");
         const message_id = Number(message_block.attr("mesid"));
-        await edit_memory(message_id);
+        await open_edit_memory_input(message_id);
     });
 
     // when a message is hidden/unhidden, trigger a memory refresh
