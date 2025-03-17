@@ -2947,8 +2947,8 @@ async function auto_summarize_chat() {
             continue
         }
 
-        // Check depth limit
-        if (depth >= depth_limit + lag) {
+        // Check depth limit (only applies if at least 1)
+        if (depth_limit > 0 && depth >= depth_limit + lag) {
             break;
         }
 
