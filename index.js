@@ -19,7 +19,8 @@ import {
     setExtensionPrompt,
     streamingProcessor,
     stopGeneration,
-    callPopup
+    callPopup,
+    main_api
 } from '../../../../script.js';
 import { formatInstructModeChat } from '../../../instruct-mode.js';
 import { Popup, POPUP_TYPE } from '../../../popup.js';
@@ -1546,6 +1547,11 @@ async function summarize_text(prompt) {
         error(`Text ${token_size} exceeds context size ${context_size}.`);
     }
 
+    let system_prompt = false
+    if (main_api === 'openai') {
+        system_prompt = "Complete the requested task."
+    }
+
     // TODO do the world info injection manually instead
     let include_world_info = get_settings('include_world_info');
     if (include_world_info) {
@@ -1559,7 +1565,7 @@ async function summarize_text(prompt) {
          * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
          * @returns
          */
-        return await generateQuietPrompt(prompt, false, false, '', "assistant", get_settings('summary_maximum_length'));
+        return await generateQuietPrompt(prompt, false, false, system_prompt, "assistant", get_settings('summary_maximum_length'));
     } else {
         /**
          * Generates a message using the provided prompt.
@@ -1571,7 +1577,7 @@ async function summarize_text(prompt) {
          * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
          * @returns {Promise<string>} Generated message
          */
-        return await generateRaw(prompt, '', true, false, '', get_settings('summary_maximum_length'));
+        return await generateRaw(prompt, '', true, false, system_prompt, get_settings('summary_maximum_length'));
     }
 }
 function get_message_history(index) {
