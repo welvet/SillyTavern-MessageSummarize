@@ -13,6 +13,7 @@ import {
     amount_gen,
     system_message_types,
     CONNECT_API_MAP,
+    main_api
 } from '../../../../script.js';
 import { getPresetManager } from '../../../preset-manager.js'
 import { formatInstructModeChat } from '../../../instruct-mode.js';
@@ -2673,6 +2674,15 @@ async function summarize_text(prompt) {
 
     let ctx = getContext()
 
+    // At least one openai-style API required at least two messages to be sent.
+    // We can do this by adding a system prompt, which will get added as another message in generateRaw().
+    // A hack obviously. Is this a standard requirement for openai-style chat completion?
+    // TODO update with a more robust method
+    let system_prompt = false
+    if (main_api === 'openai') {
+        system_prompt = "Complete the requested task."
+    }
+
     // TODO do the world info injection manually instead
     let include_world_info = get_settings('include_world_info');
     let result;
@@ -2687,7 +2697,7 @@ async function summarize_text(prompt) {
          * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
          * @returns
          */
-        result = await ctx.generateQuietPrompt(prompt, false, false, '', "assistant");
+        result = await ctx.generateQuietPrompt(prompt, false, false, system_prompt, "assistant");
     } else {
         /**
          * Generates a message using the provided prompt.
@@ -2699,7 +2709,7 @@ async function summarize_text(prompt) {
          * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
          * @returns {Promise<string>} Generated message
          */
-        result = await generateRaw(prompt, '', false, false, '');
+        result = await generateRaw(prompt, '', false, false, system_prompt);
     }
 
     // trim incomplete sentences if set in ST power user settings
