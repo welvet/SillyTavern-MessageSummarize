@@ -1785,8 +1785,8 @@ class MemoryEditInterface {
         })
         this.$content.on("click", `tr .${summarize_button_class}`, async function () {
             let message_id = Number($(this).closest('tr').attr('message_id'));  // get the message ID from the row's "message_id" attribute
-            await summarize_message(message_id);  // summarize the message, replacing the existing summary
-            self.update_table()
+            await summarize_messages(message_id);
+            self.update_table();
         });
     }
 
@@ -1838,9 +1838,7 @@ class MemoryEditInterface {
         // Update the content of the interface
 
         // if the interface isn't open, do nothing
-        if (!this.is_open()) {
-            return
-        }
+        if (!this.is_open()) return
 
         // Update the content of the memory state interface, rendering the given indexes
         refresh_memory()  // make sure current memory state is up to date
@@ -2017,6 +2015,8 @@ class MemoryEditInterface {
     }
     update_message_visuals(i, $previous_row=null, style=true, text=null) {
         // Update the visuals of a single row
+        if (!this.is_open()) return
+
         let msg = this.ctx.chat[i];
         let memory = text ?? get_memory(msg)
         let error = get_data(msg, 'error') || ""
@@ -2529,12 +2529,16 @@ globalThis.memory_intercept_messages = function (chat, _contextSize, _abort, typ
 
 
 // Summarization
-async function summarize_messages(indexes, show_progress=true) {
-    // Summarize the given list of message indexes
-    if (!indexes.length) {
-        return;
-    }
+async function summarize_messages(indexes=null, show_progress=true) {
+    // Summarize the given list of message indexes (or a single index)
     let ctx = getContext();
+
+    if (indexes === null) {  // default to the mose recent message, min 0
+        indexes = [Math.max(chat.length - 1, 0)]
+    }
+    indexes = Array.isArray(indexes) ? indexes : [indexes]  // cast to array if only one given
+    if (!indexes.length) return;
+
     debug(`Summarizing ${indexes.length} messages`)
 
      // only show progress if there's more than one message to summarize
@@ -2547,6 +2551,18 @@ async function summarize_messages(indexes, show_progress=true) {
     if (get_settings('block_chat')) {
         ctx.deactivateSendButtons();
     }
+
+    // Save the current completion preset (must happen before you set the connection profile because it changes the preset)
+    let summary_preset = get_settings('completion_preset');
+    let current_preset = await get_current_preset();
+
+    // Get the current connection profile
+    let summary_profile = get_settings('connection_profile');
+    let current_profile = await get_current_connection_profile()
+
+    // set the completion preset and connection profile for summarization (preset must be set after connection profile)
+    await set_connection_profile(summary_profile);
+    await set_preset(summary_preset);
 
     let n = 0;
     for (let i of indexes) {
@@ -2581,8 +2597,13 @@ async function summarize_messages(indexes, show_progress=true) {
         n += 1;
     }
 
-    if (show_progress) remove_progress_bar('summarize')  // remove the progress bar
 
+    // restore the completion preset and connection profile
+    await set_connection_profile(current_profile);
+    await set_preset(current_preset);
+
+    // remove the progress bar
+    if (show_progress) remove_progress_bar('summarize')
 
     if (STOP_SUMMARIZATION) {  // check if summarization was stopped
         STOP_SUMMARIZATION = false  // reset the flag
@@ -2598,15 +2619,12 @@ async function summarize_messages(indexes, show_progress=true) {
     // Update the memory state interface if it's open
     memoryEditInterface.update_table()
 }
-async function summarize_message(index=null) {
-    // summarize a message given the chat index, replacing any existing memories
+async function summarize_message(index) {
+    // Summarize a message given the chat index, replacing any existing memories
+    // Should only be used from summarize_messages()
 
     let context = getContext();
-    let chat = context.chat;
-
-    // Default to the last message, min 0
-    index = Math.max(index ?? chat.length - 1, 0)
-    let message = chat[index]
+    let message = context.chat[index]
     let message_hash = getStringHash(message.mes);
 
     // clear the reasoning early to avoid showing it when summarizing
@@ -2617,22 +2635,10 @@ async function summarize_message(index=null) {
     update_message_visuals(index, false, "Summarizing...")
     memoryEditInterface.update_message_visuals(index, null, false, "Summarizing...")
 
-    // If the most recent message, scroll to the bottom
+    // If the most recent message, scroll to the bottom to get the summary in view.
     if (index === chat.length - 1) {
         scrollChatToBottom();
     }
-
-    // Save the current completion preset (must happen before you set the connection profile because it changes the preset)
-    let summary_preset = get_settings('completion_preset');
-    let current_preset = await get_current_preset();
-
-    // Get the current connection profile
-    let summary_profile = get_settings('connection_profile');
-    let current_profile = await get_current_connection_profile()
-
-    // set the completion preset and connection profile for summarization (preset must be set after connection profile)
-    await set_connection_profile(summary_profile);
-    await set_preset(summary_preset);
 
     // construct the full summary prompt for the message
     let prompt = await create_summary_prompt(index)
@@ -2651,10 +2657,6 @@ async function summarize_message(index=null) {
         }
         summary = null
     }
-
-    // restore the completion preset and connection profile
-    await set_connection_profile(current_profile);
-    await set_preset(current_preset);
 
     if (summary) {
         debug("Message summarized: " + summary)
@@ -2956,12 +2958,10 @@ function stop_summarization() {
     if (SUMMARIZATION_DELAY_RESOLVE !== null) SUMMARIZATION_DELAY_RESOLVE()  // resolve the delay promise so the await goes through
     log("Aborted summarization.")
 }
-async function auto_summarize_chat() {
-    // Perform automatic summarization on the chat
-    log('Auto-Summarizing chat...')
+function collect_messages_to_auto_summarize() {
+    // iterate through the chat in chronological order and check which messages need to be summarized.
     let context = getContext();
 
-    // iterate through the chat in chronological order and check which messages need to be summarized.
     let messages_to_summarize = []  // list of indexes of messages to summarize
     let depth_limit = get_settings('auto_summarize_message_limit')  // how many valid messages back we can go
     let lag = get_settings('summarization_delay');  // number of messages to delay summarization for
@@ -2997,6 +2997,12 @@ async function auto_summarize_chat() {
         messages_to_summarize.push(i)
     }
     debug(`Messages to summarize (${messages_to_summarize.length}): ${messages_to_summarize}`)
+    return messages_to_summarize.reverse()  // reverse for chronological order
+}
+async function auto_summarize_chat() {
+    // Perform automatic summarization on the chat
+    log('Auto-Summarizing chat...')
+    let messages_to_summarize = collect_messages_to_auto_summarize()
 
     // If we don't have enough messages to batch, don't summarize
     let messages_to_batch = get_settings('auto_summarize_batch_size');  // number of messages to summarize in a batch
@@ -3006,11 +3012,6 @@ async function auto_summarize_chat() {
     }
 
     let show_progress = get_settings('auto_summarize_progress');
-
-    // reverse the list so the messages are in chronological order
-    messages_to_summarize.reverse()
-
-    // summarize the messages
     await summarize_messages(messages_to_summarize, show_progress);
 }
 
@@ -3074,7 +3075,7 @@ async function on_chat_event(event=null, data=null) {
                 if (!check_message_exclusion(message)) break;  // if the message is excluded, skip
                 if (!get_previous_swipe_memory(message, 'memory')) break;  // if the previous swipe doesn't have a memory, skip
                 debug("re-summarizing on swipe")
-                await summarize_message(index);  // summarize the swiped message
+                await summarize_messages(index);  // summarize the swiped message
                 refresh_memory()
                 break;
             } else { // not a swipe
@@ -3093,7 +3094,7 @@ async function on_chat_event(event=null, data=null) {
             if (!check_message_exclusion(context.chat[index])) break;  // if the message is excluded, skip
             if (!get_data(context.chat[index], 'memory')) break;  // if the message doesn't have a memory, skip
             debug("Message with memory edited, summarizing")
-            summarize_message(index);  // summarize that message (no await so the message edit goes through)
+            summarize_messages(index);  // summarize that message (no await so the message edit goes through)
 
             // TODO: I'd like to be able to refresh the memory here, but we can't await the summarization because
             //  then the message edit textbox doesn't close until the summary is done.
@@ -3278,7 +3279,7 @@ function initialize_message_buttons() {
     $chat.on("click", `.${summarize_button_class}`, async function () {
         const message_block = $(this).closest(".mes");
         const message_id = Number(message_block.attr("mesid"));
-        await summarize_message(message_id);  // summarize the message, replacing the existing summary
+        await summarize_messages(message_id);  // summarize the message
         refresh_memory();
     });
     $chat.on("click", `.${edit_button_class}`, async function () {
@@ -3470,29 +3471,18 @@ function initialize_slash_commands() {
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'summarize_chat',
+        helpString: 'Summarize the chat using the auto-summarization criteria, even if auto-summarization is off.',
         callback: async (args, limit) => {
-            if (!limit) {
-                limit = get_settings('auto_summarize_message_limit')
-            }
-
-            let indexes = collect_chat_messages(true, false, false, true, false, false, limit);
+            let indexes = collect_messages_to_auto_summarize()
             await summarize_messages(indexes);
         },
-        helpString: 'Summarize the chat using the auto-summarization exclusion criteria.',
-        unnamedArgumentList: [
-            SlashCommandArgument.fromProps({
-                description: 'Limit the number of messages to summarize. Defaults to "Auto-Summarize Message limit"',
-                isRequired: false,
-                typeList: ARGUMENT_TYPE.NUMBER,
-            }),
-        ]
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'summarize',
         callback: async (args, index) => {
             if (index === "") index = null  // if not provided the index is an empty string, but we need it to be null to get the default behavior
-            await summarize_message(index);  // summarize the message, replacing the existing summary
+            await summarize_messages(index);  // summarize the message
             refresh_memory();
         },
         helpString: 'Summarize the given message index (defaults to most recent applicable message)',
