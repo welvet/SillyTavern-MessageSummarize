@@ -1,6 +1,6 @@
 # Changelog
 
-#### v0.8.7
+#### v0.8.16
 - **IMPORTANT #1:** The number of tokens used for your summaries will be broken and you will need to update your config.
 
 - **IMPORTANT #2:** You must be on ST version 1.12.13 or above as it relies on the following PRs: 
