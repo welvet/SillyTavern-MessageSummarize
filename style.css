@@ -106,7 +106,7 @@ By default, text is greyed to indicate that is it not injected.
 }
 
 /* the progress bar, mimicking the width of the main chat area */
-.qvink_progress_bar {
+#sheld .qvink_progress_bar {
     top: var(--topBarBlockSize);
     width: var(--sheldWidth);
     position: fixed;
@@ -114,6 +114,16 @@ By default, text is greyed to indicate that is it not injected.
     padding: 5px;
     background-color: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(5px);
+}
+
+/* the progres bar when placed in the memory edit interface */
+#qvink_memory_state_interface #progress_bar .qvink_progress_bar {
+    width: 100%;
+    position: absolute;
+    bottom: 0;
+}
+#qvink_memory_state_interface #progress_bar {
+    position: relative;
 }
 
 /* in the group member selection, the buttons that toggle summarization */
