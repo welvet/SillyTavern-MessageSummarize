@@ -2645,6 +2645,11 @@ async function summarize_message(index=null) {
     if (summary) {
         debug("Message summarized: " + summary)
 
+        // TODO: This is a temporary fix for a bug before ST release gets the fix currently on staging
+        if (power_user.user_prompt_bias?.length > 0) {
+            summary = summary.slice(power_user.user_prompt_bias.length)
+        }
+
         // stick the prefill on the front and try to parse reasoning
         let prefill = get_settings('prefill')
         let prefilled_summary = summary
