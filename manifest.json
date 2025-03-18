@@ -6,7 +6,7 @@
     "js": "index.js",
     "css": "style.css",
     "author": "qvink",
-    "version": "0.8.18",
+    "version": "0.8.19",
     "homePage": "https://github.com/qvink/qvink_memory.git",
     "generate_interceptor": "memory_intercept_messages"
 }

@@ -1786,7 +1786,6 @@ class MemoryEditInterface {
         this.$content.on("click", `tr .${summarize_button_class}`, async function () {
             let message_id = Number($(this).closest('tr').attr('message_id'));  // get the message ID from the row's "message_id" attribute
             await summarize_messages(message_id);
-            self.update_table();
         });
     }
 
@@ -1815,7 +1814,6 @@ class MemoryEditInterface {
             this.scroll_to_bottom()
         }
 
-        //this.scroll_to_bottom()
         await result  // wait for user to close
     }
 
@@ -2614,6 +2612,7 @@ async function summarize_messages(indexes=null, show_progress=true) {
     if (get_settings('block_chat')) {
         ctx.activateSendButtons();
     }
+
     refresh_memory()
 
     // Update the memory state interface if it's open
@@ -3280,7 +3279,6 @@ function initialize_message_buttons() {
         const message_block = $(this).closest(".mes");
         const message_id = Number(message_block.attr("mesid"));
         await summarize_messages(message_id);  // summarize the message
-        refresh_memory();
     });
     $chat.on("click", `.${edit_button_class}`, async function () {
         const message_block = $(this).closest(".mes");
