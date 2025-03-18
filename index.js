@@ -1804,6 +1804,10 @@ class MemoryEditInterface {
             this.style.height = this.scrollHeight + "px";
         })
 
+        if (this.settings.reverse_page_sort) {
+            this.scroll_to_bottom()
+        }
+
         //this.scroll_to_bottom()
         await result  // wait for user to close
     }
@@ -1910,10 +1914,6 @@ class MemoryEditInterface {
             $previous_row = $row
         }
 
-        if (this.settings.reverse_page_sort) {
-            this.scroll_to_bottom()
-        }
-
         this.update_selected()
     }
     update_filters() {
@@ -1968,6 +1968,10 @@ class MemoryEditInterface {
                 this.update_table()
             }
         })
+
+        if (this.settings.reverse_page_sort) {
+            this.scroll_to_bottom()
+        }
     }
     update_selected() {
         // Update the interface based on selected items
