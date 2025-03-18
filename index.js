@@ -1299,9 +1299,9 @@ function get_message_div(index) {
     return div;
 }
 function get_summary_style_class(message) {
-    let include = get_memory(message, 'include');
-    let remember = get_memory(message, 'remember');
-    let exclude = get_memory(message, 'exclude');  // force-excluded by user
+    let include = get_data(message, 'include');
+    let remember = get_data(message, 'remember');
+    let exclude = get_data(message, 'exclude');  // force-excluded by user
 
     if (remember && include) {  // marked to be remembered and included in memory anywhere
         return  css_long_memory
@@ -1334,9 +1334,9 @@ function update_message_visuals(i, style=true, text=null) {
 
     let chat = getContext().chat;
     let message = chat[i];
-    let memory = get_memory(message, 'memory');
-    let error_message = get_memory(message, 'error');
-    let reasoning = get_memory(message, 'reasoning');
+    let error_message = get_data(message, 'error');
+    let reasoning = get_data(message, 'reasoning')
+    let memory = get_memory(message)
 
     // get the div holding the main message text
     let message_element = div_element.find('div.mes_text');
@@ -1350,7 +1350,7 @@ function update_message_visuals(i, style=true, text=null) {
     if (!text) {
         text = ""  // default text when no memory
         if (memory) {
-            text = `Memory: ${memory}`
+            text = clean_string_for_title(`Memory: ${memory}`)
         } else if (error_message) {
             style_class = ''  // clear the style class if there's an error
             text = `Error: ${error_message}`
@@ -1381,7 +1381,8 @@ function update_all_message_visuals() {
 function open_edit_memory_input(index) {
     // Allow the user to edit a message summary
     let message = getContext().chat[index];
-    let memory = get_memory(message, 'memory')?.trim() ?? '';  // get the current memory text
+    let memory = get_memory(message)
+    memory = memory?.trim() ?? '';  // get the current memory text
 
     let $message_div = get_message_div(index);  // top level div for this message
     let $message_text_div = $message_div.find('.mes_text')  // holds message text
@@ -1423,22 +1424,6 @@ function open_edit_memory_input(index) {
             cancel_edit();
         }
     })
-}
-function edit_memory(message, text) {
-    // edit the text of a memory
-    let current_text = get_memory(message, 'memory')
-    if (text === current_text) return;  // no change
-    store_memory(message, "memory", text);
-    store_memory(message, "error", null)  // remove any errors
-    store_memory(message, "reasoning", null)  // remove any reasoning
-    store_memory(message, "edited", Boolean(text))  // mark as edited if not deleted
-
-    // deleting or adding text to a deleted memory, remove some other flags
-    if (!text || !current_text) {
-        store_memory(message, "exclude", false)
-    }
-
-    debug(`Edited memory`);
 }
 function display_injection_preview() {
     let text = refresh_memory()
@@ -1544,35 +1529,35 @@ class MemoryEditInterface {
         "short_term": {
             "title": "Summaries currently in short-term memory",
             "display": "Short-Term",
-            "check": (msg) => get_memory(msg, 'include') === "short",
+            "check": (msg) => get_data(msg, 'include') === "short",
             "default": true,
             "count": 0
         },
         "long_term": {
             "title": "Summaries marked for long-term memory, even if they are currently in short-term memory or out of context",
             "display": "Long-Term",
-            "check": (msg) => get_memory(msg, 'remember'),
+            "check": (msg) => get_data(msg, 'remember'),
             "default": true,
             "count": 0
         },
         "excluded": {
             "title": "Summaries not in short-term or long-term memory",
             "display": "Forgot",
-            "check": (msg) => !get_memory(msg, 'include') && get_memory(msg, 'memory'),
+            "check": (msg) => !get_data(msg, 'include') && get_data(msg, 'memory'),
             "default": false,
             "count": 0
         },
         "force_excluded": {
             "title": "Summaries that have been manually excluded from memory",
             "display": "Excluded",
-            "check":  (msg) => get_memory(msg, 'exclude'),
+            "check":  (msg) => get_data(msg, 'exclude'),
             "default": false,
             "count": 0
         },
         "edited": {
             "title": "Summaries that have been manually edited",
             "display": "Edited",
-            "check": (msg) => get_memory(msg, 'edited'),
+            "check": (msg) => get_data(msg, 'edited'),
             "default": false,
             "count": 0
         },
@@ -1586,14 +1571,14 @@ class MemoryEditInterface {
         "no_summary": {
             "title": "Messages without a summary",
             "display": "No Summary",
-            "check": (msg) => !get_memory(msg, 'memory'),
+            "check": (msg) => !get_data(msg, 'memory'),
             "default": false,
             "count": 0
         },
         "errors": {
             "title": "Summaries that failed during generation",
             "display": "Errors",
-            "check": (msg) => get_memory(msg, 'error'),
+            "check": (msg) => get_data(msg, 'error'),
             "default": false,
             "count": 0
         },
@@ -1755,8 +1740,8 @@ class MemoryEditInterface {
         })
         this.$content.find(`#bulk_delete`).on('click', () => {
             this.selected.forEach(id => {
-                log("DELETING: " + id)
-                store_memory(this.ctx.chat[id], 'memory', null);
+                debug("DELETING: " + id)
+                clear_memory(this.ctx.chat[id])
             })
             this.update_table()
         })
@@ -1856,9 +1841,9 @@ class MemoryEditInterface {
         let $previous_row;
         for (let i of this.displayed) {
             let msg = this.ctx.chat[i];
-            let memory = get_memory(msg, 'memory') || ""
-            let error = get_memory(msg, 'error') || ""
-            let edited = get_memory(msg, 'edited')
+            let memory = get_memory(msg)
+            let error = get_data(msg, 'error') || ""
+            let edited = get_data(msg, 'edited')
             let row_id = `memory_${i}`
 
             // check if a row already exists for this memory
@@ -2049,9 +2034,9 @@ class MemoryEditInterface {
             log(`Running regex script \"${script_name}\" on selected memories`)
             for (let i of this.selected) {
                 let message = this.ctx.chat[i]
-                let text = get_memory(message, 'memory')
-                let new_text = runRegexScript(script, text)
-                store_memory(message, 'memory', new_text)
+                let memory = get_memory(message)
+                let new_text = runRegexScript(script, memory)
+                edit_memory(message, new_text)
             }
             this.update_table()
         })
@@ -2107,7 +2092,7 @@ class MemoryEditInterface {
 
 
 // Message functions
-function store_memory(message, key, value) {
+function set_data(message, key, value) {
     // store information on the message object
     if (!message.extra) {
         message.extra = {};
@@ -2129,9 +2114,47 @@ function store_memory(message, key, value) {
 
     saveChatDebounced();
 }
-function get_memory(message, key) {
+function get_data(message, key) {
     // get information from the message object
     return message?.extra?.[MODULE_NAME]?.[key];
+}
+function get_memory(message) {
+    // returns the memory (and reasoning, if present) properly prepended with the prefill (if present)
+    let memory = get_data(message, 'memory') ?? ""
+    let prefill = get_data(message, 'prefill') ?? ""
+
+    // prepend the prefill to the memory if needed
+    if (get_settings('show_prefill')) {
+        memory = `${prefill}${memory}`
+    }
+    return memory
+}
+function edit_memory(message, text) {
+    // perform a manual edit of the memory text
+
+    let current_text = get_memory(message)
+    if (text === current_text) return;  // no change
+    set_data(message, "memory", text);
+    set_data(message, "error", null)  // remove any errors
+    set_data(message, "reasoning", null)  // remove any reasoning
+    set_data(message, "prefill", null)  // remove any prefill
+    set_data(message, "edited", Boolean(text))  // mark as edited if not deleted
+
+    // deleting or adding text to a deleted memory, remove some other flags
+    if (!text || !current_text) {
+        set_data(message, "exclude", false)
+        set_data(message, "remember", false)
+    }
+}
+function clear_memory(message) {
+    // clear the memory from a message
+    set_data(message, "memory", null);
+    set_data(message, "error", null)  // remove any errors
+    set_data(message, "reasoning", null)  // remove any reasoning
+    set_data(message, "prefill", null)  // remove any prefill
+    set_data(message, "edited", false)
+    set_data(message, "exclude", false)
+    set_data(message, "remember", false)
 }
 function toggle_memory_value(indexes, value, check_value, set_value) {
     // For each message index, call set_value(index, value) function on each.
@@ -2181,10 +2204,10 @@ async function remember_message_toggle(indexes=null, value=null) {
 
     function set(index, value) {
         let message = context.chat[index]
-        store_memory(message, 'remember', value);
-        store_memory(message, 'exclude', false);  // regardless, remove excluded flag
+        set_data(message, 'remember', value);
+        set_data(message, 'exclude', false);  // regardless, remove excluded flag
 
-        let memory = get_memory(message, 'memory')
+        let memory = get_data(message, 'memory')
         if (value && !memory) {
             summarize.push()
         }
@@ -2192,7 +2215,7 @@ async function remember_message_toggle(indexes=null, value=null) {
     }
 
     function check(index) {
-        return get_memory(context.chat[index], 'remember')
+        return get_data(context.chat[index], 'remember')
     }
 
     toggle_memory_value(indexes, value, check, set)
@@ -2215,13 +2238,13 @@ function forget_message_toggle(indexes=null, value=null) {
 
     function set(index, value) {
         let message = context.chat[index]
-        store_memory(message, 'exclude', value);
-        store_memory(message, 'remember', false);  // regardless, remove excluded flag
+        set_data(message, 'exclude', value);
+        set_data(message, 'remember', false);  // regardless, remove excluded flag
         debug(`Set message ${index} exclude status: ${value}`);
     }
 
     function check(index) {
-        return get_memory(context.chat[index], 'exclude')
+        return get_data(context.chat[index], 'exclude')
     }
 
     toggle_memory_value(indexes, value, check, set)
@@ -2240,17 +2263,17 @@ function check_message_exclusion(message) {
     if (!message) return false;
 
     // system messages sent by this extension are always ignored
-    if (get_memory(message, 'is_qvink_system_memory')) {
+    if (get_data(message, 'is_qvink_system_memory')) {
         return false;
     }
 
     // first check if it has been marked to be remembered by the user - if so, it bypasses all other exclusion criteria
-    if (get_memory(message, 'remember')) {
+    if (get_data(message, 'remember')) {
         return true;
     }
 
     // check if it's marked to be excluded - if so, exclude it
-    if (get_memory(message, 'exclude')) {
+    if (get_data(message, 'exclude')) {
         return false;
     }
 
@@ -2298,13 +2321,13 @@ function check_message_conditional(message, no_summary=true, short=true, long=tr
     }
 
     // if we don't want messages without a summary and this message doesn't have a summary, skip it
-    let existing_memory = get_memory(message, 'memory');
+    let existing_memory = get_data(message, 'memory');
     if (!no_summary && !existing_memory) {
         return false
     }
 
     // if we don't want messages with short-term memories and this message has one, skip it
-    let include_type = get_memory(message, 'include');
+    let include_type = get_data(message, 'include');
     if (!short && include_type === "short" && existing_memory) {
         return
     }
@@ -2314,12 +2337,12 @@ function check_message_conditional(message, no_summary=true, short=true, long=tr
     }
 
     // if we don't want messages with edited memories and this memory has been edited, skip it
-    if (!edited && get_memory(message, 'edited') && existing_memory) {
+    if (!edited && get_data(message, 'edited') && existing_memory) {
         return
     }
 
     // if we don't want messages with memories that are marked to remember, skip it
-    if (!remember && get_memory(message, 'remember') && existing_memory) {
+    if (!remember && get_data(message, 'remember') && existing_memory) {
         return
     }
 
@@ -2351,13 +2374,14 @@ function update_message_inclusion_flags() {
         // check for any of the exclusion criteria
         let include = check_message_exclusion(message)
         if (!include) {
-            store_memory(message, 'include', null);
+            set_data(message, 'include', null);
             continue;
         }
 
         if (!short_limit_reached) {  // short-term limit hasn't been reached yet
-            if (!get_memory(message, 'memory')) {  // If it doesn't have a memory, mark it as excluded and move to the next
-                store_memory(message, 'include', null)
+            let memory = get_memory(message)
+            if (!memory) {  // If it doesn't have a memory, mark it as excluded and move to the next
+                set_data(message, 'include', null)
                 continue
             }
 
@@ -2368,28 +2392,28 @@ function update_message_inclusion_flags() {
                 long_term_end_index = i;  // this is where long-term memory ends and short-term begins
                 summary = ""  // reset summary
             } else {  // under context limit
-                store_memory(message, 'include', 'short');
+                set_data(message, 'include', 'short');
                 summary = new_summary
                 continue
             }
         }
 
         // if the short-term limit has been reached, check the long-term limit
-        let remember = get_memory(message, 'remember');
+        let remember = get_data(message, 'remember');
         if (!long_limit_reached && remember) {  // long-term limit hasn't been reached yet and the message was marked to be remembered
             new_summary = concatenate_summary(summary, message)  // concatenate this summary
             let long_token_size = count_tokens(new_summary);
             if (long_token_size > get_long_token_limit()) {  // over context limit
                 long_limit_reached = true;
             } else {
-                store_memory(message, 'include', 'long');  // mark the message as long-term
+                set_data(message, 'include', 'long');  // mark the message as long-term
                 summary = new_summary
                 continue
             }
         }
 
         // if we haven't marked it for inclusion yet, mark it as excluded
-        store_memory(message, 'include', null);
+        set_data(message, 'include', null);
     }
 
     update_all_message_visuals()
@@ -2418,12 +2442,12 @@ function collect_chat_messages(no_summary=false, short=false, long=false, rememb
 }
 function concatenate_summary(existing_text, message) {
     // given an existing text of concatenated summaries, concatenate the next one onto it
-    let summary = get_memory(message, 'memory');
-    if (!summary) {  // if there's no summary, do nothing
+    let memory = get_memory(message)
+    if (!memory) {  // if there's no summary, do nothing
         return existing_text
     }
     let separator = get_settings('summary_injection_separator')
-    return existing_text + separator + summary
+    return existing_text + separator + memory
 }
 function concatenate_summaries(indexes) {
     // concatenate the summaries of the messages with the given indexes
@@ -2567,6 +2591,9 @@ async function summarize_message(index=null) {
     let message = chat[index]
     let message_hash = getStringHash(message.mes);
 
+    // clear the reasoning early to avoid showing it when summarizing
+    set_data(message, 'reasoning', "")
+
     // Temporarily update the message summary text to indicate that it's being summarized (no styling based on inclusion criteria)
     // A full visual update with style should be done on the whole chat after inclusion criteria have been recalculated
     update_message_visuals(index, false, "Summarizing...")
@@ -2575,11 +2602,6 @@ async function summarize_message(index=null) {
     if (index === chat.length - 1) {
         scrollChatToBottom();
     }
-
-    // summary prefill
-    let current_prefill = context.powerUserSettings.user_prompt_bias
-    let summary_prefill = get_settings('prefill')
-    context.powerUserSettings.user_prompt_bias = summary_prefill
 
     // Save the current completion preset (must happen before you set the connection profile because it changes the preset)
     let summary_preset = get_settings('completion_preset');
@@ -2615,38 +2637,41 @@ async function summarize_message(index=null) {
     await set_connection_profile(current_profile);
     await set_preset(current_preset);
 
-    // restore the prompt prefill
-    context.powerUserSettings.user_prompt_bias = current_prefill
-
     if (summary) {
         debug("Message summarized: " + summary)
 
-        // optionally remove the prefill from the summary
-        if (!get_settings('show_prefill')) {
-            summary = summary.slice(summary_prefill.length);
+        // stick the prefill on the front and try to parse reasoning
+        let prefill = get_settings('prefill')
+        let prefilled_summary = summary
+        if (prefill) {
+            prefilled_summary = `${prefill}${summary}`
         }
 
-        // parse reasoning section and remove it, if applicable
-        let parsed_reasoning_object = context.parseReasoningFromString(summary)
-        let reasoning;
-        if (parsed_reasoning_object !== null) {
-            reasoning = parsed_reasoning_object.reasoning
-            summary = parsed_reasoning_object.content
-        } else {
-            reasoning = ""
+        let parsed_reasoning_object = context.parseReasoningFromString(prefilled_summary)
+        let reasoning = "";
+        if (parsed_reasoning_object?.reasoning) {
+            debug("Reasoning parsed: ")
+            debug(parsed_reasoning_object)
+            reasoning = parsed_reasoning_object.reasoning  // reasoning with prefill
+            summary = parsed_reasoning_object.content  // summary (no prefill)
         }
 
-        store_memory(message, 'memory', summary);
-        store_memory(message, 'hash', message_hash);  // store the hash of the message that we just summarized
-        store_memory(message, 'error', null);  // clear the error message
-        store_memory(message, 'edited', false);  // clear the error message
-        store_memory(message, 'reasoning', reasoning)
+        // The summary that is stored is WITHOUT the prefill, regardless of whether there was reasoning.
+        // If there is reasoning, it will be stored with the prefill and the prefill will be empty
+
+        set_data(message, 'memory', summary);
+        set_data(message, 'hash', message_hash);  // store the hash of the message that we just summarized
+        set_data(message, 'error', null);  // clear the error message
+        set_data(message, 'edited', false);  // clear the error message
+        set_data(message, 'prefill', reasoning ? "" : get_settings('prefill'))  // store prefill if there was no reasoning.
+        set_data(message, 'reasoning', reasoning)
     } else {  // generation failed
         error(`Failed to summarize message ${index} - generation failed.`);
-        store_memory(message, 'error', err || "Summarization failed");  // store the error message
-        store_memory(message, 'memory', null);  // clear the memory if generation failed
-        store_memory(message, 'edited', false);  // clear the error message
-        store_memory(message, 'reasoning', null)
+        set_data(message, 'error', err || "Summarization failed");  // store the error message
+        set_data(message, 'memory', null);  // clear the memory if generation failed
+        set_data(message, 'edited', false);  // clear the error message
+        set_data(message, 'prefill', null)
+        set_data(message, 'reasoning', null)
     }
 
     // update the message summary text again now with the memory, still no styling
@@ -2694,7 +2719,7 @@ async function summarize_text(prompt) {
          * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
          * @returns
          */
-        result = await ctx.generateQuietPrompt(prompt, false, false, system_prompt, "assistant");
+        result = await ctx.generateQuietPrompt(prompt, true, false, system_prompt, "assistant");
     } else {
         /**
          * Generates a message using the provided prompt.
@@ -2706,7 +2731,7 @@ async function summarize_text(prompt) {
          * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
          * @returns {Promise<string>} Generated message
          */
-        result = await generateRaw(prompt, '', false, false, system_prompt);
+        result = await generateRaw(prompt, '', true, false, system_prompt);
     }
 
     // trim incomplete sentences if set in ST settings
@@ -2752,10 +2777,10 @@ function get_message_history(index) {
             // Whether we include the *summary* is determined by the regular summary inclusion criteria.
             // This is so the inclusion matches the summary injection.
             let include_summary = check_message_exclusion(m)
-            let summary = get_memory(m, 'memory')
-            if (include_summary && summary) {
-                summary = `Summary: ${summary}`
-                history.push(formatInstructModeChat("assistant", summary, false, false, "", "", "", null))
+            let memory = get_memory(m)
+            if (include_summary && memory) {
+                memory = `Summary: ${memory}`
+                history.push(formatInstructModeChat("assistant", memory, false, false, "", "", "", null))
                 included = true
             }
         }
@@ -2775,9 +2800,9 @@ function get_message_history(index) {
     // join with newlines
     return history.join('\n')
 }
-function format_system_prompt(text) {
+function system_prompt_split(text) {
     // Given text with some number of {{macro}} items, split the text by these items and format the rest as system messages surrounding the macros
-    // It is assumed that the parts will be later replaced with appropriate text
+    // It is assumed that the macros will be later replaced with appropriate text
 
     // split on either {{...}} or {{#if ... /if}}.
     // /g flag is for global, /s flag makes . match newlines so the {{#if ... /if}} can span multiple lines
@@ -2826,7 +2851,7 @@ function substitute_params(text, params) {
     })
     return formatted.join('')
 }
-async function create_summary_prompt(index, using_instruct_override=false) {
+async function create_summary_prompt(index) {
     // create the full summary prompt for the message at the given index.
     // the instruct template will automatically add an input sequence to the beginning and an output sequence to the end.
     // Therefore, if we are NOT using instructOverride, we have to remove the first system sequence at the very beginning which gets added by format_system_prompt.
@@ -2861,24 +2886,21 @@ async function create_summary_prompt(index, using_instruct_override=false) {
         prompt = substitute_params(prompt, {"message": message_text, "history": history_text});  // substitute "message" and "history" macros
 
         // then wrap it in the system prompt (if using instructOverride)
-        if (using_instruct_override) {
-            prompt = formatInstructModeChat("", prompt, false, true, "", "", "", null)
-        }
+        prompt = formatInstructModeChat("", prompt, false, true, "", "", "", null)
     } else {  // otherwise
         // first make each prompt section its own system prompt
-        prompt = format_system_prompt(prompt)
+        prompt = system_prompt_split(prompt)
 
         // now substitute the custom macros
         prompt = substitute_params(prompt, {"message": message_text, "history": history_text});  // substitute "message" and "history" macros
     }
+
     // If using instructOverride, append the assistant starting message template to the text, replacing the name with "assistant" if needed
-    if (using_instruct_override) {
-        let output_sequence = ctx.substituteParamsExtended(power_user.instruct.output_sequence, {name: "assistant"});
-        prompt = `${prompt}\n${output_sequence}`
-    } else {    // remove system starting sequence if NOT using instructOverride, because the instruct template will add it
-        let start_sequence = power_user.instruct.system_sequence
-        prompt = prompt.slice(start_sequence.length)
-    }
+    let output_sequence = ctx.substituteParamsExtended(power_user.instruct.output_sequence, {name: "assistant"});
+    prompt = `${prompt}\n${output_sequence}`
+
+    // finally, append the prefill
+    prompt = `${prompt} ${get_settings('prefill')}`
 
     return prompt
 }
@@ -2950,7 +2972,7 @@ async function auto_summarize_chat() {
         }
 
         // skip messages that already have a summary
-        if (get_memory(message, 'memory')) {
+        if (get_data(message, 'memory')) {
             continue;
         }
 
@@ -3052,7 +3074,7 @@ async function on_chat_event(event=null, data=null) {
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
             if (!get_settings('auto_summarize_on_edit')) break;  // if auto-summarize on edit is disabled, skip
             if (!check_message_exclusion(context.chat[index])) break;  // if the message is excluded, skip
-            if (!get_memory(context.chat[index], 'memory')) break;  // if the message doesn't have a memory, skip
+            if (!get_data(context.chat[index], 'memory')) break;  // if the message doesn't have a memory, skip
             debug("Message with memory edited, summarizing")
             summarize_message(index);  // summarize that message (no await so the message edit goes through)
 
@@ -3070,7 +3092,7 @@ async function on_chat_event(event=null, data=null) {
             //  i.e. when the swipe ID is EQUAL to the length of the swipes array, not when it's length-1.
             let message = context.chat[index];
             if (message.swipe_id === message.swipes.length) {
-                store_memory(message, 'memory', null);
+                clear_memory(message)
             }
 
             refresh_memory()
@@ -3480,7 +3502,7 @@ function initialize_slash_commands() {
         callback: async (args, index) => {
             let chat = getContext().chat
             if (index === "") index = chat.length - 1
-            return get_memory(chat[index], "memory")
+            return get_memory(chat[index])
         },
         helpString: 'Return the memory associated with a given message index. If no index given, assumes the most recent message.',
         unnamedArgumentList: [

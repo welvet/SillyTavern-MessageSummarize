@@ -140,4 +140,4 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~import/export profiles~~
 - Option to remove redundant memory injections while messages are in context.
 - More robust prompt construction.
-
+- Fix interface reverse scrolling jumpting to bottom on every update.
