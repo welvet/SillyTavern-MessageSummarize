@@ -1569,13 +1569,6 @@ class MemoryEditInterface {
             "default": false,
             "count": 0
         },
-        "user": {
-            "title": "User messages with or without summaries",
-            "display": "User",
-            "check":  (msg) => msg.is_user,
-            "default": false,
-            "count": 0
-        },
         "edited": {
             "title": "Summaries that have been manually edited",
             "display": "Edited",
@@ -1583,10 +1576,10 @@ class MemoryEditInterface {
             "default": false,
             "count": 0
         },
-        "errors": {
-            "title": "Summaries that failed during generation",
-            "display": "Errors",
-            "check": (msg) => get_memory(msg, 'error'),
+        "user": {
+            "title": "User messages with or without summaries",
+            "display": "User",
+            "check":  (msg) => msg.is_user,
             "default": false,
             "count": 0
         },
@@ -1597,7 +1590,13 @@ class MemoryEditInterface {
             "default": false,
             "count": 0
         },
-
+        "errors": {
+            "title": "Summaries that failed during generation",
+            "display": "Errors",
+            "check": (msg) => get_memory(msg, 'error'),
+            "default": false,
+            "count": 0
+        },
     }
 
     html_template = `
@@ -2306,32 +2305,30 @@ function check_message_conditional(message, no_summary=true, short=true, long=tr
 
     // if we don't want messages with short-term memories and this message has one, skip it
     let include_type = get_memory(message, 'include');
-    if (include_type === "short" && !short && existing_memory) {
+    if (!short && include_type === "short" && existing_memory) {
         return
     }
     // if we don't want messages with long-term memories and this message has one, skip it
-    if (include_type === "long" && !long && existing_memory) {
+    if (!long && include_type === "long" && existing_memory) {
         return
     }
 
     // if we don't want messages with edited memories and this memory has been edited, skip it
-    let edited_memory = get_memory(message, 'edited');
-    if (edited_memory && !edited && existing_memory) {
+    if (!edited && get_memory(message, 'edited') && existing_memory) {
         return
     }
 
     // if we don't want messages with memories that are marked to remember, skip it
-    let remember_memory = get_memory(message, 'remember')
-    if (remember_memory && !remember && existing_memory) {
+    if (!remember && get_memory(message, 'remember') && existing_memory) {
         return
     }
 
     // if we don't want messages with memories that are excluded from short-term and long-term memory, skip it
-    if (include_type === null && !excluded && existing_memory) {
+    if (!excluded && include_type === null && existing_memory) {
         return
     }
 
-    return get_memory(message, 'memory')
+    return true
 }
 function update_message_inclusion_flags() {
     // Update all messages in the chat, flagging them as short-term or long-term memories to include in the injection.
@@ -2550,7 +2547,7 @@ async function summarize_messages(indexes, show_progress=true) {
     if (STOP_SUMMARIZATION) {  // check if summarization was stopped
         STOP_SUMMARIZATION = false  // reset the flag
     } else {
-        log(`Messages summarized: ${indexes.length}`)
+        debug(`Messages summarized: ${indexes.length}`)
     }
 
     if (get_settings('block_chat')) {
@@ -2579,9 +2576,6 @@ async function summarize_message(index=null) {
         scrollChatToBottom();
     }
 
-    // construct the full summary prompt for the message
-    let prompt = await create_summary_prompt(index)
-
     // summary prefill
     let current_prefill = context.powerUserSettings.user_prompt_bias
     let summary_prefill = get_settings('prefill')
@@ -2598,6 +2592,9 @@ async function summarize_message(index=null) {
     // set the completion preset and connection profile for summarization (preset must be set after connection profile)
     await set_connection_profile(summary_profile);
     await set_preset(summary_preset);
+
+    // construct the full summary prompt for the message
+    let prompt = await create_summary_prompt(index)
 
     // summarize it
     let summary;
@@ -2712,7 +2709,7 @@ async function summarize_text(prompt) {
         result = await generateRaw(prompt, '', false, false, system_prompt);
     }
 
-    // trim incomplete sentences if set in ST power user settings
+    // trim incomplete sentences if set in ST settings
     if (ctx.powerUserSettings.trim_sentences) {
         result = trimToEndSentence(result);
     }
@@ -3435,48 +3432,22 @@ function initialize_slash_commands() {
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'summarize_chat',
-        callback: (args) => {
-            let indexes = collect_chat_messages(true, args.short, args.long, args.edited, args.excluded, args.limit);
-            summarize_messages(indexes);
+        callback: async (args, limit) => {
+            if (!limit) {
+                limit = get_settings('auto_summarize_message_limit')
+            }
+
+            let indexes = collect_chat_messages(true, false, false, true, false, false, limit);
+            await summarize_messages(indexes);
         },
-        helpString: 'Summarize the chat',
-        argumentList: [
+        helpString: 'Summarize the chat using the auto-summarization exclusion criteria.',
+        unnamedArgumentList: [
             SlashCommandArgument.fromProps({
-                name: 'limit',
-                description: 'Limit the number of messages to summarize',
+                description: 'Limit the number of messages to summarize. Defaults to "Auto-Summarize Message limit"',
                 isRequired: false,
-                default: 1,
                 typeList: ARGUMENT_TYPE.NUMBER,
             }),
-            SlashCommandArgument.fromProps({
-                name: 'short',
-                description: 'Include messages with existing short-term memories',
-                isRequired: false,
-                default: false,
-                typeList: ARGUMENT_TYPE.BOOLEAN,
-            }),
-            SlashCommandArgument.fromProps({
-                name: 'long',
-                description: 'Include messages with existing long-term memories',
-                isRequired: false,
-                default: false,
-                typeList: ARGUMENT_TYPE.BOOLEAN,
-            }),
-            SlashCommandArgument.fromProps({
-                name: 'edited',
-                description: 'Include messages with manually edited memories',
-                isRequired: false,
-                default: false,
-                typeList: ARGUMENT_TYPE.BOOLEAN,
-            }),
-            SlashCommandArgument.fromProps({
-                name: 'excluded',
-                description: 'Include messages without existing memories',
-                isRequired: false,
-                default: true,
-                typeList: ARGUMENT_TYPE.BOOLEAN,
-            }),
-        ],
+        ]
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({

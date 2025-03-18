@@ -52,8 +52,10 @@ To update the dev branch when changes are made, run:
 - `/toggle_memory`: Toggles the extension on and off for the current chat. Same as clicking "Toggle Chat Memory" in the config. Can also provide a boolean argument to toggle the extension directly.
 - `/toggle_memory_display`: Toggles the display of summaries below each message. Same as clicking "Display Memories" in the config.
 - `/toggle_memory_popout`: Toggles the popout config menu.
+- `/toggle_memory_edit_interface`: Toggles the "Edit Memory" interface
+- `/toggle_memory_injection_preview`: Toggles a preview of the text that will be injected
 - `/summarize`: Summarizes the nth message in the chat (default to most recent message). Same as clicking the "quote" icon in the message button menu.
-- `/summarize_chat`: Summarizes the entire chat, with some message exclusion options. Same as clicking the "Mass re-summarization" button in the config.
+- `/summarize_chat`: Performs an auto-summarization on the chat, even if auto-summarization is disabled.
 - `/stop_summarization`: stops any summarization currently running. Same as clicking the "stop" button in the config or next to the progress bar.
 - `/remember`: Mark the nth message for long-term memory, summarizing it if not already. Same as clicking the "brain" icon in the message button menu.
 - `/force_exclude_memory`: Toggles the inclusion of the summary for the nth message. Same as clicking the "Force Exclude" button in the message button menu.
