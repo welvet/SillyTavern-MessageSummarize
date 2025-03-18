@@ -2286,8 +2286,9 @@ function check_message_exclusion(message) {
         return false
     }
 
-    // check if it's a thought message and exclude if the setting is disabled (Stepped Thinking extension)
-    if (!get_settings('include_thought_messages') && message.is_thoughts) {
+    // check if it's a thought message and exclude (Stepped Thinking extension)
+    // TODO: This is deprecated in the thought extension, could be removed at some point?
+    if (message.is_thoughts) {
         return false
     }
 
@@ -3193,7 +3194,6 @@ Available Macros:
     bind_setting('#include_user_messages', 'include_user_messages', 'boolean');
     bind_setting('#include_system_messages', 'include_system_messages', 'boolean');
     bind_setting('#include_narrator_messages', 'include_narrator_messages', 'boolean')
-    bind_setting('#include_thought_messages', 'include_thought_messages', 'boolean');
 
     bind_setting('#message_length_threshold', 'message_length_threshold', 'number');
     bind_setting('#nest_messages_in_prompt', 'nest_messages_in_prompt', 'boolean')
