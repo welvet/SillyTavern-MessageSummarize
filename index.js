@@ -2970,6 +2970,7 @@ function collect_messages_to_auto_summarize() {
     let depth_limit = get_settings('auto_summarize_message_limit')  // how many valid messages back we can go
     let lag = get_settings('summarization_delay');  // number of messages to delay summarization for
     let depth = 0
+    debug(`Collecting messages to summarize. Depth limit: ${depth_limit}, Lag: ${lag}`)
     for (let i = context.chat.length-1; i >= 0; i--) {
         // get current message
         let message = context.chat[i];
@@ -2977,6 +2978,7 @@ function collect_messages_to_auto_summarize() {
         // check message exclusion criteria
         let include = check_message_exclusion(message);  // check if the message should be included due to current settings
         if (!include) {
+            debug(`ID [${i}]: excluded`)
             continue;
         }
 
@@ -2984,21 +2986,25 @@ function collect_messages_to_auto_summarize() {
 
         // don't include if below the lag value
         if (depth <= lag) {
+            debug(`ID [${i}]: Depth < lag (${depth} < ${lag})`)
             continue
         }
 
         // Check depth limit (only applies if at least 1)
-        if (depth_limit > 0 && depth >= depth_limit + lag) {
+        if (depth_limit > 0 && depth > depth_limit + lag) {
+            debug(`ID [${i}]: Depth > depth limit + lag (${depth} > ${depth_limit} + ${lag})`)
             break;
         }
 
         // skip messages that already have a summary
         if (get_data(message, 'memory')) {
+            debug(`ID [${i}]: Already has a memory`)
             continue;
         }
 
         // this message can be summarized
         messages_to_summarize.push(i)
+        debug(`ID [${i}]: Included`)
     }
     debug(`Messages to summarize (${messages_to_summarize.length}): ${messages_to_summarize}`)
     return messages_to_summarize.reverse()  // reverse for chronological order
