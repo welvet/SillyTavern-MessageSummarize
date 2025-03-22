@@ -2749,7 +2749,7 @@ async function summarize_text(prompt) {
          * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
          * @returns {Promise<string>} Generated message
          */
-        result = await generateRaw(prompt, '', true, false, system_prompt);
+        result = await generateRaw(prompt, '', true, false, system_prompt, null, true);
     }
 
     // trim incomplete sentences if set in ST settings
