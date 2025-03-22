@@ -1467,6 +1467,7 @@ async function get_user_setting_text_input(key, title, description="") {
     let input = await popup.show();
     if (input) {
         set_settings(key, input);
+        refresh_settings()
     }
 }
 function progress_bar(id, progress, total, title) {
