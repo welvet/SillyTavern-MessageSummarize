@@ -37,7 +37,7 @@ const PROGRESS_BAR_ID = `${MODULE_NAME}_progress_bar`;
 const css_message_div = "qvink_memory_display"
 const css_short_memory = "qvink_short_memory"
 const css_long_memory = "qvink_long_memory"
-const css_remember_memory = `qvink_remember_memory`
+const css_remember_memory = `qvink_old_memory`
 const css_exclude_memory = `qvink_exclude_memory`
 const summary_div_class = `qvink_memory_text`  // class put on all added summary divs to identify them
 const summary_reasoning_class = 'qvink_memory_reasoning'
@@ -2755,7 +2755,7 @@ async function summarize_text(prompt) {
          * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
          * @returns {Promise<string>} Generated message
          */
-        result = await generateRaw(prompt, '', true, false, system_prompt);
+        result = await generateRaw(prompt, '', true, false, system_prompt, null, false);
     }
 
     // trim incomplete sentences if set in ST settings
@@ -3667,5 +3667,9 @@ jQuery(async function () {
     eventSource.on(event_types.MORE_MESSAGES_LOADED, refresh_memory)
     eventSource.on('groupSelected', set_character_enabled_button_states)
     eventSource.on(event_types.GROUP_UPDATED, set_character_enabled_button_states)
+
+    // Global Macros  // TODO get this working
+    //MacrosParser.registerMacro("qvink_memory_short_memory", () => get_short_memory());
+    //MacrosParser.registerMacro("qvink_memory_long_memory", () => get_long_memory());
 
 });

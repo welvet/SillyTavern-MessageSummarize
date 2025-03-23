@@ -61,6 +61,21 @@ To update the dev branch when changes are made, run:
 - `/force_exclude_memory`: Toggles the inclusion of the summary for the nth message. Same as clicking the "Force Exclude" button in the message button menu.
 - `/get_memory <n>`: Get the memory associated with a given message index. Defaults to the most recent message.
 
+### Custom CSS
+You can easily customize the CSS for displayed memories using the following classes:
+- `.qvink_short_memory`: In short-term memory (default green)
+- `.qvink_long_memory`: In long-term memory (default blue)
+- `.qvink_old_memory`: Marked for long-term memory, but now out of context (default red)
+- `.qvink_exclude_memory`: Manually force-excluded (default dark grey)
+
+Just make sure to use the `!important` directive to override the default styles.
+For example, to color short-term memories yellow, you would put the following in your "Custom CSS" user settings:
+```
+.qvink_short_memory {
+   color: yellow !important;
+}
+```
+
 
 ### Troubleshooting:
 
@@ -139,3 +154,4 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Allow locking profile to specific chat, not just character.~~
 - ~~import/export profiles~~
 - Option to remove redundant memory injections while messages are in context.
+- Make the memory injections global macros

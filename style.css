@@ -75,7 +75,7 @@ By default, text is greyed to indicate that is it not injected.
     color: steelblue;
 }
 /* to style memories marked for long-term, but are past the context limit */
-.qvink_remember_memory {
+.qvink_old_memory {
     color: darkred;
 }
 /* to style memories that are force-excluded */
