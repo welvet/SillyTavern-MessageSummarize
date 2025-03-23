@@ -1467,6 +1467,7 @@ async function get_user_setting_text_input(key, title, description="") {
     let input = await popup.show();
     if (input) {
         set_settings(key, input);
+        refresh_settings()
     }
 }
 function progress_bar(id, progress, total, title) {
@@ -2749,7 +2750,7 @@ async function summarize_text(prompt) {
          * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
          * @returns {Promise<string>} Generated message
          */
-        result = await generateRaw(prompt, '', true, false, system_prompt, null, true);
+        result = await generateRaw(prompt, '', true, false, system_prompt, null, false);
     }
 
     // trim incomplete sentences if set in ST settings
