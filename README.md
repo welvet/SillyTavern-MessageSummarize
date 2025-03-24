@@ -1,39 +1,37 @@
 ### Description
 - This extension reworks how memory is stored by summarizing each message individually, rather than all at once.
-- Summaries are injected into the prompt at two levels: short-term memory and long-term memory.
+- Summaries are injected into the main prompt at two levels: short-term memory and long-term memory.
 - Short term memory rotates out the most recent message summaries automatically.
 - Long-term memory stores summaries of manually-marked messages beyond the short-term limit.
 
-Pros compared to the built-in summarization:
+Benefits compared to the built-in summarization:
 - Summarizing messages individually (as opposed to all at once) gets more accurate summaries and is less likely to miss details.
-- Because each memory is stored separately, old summaries do not change when new ones are added.
+- Because memory storage is not handled by an LLM, old summaries will never change over time.
 - Each summary is attached to the message it summarizes, so deleting a message removes only the associated memory.
 - Short-term memory guarantees that relevant info is always available from the most recent messages, but goes away once no longer relevant according to a set limit.
 - Long-term memory allows you to choose which details are important to remember, keeping them available for longer, up to a separate limit.
 
-Cons, with attempted solutions:
-- If you use Context Shifting, performing the summarizations on each message breaks it. To reduce this, I have added a feature that allows you to define a batch size, summarizing multiple messages at once (still one at a time). This allows you to use context shifting for longer before summarizations occur.
-- Summarizing a single message can sometimes miss important context from previous messages. I've added the ability to include a few previous messages (and/or summaries) in the summarization prompt as context.
-
 ### Notable Features
-- Configuration profiles: save and load different configurations profiles and set one to be auto-loaded for each character.
+- Configuration profiles: save and load different configurations profiles and set one to be auto-loaded for each character or chat.
 - Popout config menu: customize summarization settings, injection settings, and auto-summarization message inclusion criteria.
-- Handles swiping, editing, and deleting messages.
+- A separate interface for viewing and editing all memories in your chat.
 - Summaries are optionally displayed in small text below each message, colored according to their status:
   - Green: Included in short-term memory
   - Blue: Marked for long-term memory (included in short-term or long-term memory)
   - Red: Marked for long-term memory, but now out of context.
   - Grey: Excluded
 
-### Usage
+### Installation and Usage
 - Install the extension in ST using the github link: https://github.com/qvink/qvink_memory
 - To mark a message for long-term memory, click the "brain" icon in the message button menu.
 - To re-summarize a message, click the "Quote" icon in the message button menu.
 - To edit a summary, click on the summary text directly or click the "pen" icon in the message button menu.
-- To summarize an existing chat, go to the config and click the "Mass re-summarization" button next to the "Summarization" section (two curved arrows).
+- To perform actions on multiple summaries at once, go to the config and click "Edit Memory". Here you can filter for specific memories or manually select memories to modify.
 - To only summarize certain characters in a group chat, open the group chat edit menu and scroll down to the member list. Click the glowing "brain" icon to toggle whether that character will be automatically summarized (if you have auto-summarization enabled).
 
 ### How to use the Dev branch
+**Note: The dev branch requires that you use the latest version of the SillyTavern staging branch.**
+
 ST doesn't have an easy way to switch extension branches, so you'll need to use git. 
 In your command line, go to the folder where extension is stored.
 This should look something like`SillyTavern/data/<user>/extensions/qvink_memory`.
@@ -55,11 +53,11 @@ To update the dev branch when changes are made, run:
 - `/toggle_memory_edit_interface`: Toggles the "Edit Memory" interface
 - `/toggle_memory_injection_preview`: Toggles a preview of the text that will be injected
 - `/summarize`: Summarizes the nth message in the chat (default to most recent message). Same as clicking the "quote" icon in the message button menu.
-- `/summarize_chat`: Performs an auto-summarization on the chat, even if auto-summarization is disabled.
+- `/summarize_chat`: Performs a single auto-summarization on the chat, even if auto-summarization is disabled.
 - `/stop_summarization`: stops any summarization currently running. Same as clicking the "stop" button in the config or next to the progress bar.
-- `/remember`: Mark the nth message for long-term memory, summarizing it if not already. Same as clicking the "brain" icon in the message button menu.
-- `/force_exclude_memory`: Toggles the inclusion of the summary for the nth message. Same as clicking the "Force Exclude" button in the message button menu.
-- `/get_memory <n>`: Get the memory associated with a given message index. Defaults to the most recent message.
+- `/remember <n>`: Mark the nth message for long-term memory, summarizing it if not already. Same as clicking the "brain" icon in the message button menu.
+- `/force_exclude_memory <n>`: Toggles the inclusion of the summary for the nth message. Same as clicking the "Force Exclude" button in the message button menu.
+- `/get_memory <n>`: Get the memory associated with the nth message. Defaults to the most recent message.
 
 ### Custom CSS
 You can easily customize the CSS for displayed memories using the following classes:
@@ -83,11 +81,11 @@ For example, to color short-term memories yellow, you would put the following in
 
 - "Syntax Error: No number after minus sign in JSON at position X": update your koboldcpp, or try disabling "Request token probabilities".
 
-- "min new tokens must be in (0, max_new_tokens(X)], got Y": your model has a minimum token amount, which is conflicting with the "Summarization Max Token Length" setting from this extension. Either reduce the minimum token amount (usually in the completion settings), or increase you Summarization Max Token Length.
+- "min new tokens must be in (0, max_new_tokens(X)], got Y": your model has a minimum token amount, which is conflicting with the max tokens you are using for summarization. Either reduce the minimum token amount for your model (usually in the completion settings), or increase the maximum token length for summarizations.
 
 - Summaries seem to be continuing the conversation rather than summarizing: probably an issue with your instruct template.
 Make sure you are using the correct template for your model, and make sure that system messages are properly distinct from user messages (the summaries use a system prompt). 
-This can be caused by the "System same as user" checkbox in your instruct template settings, which will cause all system messages to be treated like a user - uncheck that.
+This can be caused by the "System same as user" checkbox in your instruct template settings, which will cause all system messages to be treated like a user - uncheck that if your model can handle it.
 Some default instruct templates also may not have anything defined for the "System message sequences" field - that should be filled out.
 You can also try toggling "Nest Message in Summary Prompt" in the settings - some models behave better with this.
 
@@ -95,9 +93,9 @@ You can also try toggling "Nest Message in Summary Prompt" in the settings - som
 
 - The summaries refer to "a person" or "someone" rather than the character by name: Try using the "Message History" setting to include a few previous messages in the summarization prompt to give the model a little more context.
 
-- The summaries are too long: You can select a custom completion preset in the settings to use for summarizations, and that can be used to set a maximum token length after which generation will be cut off. You can also use the {{words}} macro in the summarization prompt to try and guide the LLM according to that token length, though LLMs cannot actually count words so it functions more like a suggestion.
+- The summaries are too long: You can select a custom completion preset in the settings to use for summarizations, and that can be used to set a maximum token length after which generation will be cut off. You can also use the {{words}} macro in the summarization prompt to try and guide the LLM according to that token length, though LLMs cannot actually count words so it's really just a suggestion.
 
-- Just updated and things are broken: try reloading the page first, and make sure you are on the most recent version of ST. 
+- Just updated and things are broken: try reloading the page first, and make sure you are on the most recent version of ST. If you are on the dev branch of this extension, you must also be on the staging branch of ST.
 
 If it's something else, please turn on "Debug Mode" in the settings and send me the output logs from your browser console and raise an issue or message on discord.
 
@@ -115,13 +113,11 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Add slash command to return state of the extension and toggle it on and off~~
 - ~~Allow setting a number of tokens for context sizes directly.~~
 - ~~Slash command to retrieve a memory by index~~
-- Standardize the slash command naming once we have a few more.
 - ~~Handle swiping, editing, and deleting summaries~~
 - ~~button to re-summarize a given message~~
 - ~~Display summaries below each message~~
 - ~~config profiles, and allow character-specific settings to be saved~~
 - ~~ability to stop summarization at any time~~
-- ~~Support stepped thoughts extension~~
 - ~~Added ability to provide global macros in summarization prompt~~
 - ~~Added the ability to choose whether to nest the messages in the summarization prompt or not~~
 - ~~Added the ability to toggle automatic summarization on message edit and swipe/regenerate~~
@@ -137,7 +133,7 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Set the frequency at which automatic summarizations occur (e.g. every X messages)~~
 - ~~Allow disabling extension in individual chats without giving it a profile.~~
 - ~~Add option to include a few previous messages/summaries in the summary prompt as context~~
-- ~~Progress bar for summarization of chat history~~
+- ~~Progress bar for summarization~~
 - ~~Add option to select which characters are summarized in a group~~
 - ~~Add slash command to toggle popout~~
 - ~~Add slash command to stop summarization~~
@@ -153,5 +149,5 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Allow customizing the memory injection separators~~
 - ~~Allow locking profile to specific chat, not just character.~~
 - ~~import/export profiles~~
-- Option to remove redundant memory injections while messages are in context.
+- Option to remove redundant memory injections while the associated messages are in context.
 - Make the memory injections global macros
