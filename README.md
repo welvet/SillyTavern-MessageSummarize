@@ -74,6 +74,18 @@ For example, to color short-term memories yellow, you would put the following in
 }
 ```
 
+### Tips
+Each model is different of course, but here are just some general things that I have found help getting clean summarizations.
+Try them out if you want.
+
+- **Keep it simple**: Longer summary prompts tend to muddy the waters and get less accurate results. Just in general LLMs have trouble with information overload (hence the reason for this extension in the first place).
+- **Low temperature**: I like to use a temp of 0 to reduce creativity and just get down to the facts. No need for flowery language.
+- **No repetition penalty**: Again, no need for creativity, in fact I want it to repeat what happened.
+- **The `{{words}}` macro doesn't always help**: While some models may reign themselves in if you tell them to keep it under X words, LLMs don't have a soul and therefore can't count, so don't bet on it.
+- **You can use global macros**: If your summaries aren't using names properly, keep in mind that you can use the `{{char}}` or `{{user}}` macro in the prompt.
+- **No need to pause roleplay**: You don't have to include anything like "ignore previous instructions" or "pause your roleplay". The summary prompt is completely independent and will only send what you see in the edit window.
+- **I don't recommend reasoning**: Reasoning models can summarize fine, but they do tend to blab for ages which makes summarizing slow, so I wouldn't recommend them for that reason.
+
 
 ### Troubleshooting:
 
@@ -89,9 +101,9 @@ This can be caused by the "System same as user" checkbox in your instruct templa
 Some default instruct templates also may not have anything defined for the "System message sequences" field - that should be filled out.
 You can also try toggling "Nest Message in Summary Prompt" in the settings - some models behave better with this.
 
-- My jailbreak isn't working: You'll need to put the jailbreak in the summarization prompt if you want it to be included.
+- My jailbreak isn't working: You'll need to put a jailbreak in the summarization prompt if you want it to be included.
 
-- The summaries refer to "a person" or "someone" rather than the character by name: Try using the "Message History" setting to include a few previous messages in the summarization prompt to give the model a little more context.
+- The summaries refer to "a person" or "someone" rather than the character by name: Try using the `{{user}}` or `{{char}}` macros in the summary prompt. There is also a "Message History" setting to include a few previous messages in the summarization prompt to give the model a little more context. 
 
 - The summaries are too long: You can select a custom completion preset in the settings to use for summarizations, and that can be used to set a maximum token length after which generation will be cut off. You can also use the {{words}} macro in the summarization prompt to try and guide the LLM according to that token length, though LLMs cannot actually count words so it's really just a suggestion.
 
