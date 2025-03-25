@@ -1468,6 +1468,7 @@ async function get_user_setting_text_input(key, title, description="") {
     if (input) {
         set_settings(key, input);
         refresh_settings()
+        refresh_memory()
     }
 }
 function progress_bar(id, progress, total, title) {
