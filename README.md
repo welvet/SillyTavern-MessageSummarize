@@ -107,6 +107,8 @@ You can also try toggling "Nest Message in Summary Prompt" in the settings - som
 
 - The summaries are too long: You can select a custom completion preset in the settings to use for summarizations, and that can be used to set a maximum token length after which generation will be cut off. You can also use the {{words}} macro in the summarization prompt to try and guide the LLM according to that token length, though LLMs cannot actually count words so it's really just a suggestion.
 
+- Summaries aren't having incomplete sentences trimmed even though the option is checked in the advanced formatting settings: If you are using a different connection profile for summaries, note that instruction templates are part of that so the option needs to be checked in the templated used for that connection profile.
+
 - Just updated and things are broken: try reloading the page first, and make sure you are on the most recent version of ST. If you are on the dev branch of this extension, you must also be on the staging branch of ST.
 
 If it's something else, please turn on "Debug Mode" in the settings and send me the output logs from your browser console and raise an issue or message on discord.
