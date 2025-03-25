@@ -13,7 +13,8 @@ import {
     amount_gen,
     system_message_types,
     CONNECT_API_MAP,
-    main_api
+    main_api,
+    chat_metadata,
 } from '../../../../script.js';
 import { getPresetManager } from '../../../preset-manager.js'
 import { formatInstructModeChat } from '../../../instruct-mode.js';
@@ -116,6 +117,10 @@ const default_settings = {
     include_thought_messages_in_history: false,  // include previous thought messages in the summarization prompt when including message history
 
     // injection settings
+    inject_redundant_summaries: false,
+    limit_injected_messages: -1,  // limit the number of injected messages (-1 for no limit)
+    summary_injection_separator: "\n* ",  // separator when concatenating summaries
+
     long_template: default_long_template,
     long_term_context_limit: 10,  // context size to use as long-term memory limit
     long_term_context_type: 'percent',  // percent or tokens
@@ -137,8 +142,6 @@ const default_settings = {
     display_memories: true,  // display memories in the chat below each message
     default_chat_enabled: true,  // whether memory is enabled by default for new chats
     use_global_toggle_state: false,  // whether the on/off state for this profile uses the global state
-    limit_injected_messages: -1,  // limit the number of injected messages (-1 for no limit)
-    summary_injection_separator: "\n* "  // separator when concatenating summaries
 };
 const global_settings = {
     profiles: {},  // dict of profiles by name
@@ -284,7 +287,6 @@ function unescape_string(text) {
         }
     });
 }
-
 
 // Completion presets
 function get_current_preset() {
@@ -2327,48 +2329,6 @@ function check_message_exclusion(message) {
 
     return true;
 }
-function check_message_conditional(message, no_summary=true, short=true, long=true, remember=true, edited=true, excluded=true) {
-    // check whether a message meets the given conditions
-
-    // check regular message exclusion criteria first
-    let include = check_message_exclusion(message);  // check if the message should be included due to the summary inclusion criteria
-    if (!include) {
-        return false
-    }
-
-    // if we don't want messages without a summary and this message doesn't have a summary, skip it
-    let existing_memory = get_data(message, 'memory');
-    if (!no_summary && !existing_memory) {
-        return false
-    }
-
-    // if we don't want messages with short-term memories and this message has one, skip it
-    let include_type = get_data(message, 'include');
-    if (!short && include_type === "short" && existing_memory) {
-        return
-    }
-    // if we don't want messages with long-term memories and this message has one, skip it
-    if (!long && include_type === "long" && existing_memory) {
-        return
-    }
-
-    // if we don't want messages with edited memories and this memory has been edited, skip it
-    if (!edited && get_data(message, 'edited') && existing_memory) {
-        return
-    }
-
-    // if we don't want messages with memories that are marked to remember, skip it
-    if (!remember && get_data(message, 'remember') && existing_memory) {
-        return
-    }
-
-    // if we don't want messages with memories that are excluded from short-term and long-term memory, skip it
-    if (!excluded && include_type === null && existing_memory) {
-        return
-    }
-
-    return true
-}
 function update_message_inclusion_flags() {
     // Update all messages in the chat, flagging them as short-term or long-term memories to include in the injection.
     // This has to be run on the entire chat since it needs to take the context limits into account.
@@ -2381,11 +2341,19 @@ function update_message_inclusion_flags() {
     let short_limit_reached = false;
     let long_limit_reached = false;
     let long_term_end_index = null;  // index of the most recent message that doesn't fit in short-term memory
+    let message_limit = get_settings('limit_injected_messages')
+    let message_count = 0
     let end = chat.length - 1;
     let summary = ""  // total concatenated summary so far
     let new_summary = ""  // temp summary storage to check token length
     for (let i = end; i >= 0; i--) {
         let message = chat[i];
+
+        // If we are forcing a message limit, update the last in-context message ID.
+        message_count++
+        if (message_limit > 0 && message_count === message_limit) {
+            chat_metadata['lastInContextMessageId'] = i
+        }
 
         // check for any of the exclusion criteria
         let include = check_message_exclusion(message)
@@ -2434,28 +2402,6 @@ function update_message_inclusion_flags() {
 
     update_all_message_visuals()
 }
-function collect_chat_messages(no_summary=false, short=false, long=false, remember=false, edited=false, excluded=false, limit=null) {
-    // Get a list of chat message indexes identified by the given criteria
-    let context = getContext();
-
-    let indexes = []  // list of indexes of messages
-
-    // iterate in reverse order, stopping when reaching the limit if given
-    for (let i = context.chat.length-1; i >= 0; i--) {
-        let message = context.chat[i];
-        if (check_message_conditional(message, no_summary, short, long, remember, edited, excluded)) {
-            indexes.push(i)
-        }
-        if (limit && limit > 0 && indexes.length >= limit) {
-            break
-        }
-    }
-
-    // reverse the indexes so they are in chronological order
-    indexes.reverse()
-
-    return indexes
-}
 function concatenate_summary(existing_text, message) {
     // given an existing text of concatenated summaries, concatenate the next one onto it
     let memory = get_memory(message)
@@ -2481,9 +2427,43 @@ function concatenate_summaries(indexes) {
 
     return summary
 }
+
+function collect_chat_messages(short=false, long=false) {
+    // Get a list of chat message indexes identified by the given criteria
+    let context = getContext();
+    let indexes = []  // list of indexes of messages
+    let inject_redundant = get_settings('inject_redundant_summaries')
+    let last_in_context = chat_metadata['lastInContextMessageId']  // last message index in context
+
+    // iterate in reverse order, stopping when reaching the limit if given
+    for (let i = context.chat.length-1; i >= 0; i--) {
+        let message = context.chat[i];
+
+        // check regular message exclusion criteria first
+        if (!check_message_exclusion(message)) continue
+
+        // Exclude redundant summaries?
+        // If this is a system message (hidden), we actually want the summary because that means the message is not in context.
+        // Note that if the user is excluding system messages, it wouldn't pass the exclusion criteria above.
+        if (!inject_redundant && i >= last_in_context && !message.is_system){
+            continue
+        }
+
+        let include_type = get_data(message, 'include');
+        let existing_memory = get_data(message, 'memory');
+        if (!short && include_type === "short" && existing_memory) continue
+        if (!long && include_type === "long" && existing_memory) continue
+        if (include_type === null && existing_memory) continue
+        indexes.push(i)
+    }
+
+    // reverse the indexes so they are in chronological order
+    indexes.reverse()
+    return indexes
+}
 function get_long_memory() {
     // get the injection text for long-term memory
-    let indexes = collect_chat_messages(false, false, true, true, true, null)
+    let indexes = collect_chat_messages(false, true)
     let text = concatenate_summaries(indexes);
     let template = get_settings('long_template')
     let ctx = getContext();
@@ -2498,7 +2478,7 @@ function get_long_memory() {
 }
 function get_short_memory() {
     // get the injection text for short-term memory
-    let indexes = collect_chat_messages(false, true, false, true, true, null)
+    let indexes = collect_chat_messages(true, false)
     let text = concatenate_summaries(indexes);
     let template = get_settings('short_template')
     let ctx = getContext();
@@ -3221,6 +3201,10 @@ Available Macros:
     bind_setting('#include_message_history_mode', 'include_message_history_mode', 'text');
     bind_setting('#include_user_messages_in_history', 'include_user_messages_in_history', 'boolean');
 
+    bind_setting('#inject_redundant_summaries', 'inject_redundant_summaries', 'boolean');
+    bind_setting('#limit_injected_messages', 'limit_injected_messages', 'number');
+    bind_setting('#summary_injection_separator', 'summary_injection_separator', 'text')
+
     bind_setting('input[name="short_term_position"]', 'short_term_position', 'number');
     bind_setting('#short_term_depth', 'short_term_depth', 'number');
     bind_setting('#short_term_role', 'short_term_role');
@@ -3247,8 +3231,6 @@ Available Macros:
     bind_setting('#display_memories', 'display_memories', 'boolean')
     bind_setting('#default_chat_enabled', 'default_chat_enabled', 'boolean');
     bind_setting('#use_global_toggle_state', 'use_global_toggle_state', 'boolean');
-    bind_setting('#limit_injected_messages', 'limit_injected_messages', 'number');
-    bind_setting('#summary_injection_separator', 'summary_injection_separator', 'text')
 
     // trigger the change event once to update the display at start
     $('#long_term_context_limit').trigger('change');

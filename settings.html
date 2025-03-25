@@ -174,6 +174,23 @@
                 </label>
 
 
+                <!-- General Injection Settings -->
+                <hr>
+                <h4 class="textAlignCenter">General Injection Settings <i class="fa-solid fa-info-circle" title="Determines how summaries are injected into context, applying to both short and long term memory."></i></h4>
+                <label title="Summaries will be injected even if the message is still in context." class="checkbox_label">
+                    <input id="inject_redundant_summaries" type="checkbox">
+                    <span>Inject Summaries for In-Context Messages</span>
+                </label>
+                <label title="Limit the number of chat messages to keep in context (-1 for no limit). Summaries will still be sent." class="checkbox_label">
+                    <input id="limit_injected_messages" class="text_pole widthUnset" type="number" min="0" max="999" />
+                    <span>Limit Message Context</span>
+                </label>
+                <label title="Separator between summaries when injected into context." class="checkbox_label">
+                    <input id="summary_injection_separator" class="text_pole" type="text" placeholder="" style="width: 5em">
+                    <span>Summary Injection Separator</span>
+                </label>
+
+
                 <!-- Short-term memory -->
                 <hr>
                 <h4 class="textAlignCenter">Short-term Memory Injection <i class="fa-solid fa-info-circle" title="Determines which messages are included in the short-term memory injection and where. If you change this and include messages that weren't summarized previously, you can either manually trigger a re-summarization or just wait until automatic summarization triggers."></i></h4>
@@ -182,7 +199,6 @@
                     <button id="edit_short_term_memory_prompt" class="menu_button flex1" title="Edit the short-term memory prompt"><span>Edit</span></button>
                     <!--<button id="preview_short_term_memory" class="menu_button fa-solid fa-eye interactable" title="Preview the short-term memory injection" tabindex="0"></button>-->
                 </div>
-
 
                 <label title="Auto-summarize user messages and include summaries in memory." class="checkbox_label">
                     <input id="include_user_messages" type="checkbox" />
@@ -330,16 +346,6 @@
                 <label title="Uses a global on/off state shared between all chats with this enabled. When unchecked, turning the extension on/off only applies to active chat." class="checkbox_label">
                     <input id="use_global_toggle_state" type="checkbox" />
                     <span>Use Global Toggle State</span>
-                </label>
-
-                <label title="Limit the number of messages to send in regular prompts to this number (-1 for no limit). Message memories will still be sent.">
-                    <input id="limit_injected_messages" class="text_pole widthUnset" type="number" min="0" max="999" />
-                    <span>Limit Message Context</span>
-                </label>
-
-                <label title="Separator between summaries when injected into context.">
-                    <span>Summary Injection Separator</span>
-                    <input id="summary_injection_separator" class="text_pole" type="text" placeholder="" style="width: 10em">
                 </label>
 
                 <div class="flex-container justifyspacebetween alignitemscenter">
