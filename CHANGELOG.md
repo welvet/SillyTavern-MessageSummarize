@@ -1,5 +1,8 @@
 # Changelog
 
+#### vXXX
+- **Fix**: Fixed summary injection not immediately updating when updating the template.
+
 #### v0.8.22
 - **IMPORTANT #1:** The max token length used for your summaries will be broken and you will need to update your config.
 
