@@ -177,17 +177,17 @@
                 <!-- General Injection Settings -->
                 <hr>
                 <h4 class="textAlignCenter">General Injection Settings <i class="fa-solid fa-info-circle" title="Determines how summaries are injected into context, applying to both short and long term memory."></i></h4>
-                <label title="Summaries will be injected even if the message is still in context." class="checkbox_label">
-                    <input id="inject_redundant_summaries" type="checkbox">
-                    <span>Inject Summaries for In-Context Messages</span>
-                </label>
-                <label title="Limit the number of chat messages to keep in context (-1 for no limit). Summaries will still be sent." class="checkbox_label">
-                    <input id="limit_injected_messages" class="text_pole widthUnset" type="number" min="0" max="999" />
-                    <span>Limit Message Context</span>
-                </label>
                 <label title="Separator between summaries when injected into context." class="checkbox_label">
                     <input id="summary_injection_separator" class="text_pole" type="text" placeholder="" style="width: 5em">
                     <span>Summary Injection Separator</span>
+                </label>
+                <label title="Limit the number of chat messages to keep in context (-1 for no limit). Summaries will still be sent." class="checkbox_label">
+                    <input id="limit_injected_messages" class="text_pole widthUnset" type="number" min="-1" max="999" />
+                    <span>Limit Message Context</span>
+                </label>
+                <label title="Summaries will be injected even if the message is still in context." class="checkbox_label">
+                    <input id="inject_redundant_summaries" type="checkbox">
+                    <span>Inject Summaries for In-Context Messages</span>
                 </label>
 
 
