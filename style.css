@@ -71,7 +71,7 @@ By default, text is greyed to indicate that is it not injected.
 .qvink_short_memory {
     color: var(--qvink_short);
 }
-.qvink_short_memory.qvink_redundant_memory {
+.qvink_short_memory.qvink_lagging_memory {
     color: rgba(from var(--qvink_short) r g b / var(--qvink_redundant_opacity));
     text-shadow: none;
 }
@@ -79,7 +79,7 @@ By default, text is greyed to indicate that is it not injected.
 .qvink_long_memory {
     color: var(--qvink_long);
 }
-.qvink_long_memory.qvink_redundant_memory {
+.qvink_long_memory.qvink_lagging_memory {
     color: rgba(from var(--qvink_long) r g b / var(--qvink_redundant_opacity));
     text-shadow: none;
 }
@@ -87,7 +87,7 @@ By default, text is greyed to indicate that is it not injected.
 .qvink_old_memory {
     color: var(--qvink_old)
 }
-.qvink_old_memory.qvink_redundant_memory {
+.qvink_old_memory.qvink_lagging_memory {
     color: rgba(from var(--qvink_old) r g b / var(--qvink_redundant_opacity));
     text-shadow: none;
 }

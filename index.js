@@ -41,7 +41,7 @@ const css_short_memory = "qvink_short_memory"
 const css_long_memory = "qvink_long_memory"
 const css_remember_memory = `qvink_old_memory`
 const css_exclude_memory = `qvink_exclude_memory`
-const css_redundant_memory = `qvink_redundant_memory`
+const css_lagging_memory = `qvink_lagging_memory`
 const summary_div_class = `qvink_memory_text`  // class put on all added summary divs to identify them
 const summary_reasoning_class = 'qvink_memory_reasoning'
 const css_button_separator = `qvink_memory_button_separator`
@@ -119,8 +119,8 @@ const default_settings = {
     include_thought_messages_in_history: false,  // include previous thought messages in the summarization prompt when including message history
 
     // injection settings
-    inject_redundant_summaries: false,
-    limit_injected_messages: -1,  // limit the number of injected messages (-1 for no limit)
+    exclude_summarized_messages: false,
+    start_injecting_after: 0,  // limit the number of injected messages (-1 for no limit)
     summary_injection_separator: "\n* ",  // separator when concatenating summaries
 
     long_template: default_long_template,
@@ -1317,7 +1317,7 @@ function get_summary_style_class(message) {
     let include = get_data(message, 'include');
     let remember = get_data(message, 'remember');
     let exclude = get_data(message, 'exclude');  // force-excluded by user
-    let redundant = get_data(message, 'redundant');
+    let lagging = get_data(message, 'lagging');  // not injected yet
 
     let style = ""
     if (remember && include) {  // marked to be remembered and included in memory anywhere
@@ -1330,8 +1330,8 @@ function get_summary_style_class(message) {
         style = css_exclude_memory
     }
 
-    if (redundant) {
-        style = `${style} ${css_redundant_memory}`
+    if (lagging) {
+        style = `${style} ${css_lagging_memory}`
     }
 
     return style
@@ -1363,11 +1363,7 @@ function update_message_visuals(i, style=true, text=null) {
 
     // get the div holding the main message text
     let message_element = div_element.find('div.mes_text');
-
-    let style_class = "";
-    if (style) {
-        style_class = get_summary_style_class(message)
-    }
+    let style_class = style ? get_summary_style_class(message) : ""
 
     // if no text is provided, use the memory text
     if (!text) {
@@ -2359,9 +2355,9 @@ function update_message_inclusion_flags() {
 
     debug("Updating message inclusion flags")
 
-    let message_limit = get_settings('limit_injected_messages')
-    let inject_redundant = message_limit > 0 ? get_settings('inject_redundant_summaries') : true
-    let last_in_context = chat.length - message_limit
+    let start_injecting_after = get_settings('start_injecting_after')
+    let exclude_summarized = get_settings('exclude_summarized_messages')
+    let first_to_inject = chat.length - start_injecting_after
 
     // iterate through the chat in reverse order and mark the messages that should be included in short-term and long-term memory
     let short_limit_reached = false;
@@ -2380,10 +2376,10 @@ function update_message_inclusion_flags() {
             continue;
         }
 
-        // Exclude redundant summaries?
-        // If this is a system message (hidden), we might actually want the summary because that means the message is not in context.
+        // Mark messages with summaries that won't be injected yet
+        // Special case for system messages (hidden)?
         // Note that if the user is excluding system messages, it wouldn't pass the exclusion criteria above.
-        set_data(message, 'redundant', !inject_redundant && i >= last_in_context && !message.is_system)
+        set_data(message, 'lagging', i >= first_to_inject && !message.is_system)
 
         if (!short_limit_reached) {  // short-term limit hasn't been reached yet
             let memory = get_memory(message)
@@ -2465,8 +2461,8 @@ function collect_chat_messages(short=false, long=false) {
 
         let existing_memory = get_data(message, 'memory');
         let include_type = get_data(message, 'include');
-        let redundant = get_data(message, 'redundant')
-        if (redundant && existing_memory) continue
+        let lagging = get_data(message, 'lagging')
+        if (lagging && existing_memory) continue
         if (!short && include_type === "short" && existing_memory) continue
         if (!long && include_type === "long" && existing_memory) continue
         if (include_type === null && existing_memory) continue
@@ -2513,12 +2509,17 @@ function get_short_memory() {
 // This has to match the manifest.json "generate_interceptor" key
 globalThis.memory_intercept_messages = function (chat, _contextSize, _abort, type) {
     if (!chat_enabled()) return;   // if memory disabled, do nothing
-    let limit = get_settings('limit_injected_messages');  // message limit from settings
-    if (limit < 0) return;  // if limit is -1, do nothing
+    if (!get_settings('exclude_summarized_messages')) return  // if not excluding any messages, do nothing
 
-    // truncate the chat up to the limit
-    while (chat.length > limit) {
-        chat.shift();
+    // Remove any messages that have summaries injected
+    for (let i=chat.length-1; i >= 0; i--) {
+        let message = chat[i]
+        let lagging = get_data(message, 'lagging')  // If the summary is NOT going to be injected
+        let in_memory = get_data(message, 'include')
+        if (in_memory && !lagging) {  // if in memory and not lagging (which means it will be injected)
+            chat.splice(i, 1)  // remove it  // TODO can we just remove the content instead? Need to somehow get rid of the surrounding template
+            debug("Removing message: "+i)
+        }
     }
 };
 
@@ -3216,8 +3217,8 @@ Available Macros:
     bind_setting('#include_message_history_mode', 'include_message_history_mode', 'text');
     bind_setting('#include_user_messages_in_history', 'include_user_messages_in_history', 'boolean');
 
-    bind_setting('#inject_redundant_summaries', 'inject_redundant_summaries', 'boolean');
-    bind_setting('#limit_injected_messages', 'limit_injected_messages', 'number');
+    bind_setting('#exclude_summarized_messages', 'exclude_summarized_messages', 'boolean');
+    bind_setting('#start_injecting_after', 'start_injecting_after', 'number');
     bind_setting('#summary_injection_separator', 'summary_injection_separator', 'text')
 
     bind_setting('input[name="short_term_position"]', 'short_term_position', 'number');

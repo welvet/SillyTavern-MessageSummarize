@@ -100,7 +100,7 @@
                     <span>Auto Summarize Progress Bar</span>
                 </label>
 
-                <label class="checkbox_label" title="Number of messages to delay summarization (0 = summarize up to the most recent message, 1 = lag behind by one message, etc.)">
+                <label class="checkbox_label" title="Number of messages to wait before auto-summarizing a message (0 = summarize up to the most recent message, 1 = wait one message, etc.)">
                     <input id="summarization_delay" class="text_pole widthUnset inline_setting" type="number" min="0" max="999" />
                     <span>Auto Summarize Message Lag</span>
                 </label>
@@ -181,14 +181,15 @@
                     <input id="summary_injection_separator" class="text_pole" type="text" placeholder="" style="width: 5em">
                     <span>Summary Injection Separator</span>
                 </label>
-                <label title="Limit the number of chat messages to keep in context (-1 for no limit). Summaries will still be sent." class="checkbox_label">
-                    <input id="limit_injected_messages" class="text_pole widthUnset" type="number" min="-1" max="999" />
-                    <span>Limit Message Context</span>
+                <label title="The number of messages to wait before summaries start to be injected." class="checkbox_label">
+                    <input id="start_injecting_after" class="text_pole widthUnset" type="number" min="0" max="999" />
+                    <span>Start Injecting After</span>
                 </label>
-                <label title="Summaries will be injected even if the message is still in context." class="checkbox_label">
-                    <input id="inject_redundant_summaries" type="checkbox">
-                    <span>Inject Summaries for In-Context Messages</span>
+                <label title="Messages with injected summaries will be removed from context." class="checkbox_label">
+                    <input id="exclude_summarized_messages" type="checkbox">
+                    <span>Remove Summarized Messages</span>
                 </label>
+
 
 
                 <!-- Short-term memory -->
