@@ -119,9 +119,9 @@ const default_settings = {
     include_thought_messages_in_history: false,  // include previous thought messages in the summarization prompt when including message history
 
     // injection settings
-    exclude_summarized_messages: false,
-    start_injecting_after: 0,  // limit the number of injected messages (-1 for no limit)
     summary_injection_separator: "\n* ",  // separator when concatenating summaries
+    summary_injection_threshold: 0,            // start injecting summaries after this many messages
+    exclude_messages_after_threshold: false,   // remove messages from context after the summary injection threshold
 
     long_template: default_long_template,
     long_term_context_limit: 10,  // context size to use as long-term memory limit
@@ -2355,9 +2355,9 @@ function update_message_inclusion_flags() {
 
     debug("Updating message inclusion flags")
 
-    let start_injecting_after = get_settings('start_injecting_after')
-    let exclude_summarized = get_settings('exclude_summarized_messages')
-    let first_to_inject = chat.length - start_injecting_after
+    let injection_threshold = get_settings('summary_injection_threshold')
+    let exclude_messages = get_settings('exclude_messages_after_threshold')
+    let first_to_inject = chat.length - injection_threshold
 
     // iterate through the chat in reverse order and mark the messages that should be included in short-term and long-term memory
     let short_limit_reached = false;
@@ -2509,14 +2509,14 @@ function get_short_memory() {
 // This has to match the manifest.json "generate_interceptor" key
 globalThis.memory_intercept_messages = function (chat, _contextSize, _abort, type) {
     if (!chat_enabled()) return;   // if memory disabled, do nothing
-    if (!get_settings('exclude_summarized_messages')) return  // if not excluding any messages, do nothing
+    if (!get_settings('exclude_messages_after_threshold')) return  // if not excluding any messages, do nothing
 
     // Remove any messages that have summaries injected
     for (let i=chat.length-1; i >= 0; i--) {
         let message = chat[i]
         let lagging = get_data(message, 'lagging')  // If the summary is NOT going to be injected
-        let in_memory = get_data(message, 'include')
-        if (in_memory && !lagging) {  // if in memory and not lagging (which means it will be injected)
+        //let in_memory = get_data(message, 'include')
+        if (!lagging) {  // if not lagging (which means it will be injected)
             chat.splice(i, 1)  // remove it  // TODO can we just remove the content instead? Need to somehow get rid of the surrounding template
             debug("Removing message: "+i)
         }
@@ -3217,9 +3217,9 @@ Available Macros:
     bind_setting('#include_message_history_mode', 'include_message_history_mode', 'text');
     bind_setting('#include_user_messages_in_history', 'include_user_messages_in_history', 'boolean');
 
-    bind_setting('#exclude_summarized_messages', 'exclude_summarized_messages', 'boolean');
-    bind_setting('#start_injecting_after', 'start_injecting_after', 'number');
     bind_setting('#summary_injection_separator', 'summary_injection_separator', 'text')
+    bind_setting('#summary_injection_threshold', 'summary_injection_threshold', 'number');
+    bind_setting('#exclude_messages_after_threshold', 'exclude_messages_after_threshold', 'boolean');
 
     bind_setting('input[name="short_term_position"]', 'short_term_position', 'number');
     bind_setting('#short_term_depth', 'short_term_depth', 'number');

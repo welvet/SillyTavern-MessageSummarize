@@ -1,6 +1,7 @@
 # Changelog
 
 #### vXXX
+- **New Feature**: You can now specify a summary injection threshold - a number of messages after which summaries will start being injected. You can also optionally remove messages from context after that threshold as well. If you set the threshold to 0 and *don't* exclude messages, the behavior is equivalent to before this version. If you set the threshold to 0 and *exclude* messages, then your context will effectively be relying only on summaries.
 - **Fix**: Fixed summary injection not immediately updating when updating the template.
 
 #### v0.8.22
