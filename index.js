@@ -2366,8 +2366,18 @@ function update_message_inclusion_flags() {
     let end = chat.length - 1;
     let summary = ""  // total concatenated summary so far
     let new_summary = ""  // temp summary storage to check token length
+    let first_user_message_identified = false
     for (let i = end; i >= 0; i--) {
         let message = chat[i];
+
+        // Mark whether the message is lagging (even if no summary)
+        // The first user message is kept, unless the injection threshold is -1
+        let lagging = i >= first_to_inject
+        if (!first_user_message_identified && message.is_user && injection_threshold >= 0) {
+            first_user_message_identified = true
+            lagging = true
+        }
+        set_data(message, 'lagging', lagging)
 
         // check for any of the exclusion criteria
         let include = check_message_exclusion(message)
@@ -2375,11 +2385,6 @@ function update_message_inclusion_flags() {
             set_data(message, 'include', null);
             continue;
         }
-
-        // Mark messages with summaries that won't be injected yet
-        // Special case for system messages (hidden)?
-        // Note that if the user is excluding system messages, it wouldn't pass the exclusion criteria above.
-        set_data(message, 'lagging', i >= first_to_inject && !message.is_system)
 
         if (!short_limit_reached) {  // short-term limit hasn't been reached yet
             let memory = get_memory(message)
@@ -2510,15 +2515,19 @@ function get_short_memory() {
 globalThis.memory_intercept_messages = function (chat, _contextSize, _abort, type) {
     if (!chat_enabled()) return;   // if memory disabled, do nothing
     if (!get_settings('exclude_messages_after_threshold')) return  // if not excluding any messages, do nothing
+    refresh_memory()
+
+    let start = chat.length-1
+    if (type === 'continue') start--  // if a continue, keep the most recent message
 
     // Remove any messages that have summaries injected
-    for (let i=chat.length-1; i >= 0; i--) {
+    for (let i=start; i >= 0; i--) {
         let message = chat[i]
         let lagging = get_data(message, 'lagging')  // If the summary is NOT going to be injected
         //let in_memory = get_data(message, 'include')
-        if (!lagging) {  // if not lagging (which means it will be injected)
-            chat.splice(i, 1)  // remove it  // TODO can we just remove the content instead? Need to somehow get rid of the surrounding template
-            debug("Removing message: "+i)
+        if (!lagging) {
+            chat[i] = structuredClone(chat[i])
+            chat[i].extra.ignore = true  // hide it
         }
     }
 };

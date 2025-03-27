@@ -182,14 +182,13 @@
                     <span>Summary Injection Separator</span>
                 </label>
                 <label title="The number of messages to wait before summaries start to be injected." class="checkbox_label">
-                    <input id="summary_injection_threshold" class="text_pole widthUnset" type="number" min="0" max="999" />
+                    <input id="summary_injection_threshold" class="text_pole widthUnset" type="number" min="-1" max="999" />
                     <span>Start Injecting After</span>
                 </label>
                 <label title="Messages after the summary injection threshold above will be removed from context, leaving only the summaries." class="checkbox_label">
                     <input id="exclude_messages_after_threshold" type="checkbox">
                     <span>Remove Messages After Threshold</span>
                 </label>
-
 
 
                 <!-- Short-term memory -->
