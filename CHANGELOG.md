@@ -1,6 +1,6 @@
 # Changelog
 
-#### vXXX
+#### v0.9.0
 **ST Version Requirement:** Latest ST staging (relies on the following PR)
 - https://github.com/SillyTavern/SillyTavern/pull/3763#issue-2948421833
 
@@ -9,6 +9,7 @@
 - **New Feature**: You can now use `{{short_term_memory}}` and `{{long_term_memory}}` macros in your story string if you want to manually inject them. If you do this, make sure to select "Do not inject" in the config, or they will be injected twice.
 - **New Feature**: You can now specify a summary injection threshold - a number of messages after which summaries will start being injected. You can also optionally remove messages from context after that threshold as well. If you set the threshold to 0 and *don't* exclude messages, the behavior is equivalent to before this version. If you set the threshold to 0 and *exclude* messages, then your context will effectively be relying only on summaries.
 
+- **Removed**: Because of the new summary injection threshold and the ability to exclude messages after it, the "Message Injection Limit" conifg has been removed.
 - **Change**: Reworked how you define the short-term and long-term injections - they now define the new memory macros. If there are no memories, the macros will be empty - this means you no longer need to use {{#if ..}} clauses in the memory injection templates.
 - **Fix**: Summary injections are now wrapped in a system prompt if injected autmatically (no system prompt if using the macros).
 - **Fix**: Fixed summary injection not immediately updating when updating the template.
