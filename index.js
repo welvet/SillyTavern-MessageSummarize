@@ -123,6 +123,7 @@ const default_settings = {
     summary_injection_separator: "\n* ",  // separator when concatenating summaries
     summary_injection_threshold: 0,            // start injecting summaries after this many messages
     exclude_messages_after_threshold: false,   // remove messages from context after the summary injection threshold
+    keep_last_user_message: true,  // keep the most recent user message in context
 
     long_template: default_long_template,
     long_term_context_limit: 10,  // context size to use as long-term memory limit
@@ -524,6 +525,9 @@ function get_settings(key) {
     // Get a setting for the extension, or the default value if not set
     return extension_settings[MODULE_NAME]?.[key] ?? default_settings[key];
 }
+function get_settings_element(key) {
+    return settings_ui_map[key]?.[0]
+}
 async function get_manifest() {
     // Get the manifest.json for the extension
     let module_dir = get_extension_directory();
@@ -898,32 +902,26 @@ function refresh_settings() {
 
         // when auto-summarize is disabled, related settings get disabled
         let auto_summarize = get_settings('auto_summarize');
-        $('#auto_summarize_on_send').prop('disabled', !auto_summarize)
-        $('#auto_summarize_message_limit').prop('disabled', !auto_summarize);
-        $('#auto_summarize_batch_size').prop('disabled', !auto_summarize);
-        $('#auto_summarize_progress').prop('disabled', !auto_summarize);
-        $('#summarization_delay').prop('disabled', !auto_summarize);
+        get_settings_element('auto_summarize_on_send')?.prop('disabled', !auto_summarize)
+        get_settings_element('auto_summarize_message_limit')?.prop('disabled', !auto_summarize);
+        get_settings_element('auto_summarize_batch_size')?.prop('disabled', !auto_summarize);
+        get_settings_element('auto_summarize_progress')?.prop('disabled', !auto_summarize);
+        get_settings_element('summarization_delay')?.prop('disabled', !auto_summarize);
+
 
         // If message history is disabled, disable the relevant settings
         let history_disabled = get_settings('include_message_history_mode') === "none";
-        $('#include_message_history').prop('disabled', history_disabled);
-        $('#include_user_messages_in_history').prop('disabled', history_disabled);
-        $('#preview_message_history').prop('disabled', history_disabled);
-        //$('#include_system_messages_in_history').prop('disabled', disabled);
-        //$('#include_thought_messages_in_history').prop('disabled', disabled);
+        get_settings_element('include_message_history')?.prop('disabled', history_disabled)
+        get_settings_element('include_user_messages_in_history')?.prop('disabled', history_disabled)
+        get_settings_element('preview_message_history')?.prop('disabled', history_disabled)
+
         if (!history_disabled && !get_settings('prompt').includes("{{history}}")) {
             toastr.warning("To include message history, you must use the {{history}} macro in the prompt.")
         }
 
-        // If message injection limit is disabled (-1), then the option to not inject summaries is disabled
-        let message_limit = get_settings('limit_injected_messages')
-        let $inject_redundant = $('#inject_redundant_summaries')
-        if (message_limit < 0) {
-            $inject_redundant.prop('disabled', true)
-            $inject_redundant.prop('checked', true)
-        } else {
-            $inject_redundant.prop('disabled', false)
-        }
+        // If not excluding message, then disable the option to preserve the last user message
+        let excluding_messages = get_settings('exclude_messages_after_threshold')
+        get_settings_element('keep_last_user_message')?.prop('disabled', !excluding_messages)
 
 
     } else {  // memory is disabled for this chat
@@ -2357,7 +2355,9 @@ function update_message_inclusion_flags() {
 
     let injection_threshold = get_settings('summary_injection_threshold')
     let exclude_messages = get_settings('exclude_messages_after_threshold')
+    let keep_last_user_message = get_settings('keep_last_user_message')
     let first_to_inject = chat.length - injection_threshold
+    let last_user_message_identified = false
 
     // iterate through the chat in reverse order and mark the messages that should be included in short-term and long-term memory
     let short_limit_reached = false;
@@ -2366,16 +2366,17 @@ function update_message_inclusion_flags() {
     let end = chat.length - 1;
     let summary = ""  // total concatenated summary so far
     let new_summary = ""  // temp summary storage to check token length
-    let first_user_message_identified = false
     for (let i = end; i >= 0; i--) {
         let message = chat[i];
 
-        // Mark whether the message is lagging (even if no summary)
-        // The first user message is kept, unless the injection threshold is -1
+        // Mark whether the message is lagging behind the exclusion threshold (even if no summary)
         let lagging = i >= first_to_inject
-        if (!first_user_message_identified && message.is_user && injection_threshold >= 0) {
-            first_user_message_identified = true
+
+        // If needed, mark the most recent user message as lagging
+        if (exclude_messages && keep_last_user_message && !last_user_message_identified && message.is_user) {
+            last_user_message_identified = true
             lagging = true
+            debug(`Marked most recent user message as lagging: ${i}`)
         }
         set_data(message, 'lagging', lagging)
 
@@ -2497,7 +2498,6 @@ function get_short_memory() {
 
 // Add an interception function to reduce the number of messages injected normally
 // This has to match the manifest.json "generate_interceptor" key
-const IGNORE_SYMBOL = Symbol.for('ignore')  // used for ephemeral metadata keys
 globalThis.memory_intercept_messages = function (chat, _contextSize, _abort, type) {
     if (!chat_enabled()) return;   // if memory disabled, do nothing
     if (!get_settings('exclude_messages_after_threshold')) return  // if not excluding any messages, do nothing
@@ -2506,12 +2506,15 @@ globalThis.memory_intercept_messages = function (chat, _contextSize, _abort, typ
     let start = chat.length-1
     if (type === 'continue') start--  // if a continue, keep the most recent message
 
+    // symbol is used to prevent accidentally leaking modifications to permanent chat.
+    let IGNORE_SYMBOL = getContext().symbols.ignore
+
     // Remove any messages that have summaries injected
     for (let i=start; i >= 0; i--) {
         delete chat[i].extra.ignore_formatting
         let message = chat[i]
         let lagging = get_data(message, 'lagging')  // The message should be kept
-        chat[i] = structuredClone(chat[i])  // keep changes temporary
+        chat[i] = structuredClone(chat[i])  // keep changes temporary for this generation
         chat[i].extra[IGNORE_SYMBOL] = !lagging
     }
 };
@@ -3225,6 +3228,7 @@ Available Macros:
     bind_setting('#summary_injection_separator', 'summary_injection_separator', 'text')
     bind_setting('#summary_injection_threshold', 'summary_injection_threshold', 'number');
     bind_setting('#exclude_messages_after_threshold', 'exclude_messages_after_threshold', 'boolean');
+    bind_setting('#keep_last_user_message', 'keep_last_user_message', 'boolean')
 
     bind_setting('input[name="short_term_position"]', 'short_term_position', 'number');
     bind_setting('#short_term_depth', 'short_term_depth', 'number');
