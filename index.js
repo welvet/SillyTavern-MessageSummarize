@@ -2934,6 +2934,10 @@ function refresh_memory() {
     let long_injection = get_long_memory();
     let short_injection = get_short_memory();
 
+    // if using text completion, we need to wrap it in a system prompt
+    long_injection = formatInstructModeChat("", long_injection, false, true)
+    short_injection = formatInstructModeChat("", short_injection, false, true)
+
     // inject the memories into the templates, if they exist
     ctx.setExtensionPrompt(`${MODULE_NAME}_long`,  long_injection,  get_settings('long_term_position'), get_settings('long_term_depth'), get_settings('long_term_scan'), get_settings('long_term_role'));
     ctx.setExtensionPrompt(`${MODULE_NAME}_short`, short_injection, get_settings('short_term_position'), get_settings('short_term_depth'), get_settings('short_term_scan'), get_settings('short_term_role'));
