@@ -1,7 +1,11 @@
 # Changelog
 
 #### vXXX
+**IMPORTANT**: Due to some changes with how the prompt injections are built, you should go to your short-term and long-term config sections and click "Edit", then click "Restore Default", then edit how you want from there.
+
 - **New Feature**: You can now specify a summary injection threshold - a number of messages after which summaries will start being injected. You can also optionally remove messages from context after that threshold as well. If you set the threshold to 0 and *don't* exclude messages, the behavior is equivalent to before this version. If you set the threshold to 0 and *exclude* messages, then your context will effectively be relying only on summaries.
+- **New Feature**: You can now use `{{short_term_memory}}` and `{{long_term_memory}}` macros in your story string if you want to manually inject them. If you do this, make sure to select "Do not inject" in the config, or they will be injected twice.
+- **Change**: Reworked how you define the short-term and long-term injections - they now define the new macros above. If there are no memories, the macros will be empty - this means you no longer need to use {{#if ..}} clauses. 
 - **Fix**: Fixed summary injection not immediately updating when updating the template.
 
 #### v0.8.22

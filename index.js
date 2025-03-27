@@ -52,8 +52,9 @@ const group_member_enable_button = `qvink_memory_group_member_enable`
 const group_member_enable_button_highlight = `qvink_memory_group_member_enabled`
 
 // Macros for long-term and short-term memory injection
-const long_memory_macro = `${MODULE_NAME}_long_memory`;
-const short_memory_macro = `${MODULE_NAME}_short_memory`;
+const long_memory_macro = `long_term_memory`;
+const short_memory_macro = `short_term_memory`;
+const generic_memories_macro = `memories`;
 
 // message button classes
 const remember_button_class = `${MODULE_NAME}_remember_button`
@@ -82,8 +83,8 @@ Following is a history of messages for context:
 Following is the message to summarize:
 {{message}}
 `
-const default_long_template = `{{#if ${long_memory_macro}}}\n[Following is a list of events that occurred in the past]:\n{{${long_memory_macro}}}\n{{/if}}`
-const default_short_template = `{{#if ${short_memory_macro}}}\n[Following is a list of recent events]:\n{{${short_memory_macro}}}\n{{/if}}`
+const default_long_template = `[Following is a list of events that occurred in the past]:\n{{${generic_memories_macro}}}\n`
+const default_short_template = `[Following is a list of recent events]:\n{{${generic_memories_macro}}}\n`
 const default_settings = {
     // inclusion criteria
     message_length_threshold: 10,  // minimum message token length for summarization
@@ -1480,7 +1481,6 @@ async function get_user_setting_text_input(key, title, description="") {
     let popup = new ctx.Popup(title, ctx.POPUP_TYPE.INPUT, value, {rows: 20, customButtons: [restore_button]});
 
     // Now remove the ".result-control" class to prevent it from submitting when you hit enter.
-    // This should have been a configuration option for the popup.
     popup.mainInput.classList.remove('result-control');
 
     let input = await popup.show();
@@ -2452,25 +2452,17 @@ function concatenate_summaries(indexes) {
     return summary
 }
 
-function collect_chat_messages(short=false, long=false) {
+function collect_chat_messages(include) {
     // Get a list of chat message indexes identified by the given criteria
     let context = getContext();
     let indexes = []  // list of indexes of messages
 
-    // iterate in reverse order, stopping when reaching the limit if given
+    // iterate in reverse order
     for (let i = context.chat.length-1; i >= 0; i--) {
         let message = context.chat[i];
-
-        // check regular message exclusion criteria first
-        if (!check_message_exclusion(message)) continue
-
-        let existing_memory = get_data(message, 'memory');
-        let include_type = get_data(message, 'include');
-        let lagging = get_data(message, 'lagging')
-        if (lagging && existing_memory) continue
-        if (!short && include_type === "short" && existing_memory) continue
-        if (!long && include_type === "long" && existing_memory) continue
-        if (include_type === null && existing_memory) continue
+        if (!get_data(message, 'memory')) continue  // no memory
+        if (get_data(message, 'lagging')) continue  // lagging - not injected yet
+        if (get_data(message, 'include') !== include) continue  // not the include types we want
         indexes.push(i)
     }
 
@@ -2480,35 +2472,28 @@ function collect_chat_messages(short=false, long=false) {
 }
 function get_long_memory() {
     // get the injection text for long-term memory
-    let indexes = collect_chat_messages(false, true)
+    let indexes = collect_chat_messages('long')
+    if (indexes.length === 0) return ""  // if no memories, return empty
+
     let text = concatenate_summaries(indexes);
     let template = get_settings('long_template')
     let ctx = getContext();
 
-    // first replace any global macros
-    template = ctx.substituteParamsExtended(template);
-
-    // handle the #if macros using our custom function because ST DOESN'T EXPOSE THEIRS FOR SOME REASON
-    template = substitute_conditionals(template, {[long_memory_macro]: text});
-    template = substitute_params(template, {[long_memory_macro]: text});
-    return template
+    // replace memories macro
+    return ctx.substituteParamsExtended(template, {[generic_memories_macro]: text});
 }
 function get_short_memory() {
     // get the injection text for short-term memory
-    let indexes = collect_chat_messages(true, false)
+    let indexes = collect_chat_messages('short')
+    if (indexes.length === 0) return ""  // if no memories, return empty
+
     let text = concatenate_summaries(indexes);
     let template = get_settings('short_template')
     let ctx = getContext();
 
-    // first replace any global macros
-    template = ctx.substituteParamsExtended(template);
-
-    // handle the #if macros using our custom function because ST DOESN'T EXPOSE THEIRS FOR SOME REASON
-    template = substitute_conditionals(template, {[short_memory_macro]: text});
-    template = substitute_params(template, {[short_memory_macro]: text});
-    return template
+    // replace memories macro
+    return ctx.substituteParamsExtended(template, {[generic_memories_macro]: text});
 }
-
 
 // Add an interception function to reduce the number of messages injected normally
 // This has to match the manifest.json "generate_interceptor" key
@@ -3185,10 +3170,22 @@ Available Macros:
         get_user_setting_text_input('prompt', 'Edit Summary Prompt', description)
     })
     bind_function('#edit_long_term_memory_prompt', async () => {
-        get_user_setting_text_input('long_template', 'Edit Long-Term Memory Prompt')
+        let description = `
+<ul style="text-align: left; font-size: smaller;">
+    <li>This will be the content of the <b>{{${long_memory_macro}}}</b> macro.</li>
+    <li>If there is nothing in long-term memory, the whole macro will be empty.</li>
+    <li>In this input, the <b>{{${generic_memories_macro}}}</b> macro will be replaced by all long-term memories.</li>
+</ul>`
+        get_user_setting_text_input('long_template', `Edit Long-Term Memory Injection`, description)
     })
     bind_function('#edit_short_term_memory_prompt', async () => {
-        get_user_setting_text_input('short_template', 'Edit Short-Term Memory Prompt')
+        let description = `
+<ul style="text-align: left; font-size: smaller;">
+    <li>This will be the content of the <b>{{${short_memory_macro}}}</b> macro.</li>
+    <li>If there is nothing in short-term memory, the whole macro will be empty.</li>
+    <li>In this input, the <b>{{${generic_memories_macro}}}</b> macro will be replaced by all short-term memories.</li>
+</ul>`
+        get_user_setting_text_input('short_template', `Edit Short-Term Memory Injection`, description)
     })
     bind_function('#preview_message_history', async () => {
         let chat = getContext().chat;
@@ -3676,8 +3673,8 @@ jQuery(async function () {
     eventSource.on('groupSelected', set_character_enabled_button_states)
     eventSource.on(event_types.GROUP_UPDATED, set_character_enabled_button_states)
 
-    // Global Macros  // TODO get this working
-    //MacrosParser.registerMacro("qvink_memory_short_memory", () => get_short_memory());
-    //MacrosParser.registerMacro("qvink_memory_long_memory", () => get_long_memory());
+    // Global Macros
+    MacrosParser.registerMacro(short_memory_macro, () => get_short_memory());
+    MacrosParser.registerMacro(long_memory_macro, () => get_long_memory());
 
 });
