@@ -2497,6 +2497,7 @@ function get_short_memory() {
 
 // Add an interception function to reduce the number of messages injected normally
 // This has to match the manifest.json "generate_interceptor" key
+const IGNORE_SYMBOL = Symbol.for('ignore')  // used for ephemeral metadata keys
 globalThis.memory_intercept_messages = function (chat, _contextSize, _abort, type) {
     if (!chat_enabled()) return;   // if memory disabled, do nothing
     if (!get_settings('exclude_messages_after_threshold')) return  // if not excluding any messages, do nothing
@@ -2507,13 +2508,11 @@ globalThis.memory_intercept_messages = function (chat, _contextSize, _abort, typ
 
     // Remove any messages that have summaries injected
     for (let i=start; i >= 0; i--) {
+        delete chat[i].extra.ignore_formatting
         let message = chat[i]
-        let lagging = get_data(message, 'lagging')  // If the summary is NOT going to be injected
-        //let in_memory = get_data(message, 'include')
-        if (!lagging) {
-            chat[i] = structuredClone(chat[i])
-            chat[i].extra.ignore = true  // hide it
-        }
+        let lagging = get_data(message, 'lagging')  // The message should be kept
+        chat[i] = structuredClone(chat[i])  // keep changes temporary
+        chat[i].extra[IGNORE_SYMBOL] = !lagging
     }
 };
 

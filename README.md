@@ -167,4 +167,7 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Allow locking profile to specific chat, not just character.~~
 - ~~import/export profiles~~
 - ~~Option to remove redundant memory injections while the associated messages are in context.~~
-- Make the memory injections global macros
+- ~~Make the memory injections global macros~~
+- Fix message limit messing with world info timed effects:
+  - Potential fix in PR: https://github.com/SillyTavern/SillyTavern/pull/3763#issue-2948421833
+- Format injections as system prompt
