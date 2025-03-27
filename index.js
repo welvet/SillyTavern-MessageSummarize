@@ -890,8 +890,10 @@ function refresh_settings() {
         debug("{{message}} macro not found in summary prompt. It has been added automatically.")
     }
 
-    // auto_summarize_message_limit must be >= auto_summarize_batch_size
-    if (get_settings('auto_summarize_message_limit') < get_settings('auto_summarize_batch_size')) {
+    // auto_summarize_message_limit must be >= auto_summarize_batch_size (unless the limit is disabled, i.e. -1)
+    let auto_limit = get_settings('auto_summarize_message_limit')
+    let batch_size = get_settings('auto_summarize_batch_size')
+    if (auto_limit >= 0 && (auto_limit < batch_size)) {
         set_settings('auto_summarize_message_limit', get_settings('auto_summarize_batch_size'));
         toast("The auto-summarize message limit must be greater than or equal to the batch size.", "warning")
     }
