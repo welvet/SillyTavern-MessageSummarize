@@ -291,6 +291,17 @@ function unescape_string(text) {
         }
     });
 }
+function check_st_version() {
+    // Check to see if the current version of ST is acceptable.
+    // Currently checks for the "symbols" property of the global context,
+    //   which was added in https://github.com/SillyTavern/SillyTavern/pull/3763#issue-2948421833
+    log("Checking ST version...")
+    if (getContext().symbols !== undefined) {
+        return true
+    } else {
+        toast("Incompatible ST version - please update.", "error")
+    }
+}
 
 // Completion presets
 function get_current_preset() {
@@ -3650,6 +3661,10 @@ jQuery(async function () {
     const manifest = await get_manifest();
     const VERSION = manifest.version;
     log(`Version: ${VERSION}`)
+
+    if (!check_st_version()) {
+        return
+    }
 
     // Load settings
     initialize_settings();
