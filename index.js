@@ -411,6 +411,13 @@ async function get_connection_profile_api(name) {
         return
     }
 
+    // If the API type isn't defined, it might be excluded from the connection profile. Assume based on mode.
+    if (data.api === undefined) {
+        debug(`API not defined in connection profile ${name}. Mode is ${data.mode}`)
+        if (data.mode === 'tc') return 'textgenerationwebui'
+        if (data.mode === 'cc') return 'openai'
+    }
+
     // need to map the API type to a completion API
     if (CONNECT_API_MAP[data.api] === undefined) {
         error(`API type "${data.api}" not found in CONNECT_API_MAP - could not identify API.`)
