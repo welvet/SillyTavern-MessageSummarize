@@ -2024,9 +2024,34 @@ class MemoryEditInterface {
     }
     update_context_line() {
         // updates the position of the last-in-context line for messages
-        let id = chat_metadata["lastInContextMessageId"]
+
+        // ID of last in context message
+        let target_id = chat_metadata["lastInContextMessageId"]
+
+        // get the next highest ID displayed
+        let to_check = this.settings.reverse_page_sort ? this.displayed.slice().reverse() : this.displayed
+        let start = to_check[0]  // start checking at
+        let end = to_check[to_check.length-1]
+        let closest_id;
+        let style;
+
+        if (target_id > start) {  // Not on this page - higher
+            closest_id = start;
+            style = this.settings.reverse_page_sort ? 'last_in_context_bottom' : 'last_in_context_top'
+        } else if (target_id < end) {  // Not on this page - lower
+            closest_id = end;
+            style = this.settings.reverse_page_sort ? 'last_in_context_top' : 'last_in_context_bottom'
+        } else {  // on this page - search for it
+            closest_id = start;
+            for (let id of to_check) {
+                if (id >= target_id) closest_id = id
+                else break;
+            }
+            style = this.settings.reverse_page_sort ? 'last_in_context_top' : 'last_in_context_bottom'
+        }
+
         this.$table_body.find('tr').removeClass('last_in_context_top last_in_context_bottom')
-        this.$table_body.find(`tr#memory_${id}`).addClass(this.settings.reverse_page_sort ? 'last_in_context_top' : 'last_in_context_bottom')
+        this.$table_body.find(`tr#memory_${closest_id}`).addClass(style)
     }
     toggle_selected(indexes, value=null) {
         // set the selected state of the given message indexes
