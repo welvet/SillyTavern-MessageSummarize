@@ -201,6 +201,15 @@ dialog:has(#qvink_memory_state_interface) {
     z-index: 1;  /* to be above the body when scrolling */
     background: var(--SmartThemeBlurTintColor)
 }
+#qvink_memory_state_interface table {
+    border-collapse: collapse;  /* needed to have borders around cells */
+}
+#qvink_memory_state_interface table tr.last_in_context_top {
+    border-top: 3px dotted var(--SmartThemeQuoteColor) !important;
+}
+#qvink_memory_state_interface table tr.last_in_context_bottom {
+    border-bottom: 3px dotted var(--SmartThemeQuoteColor) !important;
+}
 #qvink_memory_state_interface table tbody td {
     position: relative;  /* to be under the head when scrolling */
 }

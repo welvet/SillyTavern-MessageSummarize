@@ -15,7 +15,6 @@ import {
     CONNECT_API_MAP,
     main_api,
     chat_metadata,
-    Generate,
 } from '../../../../script.js';
 import { getPresetManager } from '../../../preset-manager.js'
 import { formatInstructModeChat } from '../../../instruct-mode.js';
@@ -1891,6 +1890,7 @@ class MemoryEditInterface {
         }
 
         this.update_selected()
+        this.update_context_line()
     }
     update_filters() {
         // update list of indexes to include based on current filters
@@ -2021,6 +2021,12 @@ class MemoryEditInterface {
             this.update_table()
         })
 
+    }
+    update_context_line() {
+        // updates the position of the last-in-context line for messages
+        let id = chat_metadata["lastInContextMessageId"]
+        this.$table_body.find('tr').removeClass('last_in_context_top last_in_context_bottom')
+        this.$table_body.find(`tr#memory_${id}`).addClass(this.settings.reverse_page_sort ? 'last_in_context_top' : 'last_in_context_bottom')
     }
     toggle_selected(indexes, value=null) {
         // set the selected state of the given message indexes
