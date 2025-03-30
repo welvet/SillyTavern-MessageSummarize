@@ -1707,7 +1707,7 @@ class MemoryEditInterface {
         this.$reverse_page_sort.prop('checked', this.settings.reverse_page_sort ?? false)
         this.$reverse_page_sort.on('change', () => {
             this.save_settings()
-            this.update_filters()
+            this.update_filters(true)
             this.update_table()
         })
 
@@ -1892,7 +1892,7 @@ class MemoryEditInterface {
         this.update_selected()
         this.update_context_line()
     }
-    update_filters() {
+    update_filters(preserve_page=false) {
         // update list of indexes to include based on current filters
         log("Updating interface filters...")
 
@@ -1933,9 +1933,11 @@ class MemoryEditInterface {
         this.$pagination.pagination({
             dataSource: this.filtered,
             pageSize: 100,
+            pageNumber: preserve_page ? this.pagination?.pageNumber : 1,
             sizeChangerOptions: [10, 50, 100, 500, 1000],
             showSizeChanger: true,
             callback: (data, pagination) => {
+                this.pagination = pagination  // the pagination object
                 if (this.settings.reverse_page_sort) {
                     data.reverse()
                 }
