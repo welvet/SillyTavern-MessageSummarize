@@ -130,7 +130,6 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 
 
 ### Known Issues
-- When using a message limit, world info cooldown and sticky timed effects do not work properly. This is because the WI timed effects rely on the number of messages in the chat history during generation. I have not found a way around this yet.
 - When editing a message that already has a memory, the memory displayed below the message does not have the right color. This is just a visual bug, and it will correct itself after the next summarization.
 
 ### Todo
