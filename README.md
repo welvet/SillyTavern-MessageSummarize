@@ -1,3 +1,15 @@
+### Contents
+- [Description](#description)
+- [Notable Features](#notable-features)
+- [Installation and Usage](#installation-and-usage)
+- [How to use the Dev branch](#how-to-use-the-dev-branch)
+- [Slash Commands](#slash-commands)
+- [Custom CSS](#custom-css)
+- [Tips](#tips)
+- [Troubleshooting](#troubleshooting)
+- [Known Issues](#known-issues)
+
+
 ### Description
 - This extension reworks how memory is stored by summarizing each message individually, rather than all at once.
 - Summaries are injected into the main prompt at two levels: short-term memory and long-term memory.
