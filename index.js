@@ -1632,6 +1632,7 @@ class MemoryEditInterface {
 <div class="flex-container justifyspacebetween alignitemscenter">
     <h4>Memory State</h4>
     <button id="preview_memory_state" class="menu_button fa-solid fa-eye margin0" title="Preview current memory state (the exact text that will be injected into your context)."></button>
+    <button id="expand_filter_bar" class="menu_button fa-solid fa-list-check margin0" title="Show chat filters"></button>
     <label class="checkbox_label" title="Selecting message subsets applies to the entire chat history. When unchecked, it only applies to the current page.">
         <input id="global_selection" type="checkbox" />
         <span>Global Selection</span>
@@ -1702,6 +1703,10 @@ class MemoryEditInterface {
         this.$global_selection_checkbox = this.$content.find("#global_selection")
         this.$global_selection_checkbox.prop('checked', this.settings.global_selection ?? false)
         this.$global_selection_checkbox.on('change', () => this.save_settings())
+
+        this.$filter_bar = this.$content.find('#filter_bar')
+        this.$expand_filter_bar = this.$content.find("#expand_filter_bar")
+        this.$expand_filter_bar.on('click', () => this.$filter_bar.toggle())
 
         this.$reverse_page_sort = this.$content.find('#reverse_page_sort')
         this.$reverse_page_sort.prop('checked', this.settings.reverse_page_sort ?? false)
