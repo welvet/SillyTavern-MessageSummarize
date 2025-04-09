@@ -1632,7 +1632,7 @@ class MemoryEditInterface {
 <div class="flex-container justifyspacebetween alignitemscenter">
     <h4>Memory State</h4>
     <button id="preview_memory_state" class="menu_button fa-solid fa-eye margin0" title="Preview current memory state (the exact text that will be injected into your context)."></button>
-    <button id="expand_filter_bar" class="menu_button fa-solid fa-list-check margin0" title="Show chat filters"></button>
+    <button id="expand_filter_bar" class="menu_button fa-solid fa-list-check margin0" title="Toggle chat filters"></button>
     <label class="checkbox_label" title="Selecting message subsets applies to the entire chat history. When unchecked, it only applies to the current page.">
         <input id="global_selection" type="checkbox" />
         <span>Global Selection</span>
