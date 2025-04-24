@@ -1,3 +1,15 @@
+### Contents
+- [Description](#description)
+- [Notable Features](#notable-features)
+- [Installation and Usage](#installation-and-usage)
+- [How to use the Dev branch](#how-to-use-the-dev-branch)
+- [Slash Commands](#slash-commands)
+- [Custom CSS](#custom-css)
+- [Tips](#tips)
+- [Troubleshooting](#troubleshooting)
+- [Known Issues](#known-issues)
+
+
 ### Description
 - This extension reworks how memory is stored by summarizing each message individually, rather than all at once.
 - Summaries are injected into the main prompt at two levels: short-term memory and long-term memory.
@@ -118,7 +130,6 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 
 
 ### Known Issues
-- When using a message limit, world info cooldown and sticky timed effects do not work properly. This is because the WI timed effects rely on the number of messages in the chat history during generation. I have not found a way around this yet.
 - When editing a message that already has a memory, the memory displayed below the message does not have the right color. This is just a visual bug, and it will correct itself after the next summarization.
 
 ### Todo
@@ -166,5 +177,9 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Allow customizing the memory injection separators~~
 - ~~Allow locking profile to specific chat, not just character.~~
 - ~~import/export profiles~~
-- Option to remove redundant memory injections while the associated messages are in context.
-- Make the memory injections global macros
+- ~~Option to remove redundant memory injections while the associated messages are in context.~~
+- ~~Make the memory injections global macros~~
+- ~~Fix message limit messing with world info timed effects. PR: https://github.com/SillyTavern/SillyTavern/pull/3763#issue-2948421833~~
+- ~~Format injections as system prompt~~
+- ~~Add dashed line to memory edit interface~~
+- detect response length change to update settings visuals

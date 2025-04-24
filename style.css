@@ -1,8 +1,9 @@
-.version_id {
-    font-size: 0.4em;
-    color: white;
-    opacity: 0.05;
-    margin: 0 5px;
+:root {
+    --qvink_short: #2E8B57;
+    --qvink_long: #4682B4;
+    --qvink_old: #8B0000;
+    --qvink_excluded: #555;
+    --qvink_redundant_opacity: 50%;
 }
 
 #drawer_content > hr {
@@ -68,19 +69,31 @@ By default, text is greyed to indicate that is it not injected.
 
 /* to style short-term memories. */
 .qvink_short_memory {
-    color: seagreen;
+    color: var(--qvink_short);
+}
+.qvink_short_memory.qvink_lagging_memory {
+    color: rgba(from var(--qvink_short) r g b / var(--qvink_redundant_opacity));
+    text-shadow: none;
 }
 /* to style long-term memories. */
 .qvink_long_memory {
-    color: steelblue;
+    color: var(--qvink_long);
+}
+.qvink_long_memory.qvink_lagging_memory {
+    color: rgba(from var(--qvink_long) r g b / var(--qvink_redundant_opacity));
+    text-shadow: none;
 }
 /* to style memories marked for long-term, but are past the context limit */
 .qvink_old_memory {
-    color: darkred;
+    color: var(--qvink_old)
+}
+.qvink_old_memory.qvink_lagging_memory {
+    color: rgba(from var(--qvink_old) r g b / var(--qvink_redundant_opacity));
+    text-shadow: none;
 }
 /* to style memories that are force-excluded */
 .qvink_exclude_memory {
-    color: #555;
+    color: var(--qvink_excluded)
 }
 
 /* Style the message buttons, separating them from the rest */
@@ -187,6 +200,15 @@ dialog:has(#qvink_memory_state_interface) {
     top: 0;
     z-index: 1;  /* to be above the body when scrolling */
     background: var(--SmartThemeBlurTintColor)
+}
+#qvink_memory_state_interface table {
+    border-collapse: collapse;  /* needed to have borders around cells */
+}
+#qvink_memory_state_interface table tr.last_in_context_top {
+    border-top: 3px dotted var(--SmartThemeQuoteColor) !important;
+}
+#qvink_memory_state_interface table tr.last_in_context_bottom {
+    border-bottom: 3px dotted var(--SmartThemeQuoteColor) !important;
 }
 #qvink_memory_state_interface table tbody td {
     position: relative;  /* to be under the head when scrolling */

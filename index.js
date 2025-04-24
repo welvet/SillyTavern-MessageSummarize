@@ -13,7 +13,8 @@ import {
     amount_gen,
     system_message_types,
     CONNECT_API_MAP,
-    main_api
+    main_api,
+    chat_metadata,
 } from '../../../../script.js';
 import { getPresetManager } from '../../../preset-manager.js'
 import { formatInstructModeChat } from '../../../instruct-mode.js';
@@ -39,6 +40,7 @@ const css_short_memory = "qvink_short_memory"
 const css_long_memory = "qvink_long_memory"
 const css_remember_memory = `qvink_old_memory`
 const css_exclude_memory = `qvink_exclude_memory`
+const css_lagging_memory = `qvink_lagging_memory`
 const summary_div_class = `qvink_memory_text`  // class put on all added summary divs to identify them
 const summary_reasoning_class = 'qvink_memory_reasoning'
 const css_button_separator = `qvink_memory_button_separator`
@@ -49,8 +51,9 @@ const group_member_enable_button = `qvink_memory_group_member_enable`
 const group_member_enable_button_highlight = `qvink_memory_group_member_enabled`
 
 // Macros for long-term and short-term memory injection
-const long_memory_macro = `${MODULE_NAME}_long_memory`;
-const short_memory_macro = `${MODULE_NAME}_short_memory`;
+const long_memory_macro = `long_term_memory`;
+const short_memory_macro = `short_term_memory`;
+const generic_memories_macro = `memories`;
 
 // message button classes
 const remember_button_class = `${MODULE_NAME}_remember_button`
@@ -79,8 +82,8 @@ Following is a history of messages for context:
 Following is the message to summarize:
 {{message}}
 `
-const default_long_template = `{{#if ${long_memory_macro}}}\n[Following is a list of events that occurred in the past]:\n{{${long_memory_macro}}}\n{{/if}}`
-const default_short_template = `{{#if ${short_memory_macro}}}\n[Following is a list of recent events]:\n{{${short_memory_macro}}}\n{{/if}}`
+const default_long_template = `[Following is a list of events that occurred in the past]:\n{{${generic_memories_macro}}}\n`
+const default_short_template = `[Following is a list of recent events]:\n{{${generic_memories_macro}}}\n`
 const default_settings = {
     // inclusion criteria
     message_length_threshold: 10,  // minimum message token length for summarization
@@ -116,6 +119,11 @@ const default_settings = {
     include_thought_messages_in_history: false,  // include previous thought messages in the summarization prompt when including message history
 
     // injection settings
+    summary_injection_separator: "\n* ",  // separator when concatenating summaries
+    summary_injection_threshold: 0,            // start injecting summaries after this many messages
+    exclude_messages_after_threshold: false,   // remove messages from context after the summary injection threshold
+    keep_last_user_message: true,  // keep the most recent user message in context
+
     long_template: default_long_template,
     long_term_context_limit: 10,  // context size to use as long-term memory limit
     long_term_context_type: 'percent',  // percent or tokens
@@ -137,8 +145,6 @@ const default_settings = {
     display_memories: true,  // display memories in the chat below each message
     default_chat_enabled: true,  // whether memory is enabled by default for new chats
     use_global_toggle_state: false,  // whether the on/off state for this profile uses the global state
-    limit_injected_messages: -1,  // limit the number of injected messages (-1 for no limit)
-    summary_injection_separator: "\n* "  // separator when concatenating summaries
 };
 const global_settings = {
     profiles: {},  // dict of profiles by name
@@ -284,7 +290,17 @@ function unescape_string(text) {
         }
     });
 }
-
+function check_st_version() {
+    // Check to see if the current version of ST is acceptable.
+    // Currently checks for the "symbols" property of the global context,
+    //   which was added in https://github.com/SillyTavern/SillyTavern/pull/3763#issue-2948421833
+    log("Checking ST version...")
+    if (getContext().symbols !== undefined) {
+        return true
+    } else {
+        toast("Incompatible ST version - please update.", "error")
+    }
+}
 
 // Completion presets
 function get_current_preset() {
@@ -392,6 +408,13 @@ async function get_connection_profile_api(name) {
         error(`Failed to parse JSON from /profile-get for \"${name}\". Result:`)
         error(result)
         return
+    }
+
+    // If the API type isn't defined, it might be excluded from the connection profile. Assume based on mode.
+    if (data.api === undefined) {
+        debug(`API not defined in connection profile ${name}. Mode is ${data.mode}`)
+        if (data.mode === 'tc') return 'textgenerationwebui'
+        if (data.mode === 'cc') return 'openai'
     }
 
     // need to map the API type to a completion API
@@ -518,6 +541,9 @@ function set_settings(key, value) {
 function get_settings(key) {
     // Get a setting for the extension, or the default value if not set
     return extension_settings[MODULE_NAME]?.[key] ?? default_settings[key];
+}
+function get_settings_element(key) {
+    return settings_ui_map[key]?.[0]
 }
 async function get_manifest() {
     // Get the manifest.json for the extension
@@ -870,37 +896,12 @@ function refresh_settings() {
         debug("{{message}} macro not found in summary prompt. It has been added automatically.")
     }
 
-    // auto_summarize_message_limit must be >= auto_summarize_batch_size
-    if (get_settings('auto_summarize_message_limit') < get_settings('auto_summarize_batch_size')) {
+    // auto_summarize_message_limit must be >= auto_summarize_batch_size (unless the limit is disabled, i.e. -1)
+    let auto_limit = get_settings('auto_summarize_message_limit')
+    let batch_size = get_settings('auto_summarize_batch_size')
+    if (auto_limit >= 0 && (auto_limit < batch_size)) {
         set_settings('auto_summarize_message_limit', get_settings('auto_summarize_batch_size'));
         toast("The auto-summarize message limit must be greater than or equal to the batch size.", "warning")
-    }
-
-    // enable or disable settings based on others
-    if (chat_enabled()) {
-        $(`.${settings_content_class} .settings_input`).prop('disabled', false);  // enable all settings
-
-        // when auto-summarize is disabled, related settings get disabled
-        let auto_summarize = get_settings('auto_summarize');
-        $('#auto_summarize_on_send').prop('disabled', !auto_summarize)
-        $('#auto_summarize_message_limit').prop('disabled', !auto_summarize);
-        $('#auto_summarize_batch_size').prop('disabled', !auto_summarize);
-        $('#auto_summarize_progress').prop('disabled', !auto_summarize);
-        $('#summarization_delay').prop('disabled', !auto_summarize);
-
-        // If message history is disabled, disable the relevant settings
-        let history_disabled = get_settings('include_message_history_mode') === "none";
-        $('#include_message_history').prop('disabled', history_disabled);
-        $('#include_user_messages_in_history').prop('disabled', history_disabled);
-        $('#preview_message_history').prop('disabled', history_disabled);
-        //$('#include_system_messages_in_history').prop('disabled', disabled);
-        //$('#include_thought_messages_in_history').prop('disabled', disabled);
-        if (!history_disabled && !get_settings('prompt').includes("{{history}}")) {
-            toastr.warning("To include message history, you must use the {{history}} macro in the prompt.")
-        }
-
-    } else {  // memory is disabled for this chat
-        $(`.${settings_content_class} .settings_input`).prop('disabled', true);  // disable all settings
     }
 
     // update the save icon highlight
@@ -912,6 +913,38 @@ function refresh_settings() {
     // iterate through the settings map and set each element to the current setting value
     for (let [key, [element, type]] of Object.entries(settings_ui_map)) {
         set_setting_ui_element(key, element, type);
+    }
+
+    // enable or disable settings based on others
+    if (chat_enabled()) {
+        $(`.${settings_content_class} .settings_input`).prop('disabled', false);  // enable all settings
+
+        // when auto-summarize is disabled, related settings get disabled
+        let auto_summarize = get_settings('auto_summarize');
+        get_settings_element('auto_summarize_on_send')?.prop('disabled', !auto_summarize)
+        get_settings_element('auto_summarize_message_limit')?.prop('disabled', !auto_summarize);
+        get_settings_element('auto_summarize_batch_size')?.prop('disabled', !auto_summarize);
+        get_settings_element('auto_summarize_progress')?.prop('disabled', !auto_summarize);
+        get_settings_element('summarization_delay')?.prop('disabled', !auto_summarize);
+
+
+        // If message history is disabled, disable the relevant settings
+        let history_disabled = get_settings('include_message_history_mode') === "none";
+        get_settings_element('include_message_history')?.prop('disabled', history_disabled)
+        get_settings_element('include_user_messages_in_history')?.prop('disabled', history_disabled)
+        get_settings_element('preview_message_history')?.prop('disabled', history_disabled)
+
+        if (!history_disabled && !get_settings('prompt').includes("{{history}}")) {
+            toastr.warning("To include message history, you must use the {{history}} macro in the prompt.")
+        }
+
+        // If not excluding message, then disable the option to preserve the last user message
+        let excluding_messages = get_settings('exclude_messages_after_threshold')
+        get_settings_element('keep_last_user_message')?.prop('disabled', !excluding_messages)
+
+
+    } else {  // memory is disabled for this chat
+        $(`.${settings_content_class} .settings_input`).prop('disabled', true);  // disable all settings
     }
 
 
@@ -1302,16 +1335,24 @@ function get_summary_style_class(message) {
     let include = get_data(message, 'include');
     let remember = get_data(message, 'remember');
     let exclude = get_data(message, 'exclude');  // force-excluded by user
+    let lagging = get_data(message, 'lagging');  // not injected yet
 
+    let style = ""
     if (remember && include) {  // marked to be remembered and included in memory anywhere
-        return  css_long_memory
+        style = css_long_memory
     } else if (include === "short") {  // not marked to remember, but included in short-term memory
-        return css_short_memory
+        style = css_short_memory
     } else if (remember) {  // marked to be remembered but not included in memory
-        return css_remember_memory
+        style = css_remember_memory
     } else if (exclude) {  // marked as force-excluded
-        return css_exclude_memory
+        style = css_exclude_memory
     }
+
+    if (lagging) {
+        style = `${style} ${css_lagging_memory}`
+    }
+
+    return style
 }
 function update_message_visuals(i, style=true, text=null) {
     // Update the message visuals according to its current memory status
@@ -1340,11 +1381,7 @@ function update_message_visuals(i, style=true, text=null) {
 
     // get the div holding the main message text
     let message_element = div_element.find('div.mes_text');
-
-    let style_class = "";
-    if (style) {
-        style_class = get_summary_style_class(message)
-    }
+    let style_class = style ? get_summary_style_class(message) : ""
 
     // if no text is provided, use the memory text
     if (!text) {
@@ -1461,7 +1498,6 @@ async function get_user_setting_text_input(key, title, description="") {
     let popup = new ctx.Popup(title, ctx.POPUP_TYPE.INPUT, value, {rows: 20, customButtons: [restore_button]});
 
     // Now remove the ".result-control" class to prevent it from submitting when you hit enter.
-    // This should have been a configuration option for the popup.
     popup.mainInput.classList.remove('result-control');
 
     let input = await popup.show();
@@ -1596,6 +1632,7 @@ class MemoryEditInterface {
 <div class="flex-container justifyspacebetween alignitemscenter">
     <h4>Memory State</h4>
     <button id="preview_memory_state" class="menu_button fa-solid fa-eye margin0" title="Preview current memory state (the exact text that will be injected into your context)."></button>
+    <button id="expand_filter_bar" class="menu_button fa-solid fa-list-check margin0" title="Toggle chat filters"></button>
     <label class="checkbox_label" title="Selecting message subsets applies to the entire chat history. When unchecked, it only applies to the current page.">
         <input id="global_selection" type="checkbox" />
         <span>Global Selection</span>
@@ -1667,11 +1704,15 @@ class MemoryEditInterface {
         this.$global_selection_checkbox.prop('checked', this.settings.global_selection ?? false)
         this.$global_selection_checkbox.on('change', () => this.save_settings())
 
+        this.$filter_bar = this.$content.find('#filter_bar')
+        this.$expand_filter_bar = this.$content.find("#expand_filter_bar")
+        this.$expand_filter_bar.on('click', () => this.$filter_bar.toggle())
+
         this.$reverse_page_sort = this.$content.find('#reverse_page_sort')
         this.$reverse_page_sort.prop('checked', this.settings.reverse_page_sort ?? false)
         this.$reverse_page_sort.on('change', () => {
             this.save_settings()
-            this.update_filters()
+            this.update_filters(true)
             this.update_table()
         })
 
@@ -1854,8 +1895,9 @@ class MemoryEditInterface {
         }
 
         this.update_selected()
+        this.update_context_line()
     }
-    update_filters() {
+    update_filters(preserve_page=false) {
         // update list of indexes to include based on current filters
         log("Updating interface filters...")
 
@@ -1896,9 +1938,11 @@ class MemoryEditInterface {
         this.$pagination.pagination({
             dataSource: this.filtered,
             pageSize: 100,
+            pageNumber: preserve_page ? this.pagination?.pageNumber : 1,
             sizeChangerOptions: [10, 50, 100, 500, 1000],
             showSizeChanger: true,
             callback: (data, pagination) => {
+                this.pagination = pagination  // the pagination object
                 if (this.settings.reverse_page_sort) {
                     data.reverse()
                 }
@@ -1984,6 +2028,37 @@ class MemoryEditInterface {
             this.update_table()
         })
 
+    }
+    update_context_line() {
+        // updates the position of the last-in-context line for messages
+
+        // ID of last in context message
+        let target_id = chat_metadata["lastInContextMessageId"]
+
+        // get the next highest ID displayed
+        let to_check = this.settings.reverse_page_sort ? this.displayed.slice().reverse() : this.displayed
+        let start = to_check[0]  // start checking at
+        let end = to_check[to_check.length-1]
+        let closest_id;
+        let style;
+
+        if (target_id > start) {  // Not on this page - higher
+            closest_id = start;
+            style = this.settings.reverse_page_sort ? 'last_in_context_bottom' : 'last_in_context_top'
+        } else if (target_id < end) {  // Not on this page - lower
+            closest_id = end;
+            style = this.settings.reverse_page_sort ? 'last_in_context_top' : 'last_in_context_bottom'
+        } else {  // on this page - search for it
+            closest_id = start;
+            for (let id of to_check) {
+                if (id >= target_id) closest_id = id
+                else break;
+            }
+            style = this.settings.reverse_page_sort ? 'last_in_context_top' : 'last_in_context_bottom'
+        }
+
+        this.$table_body.find('tr').removeClass('last_in_context_top last_in_context_bottom')
+        this.$table_body.find(`tr#memory_${closest_id}`).addClass(style)
     }
     toggle_selected(indexes, value=null) {
         // set the selected state of the given message indexes
@@ -2328,48 +2403,6 @@ function check_message_exclusion(message) {
 
     return true;
 }
-function check_message_conditional(message, no_summary=true, short=true, long=true, remember=true, edited=true, excluded=true) {
-    // check whether a message meets the given conditions
-
-    // check regular message exclusion criteria first
-    let include = check_message_exclusion(message);  // check if the message should be included due to the summary inclusion criteria
-    if (!include) {
-        return false
-    }
-
-    // if we don't want messages without a summary and this message doesn't have a summary, skip it
-    let existing_memory = get_data(message, 'memory');
-    if (!no_summary && !existing_memory) {
-        return false
-    }
-
-    // if we don't want messages with short-term memories and this message has one, skip it
-    let include_type = get_data(message, 'include');
-    if (!short && include_type === "short" && existing_memory) {
-        return
-    }
-    // if we don't want messages with long-term memories and this message has one, skip it
-    if (!long && include_type === "long" && existing_memory) {
-        return
-    }
-
-    // if we don't want messages with edited memories and this memory has been edited, skip it
-    if (!edited && get_data(message, 'edited') && existing_memory) {
-        return
-    }
-
-    // if we don't want messages with memories that are marked to remember, skip it
-    if (!remember && get_data(message, 'remember') && existing_memory) {
-        return
-    }
-
-    // if we don't want messages with memories that are excluded from short-term and long-term memory, skip it
-    if (!excluded && include_type === null && existing_memory) {
-        return
-    }
-
-    return true
-}
 function update_message_inclusion_flags() {
     // Update all messages in the chat, flagging them as short-term or long-term memories to include in the injection.
     // This has to be run on the entire chat since it needs to take the context limits into account.
@@ -2377,6 +2410,12 @@ function update_message_inclusion_flags() {
     let chat = context.chat;
 
     debug("Updating message inclusion flags")
+
+    let injection_threshold = get_settings('summary_injection_threshold')
+    let exclude_messages = get_settings('exclude_messages_after_threshold')
+    let keep_last_user_message = get_settings('keep_last_user_message')
+    let first_to_inject = chat.length - injection_threshold
+    let last_user_message_identified = false
 
     // iterate through the chat in reverse order and mark the messages that should be included in short-term and long-term memory
     let short_limit_reached = false;
@@ -2387,6 +2426,17 @@ function update_message_inclusion_flags() {
     let new_summary = ""  // temp summary storage to check token length
     for (let i = end; i >= 0; i--) {
         let message = chat[i];
+
+        // Mark whether the message is lagging behind the exclusion threshold (even if no summary)
+        let lagging = i >= first_to_inject
+
+        // If needed, mark the most recent user message as lagging
+        if (exclude_messages && keep_last_user_message && !last_user_message_identified && message.is_user) {
+            last_user_message_identified = true
+            lagging = true
+            debug(`Marked most recent user message as lagging: ${i}`)
+        }
+        set_data(message, 'lagging', lagging)
 
         // check for any of the exclusion criteria
         let include = check_message_exclusion(message)
@@ -2435,28 +2485,6 @@ function update_message_inclusion_flags() {
 
     update_all_message_visuals()
 }
-function collect_chat_messages(no_summary=false, short=false, long=false, remember=false, edited=false, excluded=false, limit=null) {
-    // Get a list of chat message indexes identified by the given criteria
-    let context = getContext();
-
-    let indexes = []  // list of indexes of messages
-
-    // iterate in reverse order, stopping when reaching the limit if given
-    for (let i = context.chat.length-1; i >= 0; i--) {
-        let message = context.chat[i];
-        if (check_message_conditional(message, no_summary, short, long, remember, edited, excluded)) {
-            indexes.push(i)
-        }
-        if (limit && limit > 0 && indexes.length >= limit) {
-            break
-        }
-    }
-
-    // reverse the indexes so they are in chronological order
-    indexes.reverse()
-
-    return indexes
-}
 function concatenate_summary(existing_text, message) {
     // given an existing text of concatenated summaries, concatenate the next one onto it
     let memory = get_memory(message)
@@ -2482,48 +2510,70 @@ function concatenate_summaries(indexes) {
 
     return summary
 }
+
+function collect_chat_messages(include) {
+    // Get a list of chat message indexes identified by the given criteria
+    let context = getContext();
+    let indexes = []  // list of indexes of messages
+
+    // iterate in reverse order
+    for (let i = context.chat.length-1; i >= 0; i--) {
+        let message = context.chat[i];
+        if (!get_data(message, 'memory')) continue  // no memory
+        if (get_data(message, 'lagging')) continue  // lagging - not injected yet
+        if (get_data(message, 'include') !== include) continue  // not the include types we want
+        indexes.push(i)
+    }
+
+    // reverse the indexes so they are in chronological order
+    indexes.reverse()
+    return indexes
+}
 function get_long_memory() {
     // get the injection text for long-term memory
-    let indexes = collect_chat_messages(false, false, true, true, true, null)
+    let indexes = collect_chat_messages('long')
+    if (indexes.length === 0) return ""  // if no memories, return empty
+
     let text = concatenate_summaries(indexes);
     let template = get_settings('long_template')
     let ctx = getContext();
 
-    // first replace any global macros
-    template = ctx.substituteParamsExtended(template);
-
-    // handle the #if macros using our custom function because ST DOESN'T EXPOSE THEIRS FOR SOME REASON
-    template = substitute_conditionals(template, {[long_memory_macro]: text});
-    template = substitute_params(template, {[long_memory_macro]: text});
-    return template
+    // replace memories macro
+    return ctx.substituteParamsExtended(template, {[generic_memories_macro]: text});
 }
 function get_short_memory() {
     // get the injection text for short-term memory
-    let indexes = collect_chat_messages(false, true, false, true, true, null)
+    let indexes = collect_chat_messages('short')
+    if (indexes.length === 0) return ""  // if no memories, return empty
+
     let text = concatenate_summaries(indexes);
     let template = get_settings('short_template')
     let ctx = getContext();
 
-    // first replace any global macros
-    template = ctx.substituteParamsExtended(template);
-
-    // handle the #if macros using our custom function because ST DOESN'T EXPOSE THEIRS FOR SOME REASON
-    template = substitute_conditionals(template, {[short_memory_macro]: text});
-    template = substitute_params(template, {[short_memory_macro]: text});
-    return template
+    // replace memories macro
+    return ctx.substituteParamsExtended(template, {[generic_memories_macro]: text});
 }
-
 
 // Add an interception function to reduce the number of messages injected normally
 // This has to match the manifest.json "generate_interceptor" key
 globalThis.memory_intercept_messages = function (chat, _contextSize, _abort, type) {
     if (!chat_enabled()) return;   // if memory disabled, do nothing
-    let limit = get_settings('limit_injected_messages');  // message limit from settings
-    if (limit < 0) return;  // if limit is -1, do nothing
+    if (!get_settings('exclude_messages_after_threshold')) return  // if not excluding any messages, do nothing
+    refresh_memory()
 
-    // truncate the chat up to the limit
-    while (chat.length > limit) {
-        chat.shift();
+    let start = chat.length-1
+    if (type === 'continue') start--  // if a continue, keep the most recent message
+
+    // symbol is used to prevent accidentally leaking modifications to permanent chat.
+    let IGNORE_SYMBOL = getContext().symbols.ignore
+
+    // Remove any messages that have summaries injected
+    for (let i=start; i >= 0; i--) {
+        delete chat[i].extra.ignore_formatting
+        let message = chat[i]
+        let lagging = get_data(message, 'lagging')  // The message should be kept
+        chat[i] = structuredClone(chat[i])  // keep changes temporary for this generation
+        chat[i].extra[IGNORE_SYMBOL] = !lagging
     }
 };
 
@@ -2661,11 +2711,6 @@ async function summarize_message(index) {
 
     if (summary) {
         debug("Message summarized: " + summary)
-
-        // TODO: This is a temporary fix for a bug before ST release gets the fix currently on staging
-        if (power_user.user_prompt_bias?.length > 0) {
-            summary = summary.slice(power_user.user_prompt_bias.length)
-        }
 
         // stick the prefill on the front and try to parse reasoning
         let prefill = get_settings('prefill')
@@ -2947,9 +2992,18 @@ function refresh_memory() {
     let long_injection = get_long_memory();
     let short_injection = get_short_memory();
 
+    let long_term_position = get_settings('long_term_position')
+    let short_term_position = get_settings('short_term_position')
+
+    // if using text completion, we need to wrap it in a system prompt
+    if (main_api !== 'openai') {
+        if (long_term_position !== extension_prompt_types.IN_CHAT && long_injection.length) long_injection = formatInstructModeChat("", long_injection, false, true)
+        if (short_term_position !== extension_prompt_types.IN_CHAT && short_injection.length) short_injection = formatInstructModeChat("", short_injection, false, true)
+    }
+
     // inject the memories into the templates, if they exist
-    ctx.setExtensionPrompt(`${MODULE_NAME}_long`,  long_injection,  get_settings('long_term_position'), get_settings('long_term_depth'), get_settings('long_term_scan'), get_settings('long_term_role'));
-    ctx.setExtensionPrompt(`${MODULE_NAME}_short`, short_injection, get_settings('short_term_position'), get_settings('short_term_depth'), get_settings('short_term_scan'), get_settings('short_term_role'));
+    ctx.setExtensionPrompt(`${MODULE_NAME}_long`,  long_injection,  long_term_position, get_settings('long_term_depth'), get_settings('long_term_scan'), get_settings('long_term_role'));
+    ctx.setExtensionPrompt(`${MODULE_NAME}_short`, short_injection, short_term_position, get_settings('short_term_depth'), get_settings('short_term_scan'), get_settings('short_term_role'));
 
     return `${long_injection}\n\n...\n\n${short_injection}`  // return the concatenated memory text
 }
@@ -3184,20 +3238,32 @@ Available Macros:
 `
         get_user_setting_text_input('prompt', 'Edit Summary Prompt', description)
     })
-    bind_function('#preview_summary_prompt', async () => {
-        let text = await create_summary_prompt(getContext().chat.length-1)
-        display_text_modal("Summary Prompt Preview (Last Message)", text);
-    })
     bind_function('#edit_long_term_memory_prompt', async () => {
-        get_user_setting_text_input('long_template', 'Edit Long-Term Memory Prompt')
+        let description = `
+<ul style="text-align: left; font-size: smaller;">
+    <li>This will be the content of the <b>{{${long_memory_macro}}}</b> macro.</li>
+    <li>If there is nothing in long-term memory, the whole macro will be empty.</li>
+    <li>In this input, the <b>{{${generic_memories_macro}}}</b> macro will be replaced by all long-term memories.</li>
+</ul>`
+        get_user_setting_text_input('long_template', `Edit Long-Term Memory Injection`, description)
     })
     bind_function('#edit_short_term_memory_prompt', async () => {
-        get_user_setting_text_input('short_template', 'Edit Short-Term Memory Prompt')
+        let description = `
+<ul style="text-align: left; font-size: smaller;">
+    <li>This will be the content of the <b>{{${short_memory_macro}}}</b> macro.</li>
+    <li>If there is nothing in short-term memory, the whole macro will be empty.</li>
+    <li>In this input, the <b>{{${generic_memories_macro}}}</b> macro will be replaced by all short-term memories.</li>
+</ul>`
+        get_user_setting_text_input('short_template', `Edit Short-Term Memory Injection`, description)
     })
     bind_function('#preview_message_history', async () => {
         let chat = getContext().chat;
         let history = get_message_history(chat.length-1);
         display_text_modal("{{history}} Macro Preview (Last Message)", history);
+    })
+    bind_function('#preview_summary_prompt', async () => {
+        let text = await create_summary_prompt(getContext().chat.length-1)
+        display_text_modal("Summary Prompt Preview (Last Message)", text);
     })
 
     bind_setting('#connection_profile', 'connection_profile', 'text')
@@ -3205,27 +3271,31 @@ Available Macros:
     bind_setting('#auto_summarize', 'auto_summarize', 'boolean');
     bind_setting('#auto_summarize_on_edit', 'auto_summarize_on_edit', 'boolean');
     bind_setting('#auto_summarize_on_swipe', 'auto_summarize_on_swipe', 'boolean');
-    bind_setting('#summarization_delay', 'summarization_delay', 'number');
-    bind_setting('#summarization_time_delay', 'summarization_time_delay', 'number')
     bind_setting('#auto_summarize_batch_size', 'auto_summarize_batch_size', 'number');
     bind_setting('#auto_summarize_message_limit', 'auto_summarize_message_limit', 'number');
     bind_setting('#auto_summarize_progress', 'auto_summarize_progress', 'boolean');
     bind_setting('#auto_summarize_on_send', 'auto_summarize_on_send', 'boolean');
+    bind_setting('#summarization_delay', 'summarization_delay', 'number');
+    bind_setting('#summarization_time_delay', 'summarization_time_delay', 'number')
     bind_setting('#prefill', 'prefill', 'text')
     bind_setting('#show_prefill', 'show_prefill', 'boolean')
 
-    bind_setting('#include_world_info', 'include_world_info', 'boolean');
-    bind_setting('#block_chat', 'block_chat', 'boolean');
     bind_setting('#include_user_messages', 'include_user_messages', 'boolean');
     bind_setting('#include_system_messages', 'include_system_messages', 'boolean');
     bind_setting('#include_narrator_messages', 'include_narrator_messages', 'boolean')
-
     bind_setting('#message_length_threshold', 'message_length_threshold', 'number');
-    bind_setting('#nest_messages_in_prompt', 'nest_messages_in_prompt', 'boolean')
 
+    bind_setting('#include_world_info', 'include_world_info', 'boolean');
+    bind_setting('#block_chat', 'block_chat', 'boolean');
+    bind_setting('#nest_messages_in_prompt', 'nest_messages_in_prompt', 'boolean')
     bind_setting('#include_message_history', 'include_message_history', 'number');
     bind_setting('#include_message_history_mode', 'include_message_history_mode', 'text');
     bind_setting('#include_user_messages_in_history', 'include_user_messages_in_history', 'boolean');
+
+    bind_setting('#summary_injection_separator', 'summary_injection_separator', 'text')
+    bind_setting('#summary_injection_threshold', 'summary_injection_threshold', 'number');
+    bind_setting('#exclude_messages_after_threshold', 'exclude_messages_after_threshold', 'boolean');
+    bind_setting('#keep_last_user_message', 'keep_last_user_message', 'boolean')
 
     bind_setting('input[name="short_term_position"]', 'short_term_position', 'number');
     bind_setting('#short_term_depth', 'short_term_depth', 'number');
@@ -3253,8 +3323,6 @@ Available Macros:
     bind_setting('#display_memories', 'display_memories', 'boolean')
     bind_setting('#default_chat_enabled', 'default_chat_enabled', 'boolean');
     bind_setting('#use_global_toggle_state', 'use_global_toggle_state', 'boolean');
-    bind_setting('#limit_injected_messages', 'limit_injected_messages', 'number');
-    bind_setting('#summary_injection_separator', 'summary_injection_separator', 'text')
 
     // trigger the change event once to update the display at start
     $('#long_term_context_limit').trigger('change');
@@ -3265,6 +3333,7 @@ Available Macros:
 function initialize_message_buttons() {
     // Add the message buttons to the chat messages
     debug("Initializing message buttons")
+    let ctx = getContext()
 
     let html = `
 <div title="Remember (toggle inclusion of summary in long-term memory)" class="mes_button ${remember_button_class} fa-solid fa-brain" tabindex="0"></div>
@@ -3299,11 +3368,16 @@ function initialize_message_buttons() {
         await open_edit_memory_input(message_id);
     });
 
-    // when a message is hidden/unhidden, trigger a memory refresh
-    $chat.on("click", ".mes_hide", refresh_memory);
-    $chat.on("click", ".mes_unhide", refresh_memory);
-
-
+    // when a message is hidden/unhidden, trigger a memory refresh.
+    // Yes the chat is saved already when these buttons are clicked, but we need to wait until after to refresh.
+    $chat.on("click", ".mes_hide", async () => {
+        await ctx.saveChat()
+        refresh_memory()
+    });
+    $chat.on("click", ".mes_unhide", async () => {
+        await ctx.saveChat()
+        refresh_memory()
+    });
 }
 function initialize_group_member_buttons() {
     // Insert a button into the group member selection to disable summarization
@@ -3638,6 +3712,10 @@ jQuery(async function () {
     const VERSION = manifest.version;
     log(`Version: ${VERSION}`)
 
+    if (!check_st_version()) {
+        return
+    }
+
     // Load settings
     initialize_settings();
 
@@ -3668,4 +3746,9 @@ jQuery(async function () {
     eventSource.on(event_types.MORE_MESSAGES_LOADED, refresh_memory)
     eventSource.on('groupSelected', set_character_enabled_button_states)
     eventSource.on(event_types.GROUP_UPDATED, set_character_enabled_button_states)
+
+    // Global Macros
+    MacrosParser.registerMacro(short_memory_macro, () => get_short_memory());
+    MacrosParser.registerMacro(long_memory_macro, () => get_long_memory());
+
 });
