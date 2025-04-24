@@ -72,17 +72,18 @@ To update the dev branch when changes are made, run:
 - `/get_memory <n>`: Get the memory associated with the nth message. Defaults to the most recent message.
 
 ### Custom CSS
-You can easily customize the CSS for displayed memories using the following classes:
-- `.qvink_short_memory`: In short-term memory (default green)
-- `.qvink_long_memory`: In long-term memory (default blue)
-- `.qvink_old_memory`: Marked for long-term memory, but now out of context (default red)
-- `.qvink_exclude_memory`: Manually force-excluded (default dark grey)
+You can easily customize the CSS for displayed memories by setting the following variables:
+- `--qvink_short`: In short-term memory (default green)
+- `--qvink_long`: In long-term memory (default blue)
+- `--qvink_old`: Marked for long-term memory, but now out of context (default red)
+- `--qvink_excluded`: Manually force-excluded (default dark grey)
 
 Just make sure to use the `!important` directive to override the default styles.
-For example, to color short-term memories yellow, you would put the following in your "Custom CSS" user settings:
+For example, to color short-term memories yellow and long-term memories black, you would put the following in your "Custom CSS" user settings:
 ```
-.qvink_short_memory {
-   color: yellow !important;
+:root {
+   --qvink_short: yellow !important;
+   --qvink_long: black !important;
 }
 ```
 

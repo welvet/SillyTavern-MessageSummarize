@@ -9,6 +9,7 @@
 - **New Feature**: You can now specify a summary injection threshold - a number of messages after which summaries will start being injected. You can also optionally remove messages from context after that threshold as well. If you set the threshold to 0 and *don't* exclude messages, the behavior is equivalent to before this version. 
 - **Removed**: Because of the new summary injection threshold and the ability to exclude messages after it, the "Message Injection Limit" config has been removed.
 - **Change**: Reworked how you define the short-term and long-term injections - they now define the new memory macros. If there are no memories, the macros will be empty - this means you no longer need to use {{#if ..}} clauses in the memory injection templates.
+- **Change**: Changed how custom colors are defined for the extension. Instead of using classes you can now just set variables. See the custom CSS section of README.md
 - **Fix**: Summary injections are now wrapped in a system prompt if injected automatically (no system prompt if using the macros).
 - **Fix**: Fixed summary injection not immediately updating when updating the template.
 
