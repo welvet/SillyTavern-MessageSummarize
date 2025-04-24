@@ -1,8 +1,7 @@
 # Changelog
 
-#### v0.9.0
-**ST Version Requirement:** Latest ST staging (relies on the following PR)
-- https://github.com/SillyTavern/SillyTavern/pull/3763#issue-2948421833
+#### v0.9.5
+**ST Version Requirement:** You must be on ST version 1.12.14 or greater as it relies on this PR https://github.com/SillyTavern/SillyTavern/pull/3763#issue-2948421833
 
 **IMPORTANT**: Due to some changes with how the prompt injections are built, you should go to your short-term and long-term config sections and click "Edit", then click "Restore Default", then edit how you want from there.
 

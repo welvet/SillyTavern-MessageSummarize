@@ -182,3 +182,4 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Fix message limit messing with world info timed effects. PR: https://github.com/SillyTavern/SillyTavern/pull/3763#issue-2948421833~~
 - ~~Format injections as system prompt~~
 - ~~Add dashed line to memory edit interface~~
+- detect response length change to update settings visuals
