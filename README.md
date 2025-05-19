@@ -78,6 +78,7 @@ You can easily customize the CSS for displayed memories by setting the following
 - `--qvink_long`: In long-term memory (default blue)
 - `--qvink_old`: Marked for long-term memory, but now out of context (default red)
 - `--qvink_excluded`: Manually force-excluded (default dark grey)
+- `--qvink_message_removed`: Messages that have been removed from context and replaced by summaries (default dark grey)
 
 Just make sure to use the `!important` directive to override the default styles.
 For example, to color short-term memories yellow and long-term memories black, you would put the following in your "Custom CSS" user settings:
@@ -88,7 +89,7 @@ For example, to color short-term memories yellow and long-term memories black, y
 }
 ```
 
-### Tips
+### Summary Prompt Tips & Tricks
 Each model is different of course, but here are just some general things that I have found help getting clean summarizations.
 Try them out if you want.
 
@@ -99,6 +100,7 @@ Try them out if you want.
 - **You can use global macros**: If your summaries aren't using names properly, keep in mind that you can use the `{{char}}` or `{{user}}` macro in the prompt.
 - **No need to pause roleplay**: You don't have to include anything like "ignore previous instructions" or "pause your roleplay". The summary prompt is completely independent and will only send what you see in the edit window.
 - **I don't recommend reasoning**: Reasoning models can summarize fine, but they do tend to blab for ages which makes summarizing slow, so I wouldn't recommend them for that reason.
+- **Custom Macros**: In the `Edit` window for your summary prompt, you can create custom macros to use in your prompt with STScript. In your command, you can reference the ID of the message being summarized with `{{id}}`.
 - **Save your presets**: If you are using a different completion preset or connection profile for summaries, make sure to save any changes to your regular completion preset or instruct template. When summarizing, the extension has to temporarily switch presets or connection profiles, which will discard any unsaved changes to the one you are currently using.
 
 
