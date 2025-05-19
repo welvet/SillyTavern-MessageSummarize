@@ -4,6 +4,7 @@
     --qvink_old: #8B0000;
     --qvink_excluded: #555;
     --qvink_redundant_opacity: 50%;
+    --qvink_message_removed: #555;
 }
 
 #drawer_content > hr {
@@ -94,6 +95,11 @@ By default, text is greyed to indicate that is it not injected.
 /* to style memories that are force-excluded */
 .qvink_exclude_memory {
     color: var(--qvink_excluded)
+}
+
+/* To style messages that have been removed from context */
+.qvink_removed_message {
+    color: var(--qvink_message_removed);
 }
 
 /* Style the message buttons, separating them from the rest */

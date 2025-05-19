@@ -7,6 +7,7 @@
 - **New Slash Command**: `/get_summary_max_tokens` returns the max tokens allowed for summarization given the current completion preset.
 - **Removed**: The "Message History" config section has been removed.
 - **Removed**: The "Nest messages in summary prompt" has been removed.
+- **Changed**: Messages that have been removed from context are now turned grey in the chat. This can be modified by using the `--qvink_message_removed` CSS variable.
 - **Changed**: Modified how profile changes are detected under the hood. Shouldn't affect anything.
 - **Changed**: You won't believe it I moved settings around again. Auto-Summarization settings now get their own section.
 - **Fixed**: The config popout now works with MovingUI

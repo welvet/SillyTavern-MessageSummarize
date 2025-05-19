@@ -188,5 +188,3 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - rework message history
 - How to pass in the summary index into a summary prompt macro?
 - remove the 'include everything' config option.
-- fix MovingUI bug
-- mark the injection threshold message with a class so messages before can be targeted by css

@@ -41,6 +41,7 @@ const css_long_memory = "qvink_long_memory"
 const css_remember_memory = `qvink_old_memory`
 const css_exclude_memory = `qvink_exclude_memory`
 const css_lagging_memory = `qvink_lagging_memory`
+const css_removed_message = `qvink_removed_message`
 const summary_div_class = `qvink_memory_text`  // class put on all added summary divs to identify them
 const summary_reasoning_class = 'qvink_memory_reasoning'
 const css_button_separator = `qvink_memory_button_separator`
@@ -649,7 +650,7 @@ function toggle_chat_enabled(value=null) {
     refresh_memory()
 
     // update the message visuals
-    update_all_message_visuals()  //not needed? happens in update_message_influsion_flags
+    update_all_message_visuals()  // not needed? happens in update_message_inclusion_flags
 
     // refresh settings UI
     refresh_settings()
@@ -1395,9 +1396,20 @@ function update_message_visuals(i, style=true, text=null) {
     let error_message = get_data(message, 'error');
     let reasoning = get_data(message, 'reasoning')
     let memory = get_memory(message)
+    let lagging = get_data(message, 'lagging')  // lagging behind injection threshold
+    let exclude_messages = get_settings('exclude_messages_after_threshold')  // are we excluding messages after the threshold?
 
     // get the div holding the main message text
     let message_element = div_element.find('div.mes_text');
+
+    // If we are excluding messages and the message isn't lagging (i.e. the message is removed and the summary injected)
+    if (exclude_messages && !lagging) {
+        message_element.addClass(css_removed_message);
+    } else {
+        message_element.removeClass(css_removed_message);
+    }
+
+    // get the style class, either passed in or based on inclusion flags
     let style_class = style ? get_summary_style_class(message) : ""
 
     // if no text is provided, use the memory text
