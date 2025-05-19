@@ -2281,7 +2281,7 @@ class SummaryPromptEditInterface {
         </div>
 
         <div class="macro_type_custom">
-            <label title="The macro will be replaced by the return value of the command when run." class="checkbox_label">
+            <label title="The macro will be replaced by the return value of the command when run. Use {{id}} for the ID of the message being summarized." class="checkbox_label">
                 <input class="macro_command text_pole" type="text" placeholder="command">
             </label>
         </div>
@@ -2614,8 +2614,8 @@ class SummaryPromptEditInterface {
         if (macro.type === "preset") {  // range presets
            return this.compute_range_macro(index, macro)
         } else if (macro.type === "custom") {  // STScript
-            let ctx = getContext();
-            let result = await ctx.executeSlashCommandsWithOptions(macro.command)  // TODO can I pass in the index here somehow?
+            let command = macro.command.replace(/\{\{id}}/g, index.toString())  // replace {{id}} in the command with the message index
+            let result = await this.ctx.executeSlashCommandsWithOptions(command)
             let text = result?.pipe ?? ""
             if (text && macro.instruct_template) {
                 text = formatInstructModeChat("", text, false, true, "", this.ctx.name1, this.ctx.name2, null)

@@ -186,5 +186,4 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Add dashed line to memory edit interface~~
 - detect response length change to update settings visuals
 - rework message history
-- How to pass in the summary index into a summary prompt macro?
 - remove the 'include everything' config option.
