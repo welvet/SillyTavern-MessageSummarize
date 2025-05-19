@@ -9,6 +9,7 @@
 - **Removed**: The "Nest messages in summary prompt" has been removed.
 - **Changed**: Modified how profile changes are detected under the hood. Shouldn't affect anything.
 - **Changed**: You won't believe it I moved settings around again. Auto-Summarization settings now get their own section.
+- **Fixed**: The config popout now works with MovingUI
 
 #### v0.9.5
 **ST Version Requirement:** You must be on ST version 1.12.14 or greater as it relies on this PR https://github.com/SillyTavern/SillyTavern/pull/3763#issue-2948421833
