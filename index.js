@@ -115,7 +115,6 @@ const default_settings = {
     auto_summarize_progress: true,  // display a progress bar for auto-summarization
     auto_summarize_on_send: false,  // trigger auto-summarization right before a new message is sent
 
-    include_world_info: false,  // include world info in context when summarizing
     block_chat: true,  // block input when summarizing
 
     // injection settings
@@ -2214,23 +2213,23 @@ class SummaryPromptEditInterface {
 
     html_template = `
 <div id="qvink_summary_prompt_interface">
-<div class="flex-container justifyspacebetween alignitemscenter">
-    <h4>Summary Prompt</h4>
-    <button id="preview_summary_prompt" class="menu_button fa-solid fa-eye margin0" title="Preview current summary prompt (the exact text that will be sent to the model)."></button>
-    <i class="fa-solid fa-info-circle" title="To the left, customize the prompt for summarizing messages. To the right are dynamic macros which can be used to provide additional messages or summaries as context. These macros are only available for the summary prompt."></i>
-</div>
-
-<div class="flex-container justifyspacebetween" style="height: calc(90vh - 110px)">
+<div class="flex-container justifyspacebetween" style="height: calc(90vh - 120px)">
     <div class="flex2">
+        <div class="flex-container justifyspacebetween alignitemscenter">
+            <h4>Summary Prompt</h4>
+            <i class="fa-solid fa-info-circle" style="margin-right: 1em" title="Customize the prompt used for summarizing messages."></i>
+            <button id="preview_summary_prompt" class="menu_button fa-solid fa-eye margin0" title="Preview current summary prompt (the exact text that will be sent to the model)"></button>
+            <button id="restore_default_prompt" class="menu_button fa-solid fa-recycle margin0 red_button" title="Restore the default prompt"></button>
+        </div>
         <textarea id="prompt" class="" style="height: 100%; overflow-y: auto"></textarea>
     </div>
 
     <div class="flex1" style="height: 100%">
         <div class="flex-container justifyspacebetween alignitemscenter">
-            <h4 class="flex2">Available Macros</h4>
+            <h4 class="flex2">Available Macros <i class="fa-solid fa-info-circle" title="Dynamic macros only available for the summary prompt."></i></h4>
             <button id="add_macro" class="flex1 menu_button" title="Add a new macro">New</button>
         </div>
-        <div id="macro_definitions" style="height: calc(100% - 50px); overflow-y: auto"></div>
+        <div id="macro_definitions" style="height: 100%; overflow-y: auto"></div>
     </div>
 </div>
 `
@@ -2323,23 +2322,14 @@ class SummaryPromptEditInterface {
                 appendAtEnd: true,
                 result: 0  // don't save
             },
-            {
-                text: 'Restore Default',
-                appendAtEnd: true,
-                // no result key means the popup won't close
-                action: () => {  // replace the default prompt and default macros
-                    this.$prompt.val(default_settings["prompt"])
-                    for (let name of this.list_macros()) {
-                        this.restore_macro_default(name)
-                    }
-                }
-            }
         ]
 
-        this.popup = new this.ctx.Popup(this.html_template, this.ctx.POPUP_TYPE.TEXT, undefined, {wider: true, okButton: 'Save', customButtons: custom_buttons});
+        this.popup = new this.ctx.Popup(this.html_template, this.ctx.POPUP_TYPE.TEXT, undefined, {wider: true, okButton: 'Save', cancelButton: 'Cancel'});
         this.$content = $(this.popup.content)
+        this.$buttons = this.$content.find('.popup-controls')
         this.$prompt = this.$content.find('#prompt')
         this.$preview = this.$content.find('#preview_summary_prompt')
+        this.$restore = this.$content.find('#restore_default_prompt')
         this.$definitions = this.$content.find('#macro_definitions')
         this.$add_macro = this.$content.find('#add_macro')
 
@@ -2349,6 +2339,11 @@ class SummaryPromptEditInterface {
         // buttons
         this.$preview.on('click', () => this.preview_prompt())
         this.$add_macro.on('click', () => this.new_macro())
+        this.$restore.on('click', () => this.$prompt.val(default_settings["prompt"]))
+
+        // manually add tooltips to the popout buttons because you can't do that when defining them
+        this.$buttons.find('.popup-button-ok').attr('title', 'Save changes to the prompt and macros')
+        this.$buttons.find('.popup-button-cancel').attr('title', 'Discard changes to the prompt and macros')
 
         // set the prompt text and the macro settings
         this.from_settings()
@@ -3440,34 +3435,17 @@ async function summarize_text(prompt) {
         system_prompt = "Complete the requested task."
     }
 
-    // TODO do the world info injection manually instead
-    let include_world_info = get_settings('include_world_info');
-    let result;
-    if (include_world_info) {
-        /**
-         * Background generation based on the provided prompt.
-         * @param {string} quiet_prompt Instruction prompt for the AI
-         * @param {boolean} quietToLoud Whether the message should be sent in a foreground (loud) or background (quiet) mode
-         * @param {boolean} skipWIAN whether to skip addition of World Info and Author's Note into the prompt
-         * @param {string} quietImage Image to use for the quiet prompt
-         * @param {string} quietName Name to use for the quiet prompt (defaults to "System:")
-         * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
-         * @returns
-         */
-        result = await ctx.generateQuietPrompt(prompt, true, false, system_prompt, "assistant");
-    } else {
-        /**
-         * Generates a message using the provided prompt.
-         * @param {string} prompt Prompt to generate a message from
-         * @param {string} api API to use. Main API is used if not specified.
-         * @param {boolean} instructOverride true to override instruct mode, false to use the default value
-         * @param {boolean} quietToLoud true to generate a message in system mode, false to generate a message in character mode
-         * @param {string} [systemPrompt] System prompt to use. Only Instruct mode or OpenAI.
-         * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
-         * @returns {Promise<string>} Generated message
-         */
-        result = await generateRaw(prompt, '', true, false, system_prompt, null, false);
-    }
+    /**
+     * Generates a message using the provided prompt.
+     * @param {string} prompt Prompt to generate a message from
+     * @param {string} api API to use. Main API is used if not specified.
+     * @param {boolean} instructOverride true to override instruct mode, false to use the default value
+     * @param {boolean} quietToLoud true to generate a message in system mode, false to generate a message in character mode
+     * @param {string} [systemPrompt] System prompt to use. Only Instruct mode or OpenAI.
+     * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
+     * @returns {Promise<string>} Generated message
+     */
+    let result = await generateRaw(prompt, '', true, false, system_prompt, null, false);
 
     // trim incomplete sentences if set in ST settings
     if (ctx.powerUserSettings.trim_sentences) {
@@ -3766,7 +3744,6 @@ function initialize_settings_listeners() {
     bind_setting('#include_narrator_messages', 'include_narrator_messages', 'boolean')
     bind_setting('#message_length_threshold', 'message_length_threshold', 'number');
 
-    bind_setting('#include_world_info', 'include_world_info', 'boolean');
     bind_setting('#block_chat', 'block_chat', 'boolean');
 
     bind_setting('#summary_injection_separator', 'summary_injection_separator', 'text')
