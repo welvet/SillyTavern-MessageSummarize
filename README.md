@@ -70,6 +70,7 @@ To update the dev branch when changes are made, run:
 - `/remember <n>`: Mark the nth message for long-term memory, summarizing it if not already. Same as clicking the "brain" icon in the message button menu.
 - `/force_exclude_memory <n>`: Toggles the inclusion of the summary for the nth message. Same as clicking the "Force Exclude" button in the message button menu.
 - `/get_memory <n>`: Get the memory associated with the nth message. Defaults to the most recent message.
+- `/get_summary_max_tokens`: Get the max response tokens defined in the current completion preset used for summaries.
 
 ### Custom CSS
 You can easily customize the CSS for displayed memories by setting the following variables:
@@ -184,3 +185,8 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Format injections as system prompt~~
 - ~~Add dashed line to memory edit interface~~
 - detect response length change to update settings visuals
+- rework message history
+- How to pass in the summary index into a summary prompt macro?
+- remove the 'include everything' config option.
+- fix MovingUI bug
+- mark the injection threshold message with a class so messages before can be targeted by css

@@ -1,5 +1,15 @@
 # Changelog
 
+#### v0.9.6
+**IMPORTANT**: Due to changes in how message history (for the summary prompt) is constructed, your current {{history}} macro will no longer work as it did before. You will need to reconfigure it in the new interface by clicking "Edit" under "Summarization"
+
+- **New Feature**: Reworked "Edit" interface for the summary prompt. This is now where the `{{history}}`, `{{message}}`, and `{{words}}` macro are defined and modified. You can also create custom macros for the summary prompt using either a message range or STScript.
+- **New Slash Command**: `/get_summary_max_tokens` returns the max tokens allowed for summarization given the current completion preset.
+- **Removed**: The "Message History" config section has been removed.
+- **Removed**: The "Nest messages in summary prompt" has been removed.
+- **Changed**: Modified how profile changes are detected under the hood. Shouldn't affect anything.
+- **Changed**: You won't believe it I moved settings around again. Auto-Summarization settings now get their own section.
+
 #### v0.9.5
 **ST Version Requirement:** You must be on ST version 1.12.14 or greater as it relies on this PR https://github.com/SillyTavern/SillyTavern/pull/3763#issue-2948421833
 

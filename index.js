@@ -84,6 +84,11 @@ Following is the message to summarize:
 `
 const default_long_template = `[Following is a list of events that occurred in the past]:\n{{${generic_memories_macro}}}\n`
 const default_short_template = `[Following is a list of recent events]:\n{{${generic_memories_macro}}}\n`
+const default_summary_macros = {  // default set of macros for the summary prompt.
+    "message": {name: "message", default: true, type: "special", instruct_template: true, description: "The message being summarized"},
+    "words": {name: "words", default: true, type: "custom", command: "/get_summary_max_tokens", description: "Max response tokens defined by the chosen completion preset"},
+    "history": {name: "history", default: true, type: "preset", start: 1, end: 6, bot_messages: true, user_messages: true, instruct_template: true},
+}
 const default_settings = {
     // inclusion criteria
     message_length_threshold: 10,  // minimum message token length for summarization
@@ -94,6 +99,7 @@ const default_settings = {
 
     // summarization settings
     prompt: default_prompt,
+    summary_prompt_macros: default_summary_macros,  // macros for the summary prompt interface
     prefill: "",   // summary prompt prefill
     show_prefill: false, // whether to show the prefill when memories are displayed
     completion_preset: "",  // completion preset to use for summarization. Empty ("") indicates the same as currently selected.
@@ -110,13 +116,6 @@ const default_settings = {
 
     include_world_info: false,  // include world info in context when summarizing
     block_chat: true,  // block input when summarizing
-    nest_messages_in_prompt: false,  // nest messages to summarize in the prompt for summarization
-
-    include_message_history: 3,  // include a number of previous messages in the prompt for summarization
-    include_message_history_mode: 'none',  // mode for including message history in the prompt
-    include_user_messages_in_history: false,  // include previous user message in the summarization prompt when including message history
-    include_system_messages_in_history: false,  // include previous system messages in the summarization prompt when including message history
-    include_thought_messages_in_history: false,  // include previous thought messages in the summarization prompt when including message history
 
     // injection settings
     summary_injection_separator: "\n* ",  // separator when concatenating summaries
@@ -155,7 +154,7 @@ const global_settings = {
     chats_enabled: {},  // dict of chat IDs to whether memory is enabled
     global_toggle_state: true,  // global state of memory (used when a profile uses the global state)
     disabled_group_characters: {},  // group chat IDs mapped to a list of disabled character keys
-    memory_edit_interface_settings: {}  // settings last used in the memory edit interface
+    memory_edit_interface_settings: {},  // settings last used in the memory edit interface
 }
 const settings_ui_map = {}  // map of settings to UI elements
 
@@ -289,6 +288,34 @@ function unescape_string(text) {
           }
         }
     });
+}
+function assign_and_prune(target, source) {
+    // Modifies target in-place while also deleting any keys not in source
+    for (const key in target) {
+        if (!(key in source)) delete target[key];
+        else target[key] = source[key];
+    }
+}
+function check_objects_different(obj_1, obj_2) {
+    // check whether two objects are different by checking each key, recursively
+    // if both are objects, recurse on each element of obj_1
+    // The "instanceof" method is true for Objects, Arrays, and Sets.
+    if (obj_1 instanceof Object && obj_2 instanceof Object) {
+        let keys = Object.keys(obj_1).concat(Object.keys(obj_2))
+        for (let key of keys) {
+            if (check_objects_different(obj_1[key], obj_2[key])) {
+                return true  // different
+            }
+        }
+        return false  // not different
+    } else {  // not both objects - check equality directly
+        return obj_1 !== obj_2  // return if different
+    }
+}
+function regex(string, re) {
+    // Returns an array of all matches in capturing groups
+    let matches = [...string.matchAll(re)];
+    return matches.flatMap(m => m.slice(1).filter(Boolean));
 }
 function check_st_version() {
     // Check to see if the current version of ST is acceptable.
@@ -533,14 +560,23 @@ function reset_settings() {
     Object.assign(extension_settings[MODULE_NAME], structuredClone(default_settings))
     refresh_settings();   // refresh the UI
 }
-function set_settings(key, value) {
+function set_settings(key, value, copy=false) {
     // Set a setting for the extension and save it
+    if (copy) {
+        value = structuredClone(value)
+    }
     extension_settings[MODULE_NAME][key] = value;
     saveSettingsDebounced();
 }
-function get_settings(key) {
+function get_settings(key, copy=false) {
     // Get a setting for the extension, or the default value if not set
-    return extension_settings[MODULE_NAME]?.[key] ?? default_settings[key];
+    let value = extension_settings[MODULE_NAME]?.[key] ?? default_settings[key];
+    if (copy) {  // needed when retrieving objects
+        return structuredClone(value)
+    } else {
+        return value
+    }
+
 }
 function get_settings_element(key) {
     return settings_ui_map[key]?.[0]
@@ -927,17 +963,6 @@ function refresh_settings() {
         get_settings_element('auto_summarize_progress')?.prop('disabled', !auto_summarize);
         get_settings_element('summarization_delay')?.prop('disabled', !auto_summarize);
 
-
-        // If message history is disabled, disable the relevant settings
-        let history_disabled = get_settings('include_message_history_mode') === "none";
-        get_settings_element('include_message_history')?.prop('disabled', history_disabled)
-        get_settings_element('include_user_messages_in_history')?.prop('disabled', history_disabled)
-        get_settings_element('preview_message_history')?.prop('disabled', history_disabled)
-
-        if (!history_disabled && !get_settings('prompt').includes("{{history}}")) {
-            toastr.warning("To include message history, you must use the {{history}} macro in the prompt.")
-        }
-
         // If not excluding message, then disable the option to preserve the last user message
         let excluding_messages = get_settings('exclude_messages_after_threshold')
         get_settings_element('keep_last_user_message')?.prop('disabled', !excluding_messages)
@@ -1072,15 +1097,7 @@ function detect_settings_difference(profile=null) {
     }
     let current_settings = copy_settings();
     let profile_settings = copy_settings(profile);
-
-    let different = false;
-    for (let key of Object.keys(profile_settings)) {
-        if (profile_settings[key] !== current_settings[key]) {
-            different = true;
-            break;
-        }
-    }
-    return different;
+    return check_objects_different(current_settings, profile_settings)
 }
 function save_profile(profile=null) {
     // Save the current settings to the given profile
@@ -1475,7 +1492,7 @@ async function display_text_modal(title, text="") {
     text = text.replace(/\n/g, '<br>');
     let html = `<h2>${title}</h2><div style="text-align: left; overflow: auto;">${text}</div>`
     //const popupResult = await ctx.callPopup(html, 'text', undefined, { okButton: `Close` });
-    let popup = new ctx.Popup(html, ctx.POPUP_TYPE.TEXT, undefined, {okButton: 'Close', allowVerticalScrolling: true});
+    let popup = new ctx.Popup(html, ctx.POPUP_TYPE.TEXT, undefined, {okButton: 'Close', allowVerticalScrolling: true, wider: true});
     await popup.show()
 }
 async function get_user_setting_text_input(key, title, description="") {
@@ -1556,7 +1573,7 @@ function remove_progress_bar(id) {
 }
 
 
-// Memory State Interface
+// Interfaces
 class MemoryEditInterface {
 
     // Array with each message index to show in the interface.
@@ -1685,7 +1702,7 @@ class MemoryEditInterface {
     `
     ctx = getContext();
 
-    // If you define the popup in the constructor so you don't have to recreate it every time, then clicking the "ok" button has like a .5-second lang before closing the popup.
+    // If you define the popup in the constructor so you don't have to recreate it every time, then clicking the "ok" button has like a .5-second lag before closing the popup.
     // If you instead re-create it every time in show(), there is no lag.
     constructor() {
         this.settings = get_settings('memory_edit_interface_settings')
@@ -1733,7 +1750,7 @@ class MemoryEditInterface {
             let checked = this.settings[id] ?? data.default
 
             let $el = $(`
-<div class="filter_box flex1">
+<div class="flex1 qvink_interface_card">
     <label class="checkbox_label" title="${data.title}">
         <input id="${filter_checkbox_id}" type="checkbox" ${checked ? "checked" : ""}/>
         <span>${data.display}</span>
@@ -2180,6 +2197,642 @@ class MemoryEditInterface {
         set_settings('memory_edit_interface_settings', this.settings)
     }
 }
+
+class SummaryPromptEditInterface {
+
+    html_template = `
+<div id="qvink_summary_prompt_interface">
+<div class="flex-container justifyspacebetween alignitemscenter">
+    <h4>Summary Prompt</h4>
+    <button id="preview_summary_prompt" class="menu_button fa-solid fa-eye margin0" title="Preview current summary prompt (the exact text that will be sent to the model)."></button>
+    <i class="fa-solid fa-info-circle" title="To the left, customize the prompt for summarizing messages. To the right are dynamic macros which can be used to provide additional messages or summaries as context. These macros are only available for the summary prompt."></i>
+</div>
+
+<div class="flex-container justifyspacebetween" style="height: calc(90vh - 110px)">
+    <div class="flex2">
+        <textarea id="prompt" class="" style="height: 100%; overflow-y: auto"></textarea>
+    </div>
+
+    <div class="flex1" style="height: 100%">
+        <div class="flex-container justifyspacebetween alignitemscenter">
+            <h4 class="flex2">Available Macros</h4>
+            <button id="add_macro" class="flex1 menu_button" title="Add a new macro">New</button>
+        </div>
+        <div id="macro_definitions" style="height: calc(100% - 50px); overflow-y: auto"></div>
+    </div>
+</div>
+`
+    // remember to set the name of the radio group for each separate instance
+    macro_definition_template = `
+    <div class="macro_definition qvink_interface_card">
+        <div class="flex-container justifyspacebetween alignitemscenter">
+            <button class="macro_preview menu_button fa-solid fa-eye margin0" title="Preview the result of this macro"></button>
+            <input class="macro_name flex1 text_pole" type="text" placeholder="name">
+            <button class="macro_delete menu_button red_button fa-solid fa-trash margin0" title="Delete custom macro"></button>
+            <button class="macro_restore menu_button red_button fa-solid fa-recycle margin0" title="Restore default macro"></button>
+        </div>
+
+        <div class="macro_type">
+            <label>
+                <input type="radio" value="preset" />
+                <span>Range</span>
+            </label>
+            <label>
+                <input type="radio" value="custom" />
+                <span>Script</span>
+            </label>
+        </div>
+
+        <div class="macro_type_presets">
+            <div title="The range of messages to replace this macro, relative to the message being summarized. For example, setting this to (3, 10) will include from the 3rd to the 10th message back in the chat.">
+                <input class="macro_preset_start text_pole widthUnset" type="number" min="1" max="99" />
+                <span> - </span>
+                <input class="macro_preset_end text_pole widthUnset" type="number" min="1" max="99" />
+            </div>
+
+            <label title="Bot messages within the range above will be included" class="checkbox_label">
+                <input class="macro_preset_bot_messages" type="checkbox" />
+                <span>Bot Messages</span>
+            </label>
+            <label title="Summaries on bot messages within the range above will be included" class="checkbox_label">
+                <input class="macro_preset_bot_summaries" type="checkbox" />
+                <span>Bot Summaries</span>
+            </label>
+            <label title="User messages within the range above will be included" class="checkbox_label">
+                <input class="macro_preset_user_messages" type="checkbox" />
+                <span>User Messages</span>
+            </label>
+            <label title="Summaries on user messages within the range above will be included" class="checkbox_label">
+                <input class="macro_preset_user_summaries" type="checkbox" />
+                <span>User Summaries</span>
+            </label>
+        </div>
+
+        <div class="macro_type_custom">
+            <label title="The macro will be replaced by the return value of the command when run." class="checkbox_label">
+                <input class="macro_command text_pole" type="text" placeholder="command">
+            </label>
+        </div>
+
+        <div class="macro_type_any">
+            <label title="The result of this macro will be wrapped in your instruct template. Recommended for messages." class="checkbox_label">
+                <input class="macro_instruct_template" type="checkbox">
+                <span>Instruct Template</span>
+            </label>
+        </div>
+
+    </div>
+    `
+    ctx = getContext();
+
+    default_macro_settings = {
+        "name": "new_macro",
+        "type": "preset",
+        "start": 1, "end": 1,
+        "bot_messages": true,
+        "bot_summaries": true,
+        "user_messages": true,
+        "user_summaries": true,
+        "instruct_template": true,
+        "command": ""
+    }
+
+    // If you define the popup in the constructor so you don't have to recreate it every time, then clicking the "ok" button has like a .5-second lag before closing the popup.
+    // If you instead re-create it every time in show(), there is no lag.
+    constructor() {
+        this.from_settings()
+    }
+    init() {
+
+        // don't specify "result" key to not close the popup
+        let custom_buttons = [
+            {
+                text: 'Cancel',
+                appendAtEnd: true,
+                result: 0  // don't save
+            },
+            {
+                text: 'Restore Default',
+                appendAtEnd: true,
+                // no result key means the popup won't close
+                action: () => {  // replace the default prompt and default macros
+                    this.$prompt.val(default_settings["prompt"])
+                    for (let name of this.list_macros()) {
+                        this.restore_macro_default(name)
+                    }
+                }
+            }
+        ]
+
+        this.popup = new this.ctx.Popup(this.html_template, this.ctx.POPUP_TYPE.TEXT, undefined, {wider: true, okButton: 'Save', customButtons: custom_buttons});
+        this.$content = $(this.popup.content)
+        this.$prompt = this.$content.find('#prompt')
+        this.$preview = this.$content.find('#preview_summary_prompt')
+        this.$definitions = this.$content.find('#macro_definitions')
+        this.$add_macro = this.$content.find('#add_macro')
+
+        // manually set a larger width
+        this.$content.closest('dialog').css('min-width', '80%')
+
+        // buttons
+        this.$preview.on('click', () => this.preview_prompt())
+        this.$add_macro.on('click', () => this.new_macro())
+
+        // set the prompt text and the macro settings
+        this.from_settings()
+    }
+
+    async show() {
+        this.init()
+        this.update_macros()
+
+        let result = await this.popup.show();  // wait for result
+        if (result) {  // clicked save
+            this.save_settings()
+        }
+        refresh_settings()
+    }
+
+    // building interface
+    update_macros() {
+        // clear all macros from the interface
+        this.$definitions.find(".macro_definition").remove()
+
+        // Update the interface from settings
+        for (let name of this.list_macros()) {
+            let macro = this.get_macro(name)
+            this.create_macro_interface(macro)
+        }
+    }
+    create_macro_interface(macro) {
+        // Create a new macro interface item with the given settings
+        let $template = $(this.macro_definition_template)
+        let $macro = $template.prependTo(this.$definitions)
+
+        // handling the macro type radio group
+        let radio_group_name = `macro_type_radio_${macro.name}`
+        $macro.find(`.macro_type input`).attr('name', radio_group_name)  // set the radio group name
+
+        let $preset_div = $macro.find(".macro_type_presets")
+        let $custom_div = $macro.find(".macro_type_custom")
+        let $any_div = $macro.find(".macro_type_any")
+
+        function show_settings_div() {
+            // hide/show the appropriate settings divs.
+            // .show() fails if the object isn't in the DOM yet, so we have to try/catch since the popup isn't inserted yet.
+            if (macro.type === "preset") {
+                try {$preset_div.show()} catch {}
+                $custom_div.hide()
+            } else if (macro.type === "custom") {
+                $preset_div.hide()
+                try{$custom_div.show()} catch {}
+            }
+        }
+        show_settings_div()
+
+        // set settings
+        let $name = $macro.find("input.macro_name")
+        let $preview = $macro.find("button.macro_preview")
+        let $delete = $macro.find("button.macro_delete")
+        let $restore = $macro.find("button.macro_restore")
+        let $macro_type_div = $macro.find('.macro_type')
+        let $macro_type_radios = $macro.find(`input[name=${radio_group_name}]`)
+        let $macro_preset_start = $macro.find(".macro_preset_start")
+        let $macro_preset_end = $macro.find(".macro_preset_end")
+        let $macro_preset_bot_messages = $macro.find(".macro_preset_bot_messages")
+        let $macro_preset_bot_summaries = $macro.find(".macro_preset_bot_summaries")
+        let $macro_preset_user_messages = $macro.find(".macro_preset_user_messages")
+        let $macro_preset_user_summaries = $macro.find(".macro_preset_user_summaries")
+        let $macro_command = $macro.find("input.macro_command")
+        let $macro_instruct = $macro.find(".macro_instruct_template")
+
+        // preview
+        $preview.on('click', async () => {
+            let result = await this.compute_macro(this.ctx.chat.length-1, macro.name)
+            await display_text_modal(`Macro Preview: {{${macro.name}}}`, result)
+        })
+
+        // if it has a description, add it as the title for the name
+        if (macro.description) {
+            $name.attr('title', macro.description)
+        }
+
+        // if special, disable all inputs except in the "any" div
+        if (macro.type === "special") {
+            $name.prop('disabled', true)  // prevent name change
+            $macro_type_div.remove()
+            $preset_div.remove()
+            $custom_div.remove()
+        }
+
+        // special case for the {{words}} macro
+        if (macro.name === "words") {
+            $macro_command.prop('disabled', true)
+            $any_div.remove()
+        }
+
+        // delete / restore
+        if (macro.default) {
+            $name.prop('disabled', true)  // prevent name change (or else we couldn't restore default)
+            $delete.remove()
+            $restore.on('click', () => this.restore_macro_default(macro.name))
+            $macro_type_div.remove()
+        } else {
+            $restore.remove()
+            $delete.on('click', () => {
+                delete this.macros[macro.name]
+                $macro.remove()
+            })
+        }
+
+        // name
+        $name.val(macro.name)
+        $name.on('change', () => this.set_macro_name(macro.name, $name.val()))
+
+        // type
+        $macro_type_radios.filter(`[value=${macro.type}]`).prop('checked', true)
+        $macro_type_radios.on('change', () => {
+            macro.type = $macro_type_radios.filter(':checked').val()
+            show_settings_div()
+        })
+
+        // start, end
+        $macro_preset_start.val(macro.start)
+        $macro_preset_start.on('change', () => {
+            macro.start = Number($macro_preset_start.val())
+        })
+        $macro_preset_end.val(macro.end)
+        $macro_preset_end.on('change', () => {
+            macro.end = Number($macro_preset_end.val())
+        })
+
+        // checkboxes
+        $macro_preset_bot_messages.prop('checked', macro.bot_messages)
+        $macro_preset_bot_messages.on('change', () => {
+            macro.bot_messages = $macro_preset_bot_messages.is(':checked')
+        })
+        $macro_preset_bot_summaries.prop('checked', macro.bot_summaries)
+        $macro_preset_bot_summaries.on('change', () => {
+            macro.bot_summaries = $macro_preset_bot_summaries.is(':checked')
+        })
+        $macro_preset_user_messages.prop('checked', macro.user_messages)
+        $macro_preset_user_messages.on('change', () => {
+            macro.user_messages = $macro_preset_user_messages.is(':checked')
+        })
+        $macro_preset_user_summaries.prop('checked', macro.user_summaries)
+        $macro_preset_user_summaries.on('change', () => {
+            macro.user_summaries = $macro_preset_user_summaries.is(':checked')
+        })
+        $macro_instruct.prop('checked', macro.instruct_template)
+        $macro_instruct.on('change', () => {
+            macro.instruct_template = $macro_instruct.is(':checked')
+        })
+
+        // command
+        $macro_command.val(macro.command)
+        $macro_command.on('change', () => {
+            macro.command = $macro_command.val()
+        })
+
+    }
+
+    // special macros
+    special_macro_message(index) {
+        let macro = this.get_macro("message")
+        let message = this.ctx.chat[index]
+        let text
+        if (macro.instruct_template) {
+            text = formatInstructModeChat(message.name, message.mes, message.is_user, false, "", this.ctx.name1, this.ctx.name2, null)
+        } else {
+            text = message.mes
+        }
+        return text
+    }
+
+    // utilities
+    is_open() {
+        if (!this.popup) return false
+        return this.$content.closest('dialog').attr('open');
+    }
+    from_settings() {
+        // set the interface from settings
+        this.$prompt?.val(get_settings('prompt'))
+        this.macros = get_settings('summary_prompt_macros', true)
+    }
+    save_settings() {
+        // save settings in the interface
+        set_settings('prompt', this.$prompt.val())  // save the prompt
+        set_settings('summary_prompt_macros', this.macros, true)
+    }
+    get_unique_name(name) {
+        // if the given name isn't unique, make it unique
+
+        // replace the last "_n" with "_(n+1)"
+        while (this.get_macro(name)) {
+            let match = name.match(/_(\d+)$/)
+            if (match) {
+                name = name.slice(0, match.index) + "_" + (Number(match[1]) + 1)
+            } else {
+                name += "_2"
+            }
+        }
+        return name
+    }
+    list_macros() {
+        return Object.keys(this.macros)
+    }
+    get_macro(name) {
+        // get the macro by name.
+        let macro = this.macros[name]
+        if (macro) return macro
+    }
+    new_macro(name=null) {
+        // Create a new macro with the given name or the default
+        let macro = structuredClone(this.default_macro_settings)
+        if (name) macro.name = name
+        macro.name = this.get_unique_name(macro.name)  // ensure unique name from existing macros
+        this.macros[macro.name] = macro
+        this.update_macros()
+    }
+    set_macro_name(old_name, new_name) {
+        // change the name of a macro
+        if (old_name === new_name) return  // no change
+
+        let macro = this.get_macro(old_name)
+        if (!macro) return  // macro doesn't exist
+
+        // can't change the name of a default or special macro
+        if (macro.default || macro.type === "special") return
+
+        new_name = this.get_unique_name(new_name)  // ensure unique name
+        macro.name = new_name
+        this.macros[new_name] = macro
+        delete this.macros[old_name]
+    }
+    restore_macro_default(name) {
+        // Restore the macro to default (does nothing for non-default macros).
+        // Edit the macro settings object in-place so all the callbacks with a reference to it still work.
+        let macro = this.get_macro(name)
+        if (!macro.default) return
+        let default_macro = default_summary_macros[name]
+        if (!default_macro) error(`Attempted to restore default summary macro, but no default was found: "${name}"`)
+        assign_and_prune(macro, default_macro)
+        this.update_macros()
+    }
+
+
+    // creating the prompt
+    async preview_prompt() {
+        // show the summary prompt preview popup using the current interface settings
+        let index = this.ctx.chat.length-1
+        let prompt = this.$prompt.val()
+        let text = await this.create_summary_prompt(index, prompt)
+        await display_text_modal("Summary Prompt Preview (Last Message)", text);
+    }
+    async compute_macro(index, name) {
+        // get the result from the given custom macro for the given message index
+
+        // special macro?
+        if (name === "message") {
+            return this.special_macro_message(index)
+        }
+
+        let macro = this.get_macro(name)
+        if (!macro) return  // macro doesn't exist
+        if (macro.type === "preset") {  // range presets
+           return this.compute_range_macro(index, macro)
+        } else if (macro.type === "custom") {  // STScript
+            let ctx = getContext();
+            let result = await ctx.executeSlashCommandsWithOptions(macro.command)  // TODO can I pass in the index here somehow?
+            let text = result?.pipe ?? ""
+            if (text && macro.instruct_template) {
+                text = formatInstructModeChat("", text, false, true, "", this.ctx.name1, this.ctx.name2, null)
+            }
+            return text
+        } else {
+            error(`Unknown summary prompt macro type: "${macro.type}"`)
+        }
+    }
+    compute_range_macro(index, macro) {
+        // Get a history of messages from index-end to index-start
+        let chat = this.ctx.chat
+        let history = []
+
+        // calculate starting and ending indexes, bounded by the start of the chat
+        let start_index = Math.max(index-macro.end, 0)
+        let end_index = Math.max(index-macro.start, 0)
+        debug(`Getting Message History. Index: ${index}, Start: ${macro.start}, End: ${macro.end} (${start_index} to ${end_index})`)
+
+        for (let i = start_index; i <= end_index && i < chat.length; i++) {
+            let m = chat[i];
+            let include_message = true
+            let include_summary = true
+
+            // whether we include the message itself is determined only by these settings.
+            // Even if the message wouldn't be *summarized* we still want to include it in the history for context.
+            if (m.is_user) {
+                include_message = macro.user_messages
+                include_summary = macro.user_summaries
+            } else if (m.is_system || m.is_thoughts) {
+                include_message = false;
+                include_summary = false
+            } else {  // otherwise it's a bot message
+                include_message = macro.bot_messages
+                include_summary = macro.bot_summaries
+            }
+
+            if (include_message) {
+                let text = m.mes
+                if (macro.instruct_template) {
+                    text = formatInstructModeChat(m.name, m.mes, m.is_user, false, "", this.ctx.name1, this.ctx.name2, null)
+                }
+                history.push(text)
+            }
+
+            if (include_summary) {
+                // Whether we include the *summary* is also determined by the regular summary inclusion criteria.
+                // This is so the inclusion matches the summary injection.
+                include_summary = check_message_exclusion(m)
+                let memory = get_memory(m)
+                if (include_summary && memory) {  // if there is a memory to include
+                    memory = `Summary: ${memory}`
+                    if (macro.instruct_template) {
+                        memory = formatInstructModeChat("", memory, false, false, "", "", "", null)
+                    }
+                    history.push(memory)
+                }
+            }
+        }
+
+        // join with newlines
+        return history.join('\n')
+    }
+
+    async create_summary_prompt(index, prompt=null) {
+        // Create the full summary prompt for the message at the given index.
+        // The instruct template will automatically add an input sequence to the beginning and an output sequence to the end.
+        // Therefore, if we are NOT using instructOverride, we have to remove the first system sequence at the very beginning which gets added by format_system_prompt.
+        // If we ARE using instructOverride, we have to add a final trailing output sequence
+
+        // If no prompt given, use the current settings prompt.
+        if (prompt === null) {
+            prompt = get_settings('prompt')
+        }
+
+        // map of macros used in the prompt to their values
+        let macros = await this.compute_used_macros(index, prompt)
+
+        // Substitute any {{#if macro}} ... {{/if}} blocks.
+        // These conditional substitutions have to be done before splitting and making each section a system prompt,
+        //   because the conditional content may contain regular text that should be included in the system prompt.
+        prompt = this.substitute_conditionals(prompt, macros)
+
+        // now split the prompt into separate system prompts where needed
+        prompt = this.system_prompt_split(prompt, macros)
+
+        // substitute any global macros like {{persona}}, {{char}}, etc...
+        prompt = this.ctx.substituteParamsExtended(prompt)
+
+        // substitute all defined macros (unrecognized macros will be replaced by an empty string)
+        prompt = this.substitute_macros(prompt, macros);
+
+        // If using instructOverride, append the assistant starting message template to the text, replacing the name with "assistant" if needed
+        let output_sequence = this.ctx.substituteParamsExtended(power_user.instruct.output_sequence, {name: "assistant"});
+        if (output_sequence) output_sequence += "\n"  // newline after output sequence if present
+        prompt = `${prompt}\n${output_sequence}`
+
+        // finally, append the prefill
+        prompt = `${prompt}${get_settings('prefill')}`
+
+        return prompt
+    }
+    async compute_used_macros(index, text) {
+        // return a mapping of the macros used in this text and their return value
+
+        // Matches {{macro}} or {{#if macro}}, captures the macro name
+        let matches = regex(text, /\{\{#if (.*?)}}|\{\{(?!\/if)(.*?)}}/gs)
+
+        // trim whitespace and remove duplicates
+        let names = new Set()
+        for (let match of matches) {  // iterate over all match objects
+            names.add(match.trim())
+        }
+
+        // compute value for each
+        let values = {}
+        for (let name of names) {
+            let value = await this.compute_macro(index, name)
+            if (!value) continue
+            values[name] = value
+        }
+        return values
+    }
+    substitute_conditionals(text, macros) {
+        // substitute any {{#if macro}} ... {{/if}} blocks in the text with the corresponding content if the macro is in the passed map
+        // Does NOT replace the actual macros, that is done in substitute_macros()
+
+        // TODO: should I trim those newlines since they are really only there for readability?
+        // Note this preserves newlines. Ex:
+        // {{#if macro}}
+        // text
+        // {{/if}}
+        // will result in:
+        //
+        // text
+        //
+
+        let parts = text.split(/(\{\{#if.*?\/if}})/gs);
+        let formatted = parts.map((part) => {
+            if (!part) return ""
+            if (!part.startsWith('{{#if')) return part  // not a conditional
+            part = part.trim()  // clean whitespace
+            let macro_name = part.match(/\{\{#if (.*?)}}/)[1]  // what macro is this for?
+            let macro_present = Boolean(macros[macro_name]?.trim())  // does this macro have a value?
+            let conditional_content = part.match(/\{\{#if.*?}}(.*?)\{\{\/if}}/s)[1] ?? ""  // content inside the #if block
+            return macro_present ? conditional_content : ""
+        })
+        return formatted.join('')
+    }
+    system_prompt_split(text, macros) {
+        // Given text with some number of {{macro}} items, split the text by these items and format the rest as system messages surrounding the macros
+        // It is assumed that the macros will be later replaced with appropriate text
+
+        // split on either {{...}} or {{#if ... /if}}.
+        // /g flag is for global, /s flag makes . match newlines so the {{#if ... /if}} can span multiple lines
+        // You need the capturing groups for the matches to be included in the parts.
+        // However this results in some parts being undefined for some reason, I think because only one capturing group is used for each match
+        let parts = text.split(/(\{\{#if.*?\/if}})|(\{\{.*?}})/gs);
+
+        // macros that have an instruct template will cause the regular text around it to get wrapped in the system sequence.
+        // Therefore, macros that don't have an instruct template should be merged with the surrounding text.
+        let adjusted = []
+        let merge_next = false
+
+        function add(p, merge=false) {
+            // add a part to the adjusted list
+            if (merge && adjusted.length > 0) {
+                adjusted[adjusted.length-1] += p
+            } else {
+                adjusted.push(p)
+            }
+        }
+
+        for (let i in parts) {
+            let part = parts[i]?.trim()
+            if (!part) continue  // some parts are undefined
+            if (part.startsWith('{{') && part.endsWith('}}')) {  // this is a macro
+                let macro_name = part.slice(2, -2)  // get the macro name
+                let macro = this.get_macro(macro_name)  // get the macro info
+
+                // don't merge if the macro has a value and was wrapped (if there was no value, it wouldn't have been wrapped)
+                if (macro?.instruct_template && macros[macro_name]) {
+                    add(parts[i], false)  // don't merge
+                    merge_next = false  // don't merge the next part
+                } else {  // doesn't exist or no template, merge according to the previous item
+                    add(parts[i], merge_next)
+                    merge_next = true  // next part can merge
+                }
+            } else {  // not a macro - merge according to the previous item
+                add(parts[i], merge_next)
+                merge_next = true  // next part can merge
+            }
+        }
+
+        // Now all macros that are left will split the system template.
+        // Wrap all non-macro text in system templates.
+        let formatted = adjusted.map((part) => {
+            if (!part) return ""  // some parts are undefined?
+            let check_part = part?.trim()
+            if (check_part.startsWith('{{') && check_part.endsWith('}}')) {
+                return part  // don't format macros
+            }
+            return formatInstructModeChat("", part, false, true, "", "", "", null)
+        })
+
+        return formatted.join('')
+    }
+    substitute_macros(text, macros) {
+        // Go through each macro as they occur.
+        // For each macro, check if it will be wrapped in an instruct template. If so, we need to end the system
+        //   template before the macro, and continue it after UNLESS it is the first or last text in the prompt
+        // Does NOT take into account {{#if macro}} ... {{/if}} blocks, that is done in substitute_conditionals()
+        // If the macro is not found in the macros object, it is replaced with an empty string
+
+        let parts = text.split(/(\{\{.*?}})/g);
+        let formatted = parts.map((part) => {
+            if (!part) return ""
+            if (!part.startsWith('{{') || !part.endsWith('}}')) return part
+            part = part.trim()  // clean whitespace
+            let macro_name = part.slice(2, -2)
+            return macros[macro_name] ?? ""
+        })
+        return formatted.join('')
+    }
+
+
+
+}
+
 
 
 // Message functions
@@ -2692,7 +3345,7 @@ async function summarize_message(index) {
     }
 
     // construct the full summary prompt for the message
-    let prompt = await create_summary_prompt(index)
+    let prompt = await summaryPromptEditInterface.create_summary_prompt(index)
 
     // summarize it
     let summary;
@@ -2811,170 +3464,6 @@ async function summarize_text(prompt) {
 
     return result;
 }
-function get_message_history(index) {
-    // Get a history of messages leading up to the given index (excluding the message at the index)
-    // If the include_message_history setting is 0, returns null
-    let num_history_messages = get_settings('include_message_history');
-    let mode = get_settings('include_message_history_mode');
-    if (num_history_messages === 0 || mode === "none") {
-        return;
-    }
-
-    let ctx = getContext()
-    let chat = ctx.chat
-
-    let num_included = 0;
-    let history = []
-    for (let i = index-1; num_included < num_history_messages && i>=0; i--) {
-        let m = chat[i];
-        let include = true
-
-        // whether we include the message itself is determined only by these settings.
-        // Even if the message wouldn't be *summarized* we still want to include it in the history for context.
-        if (m.is_user && !get_settings('include_user_messages_in_history')) {
-            include = false;
-        } else if (m.is_system && !get_settings('include_system_messages_in_history')) {
-            include = false;
-        } else if (m.is_thoughts && !get_settings('include_thought_messages_in_history')) {
-            include = false;
-        }
-
-        if (!include) continue;
-
-        let included = false
-        if (mode === "summaries_only" || mode === "messages_and_summaries") {
-
-            // Whether we include the *summary* is determined by the regular summary inclusion criteria.
-            // This is so the inclusion matches the summary injection.
-            let include_summary = check_message_exclusion(m)
-            let memory = get_memory(m)
-            if (include_summary && memory) {
-                memory = `Summary: ${memory}`
-                history.push(formatInstructModeChat("assistant", memory, false, false, "", "", "", null))
-                included = true
-            }
-        }
-        if (mode === "messages_only" || mode === "messages_and_summaries") {
-            history.push(formatInstructModeChat(m.name, m.mes, m.is_user, false, "", ctx.name1, ctx.name2, null))
-            included = true
-        }
-
-        if (included) {
-            num_included++
-        }
-    }
-
-    // reverse the history so that the most recent message is first
-    history.reverse()
-
-    // join with newlines
-    return history.join('\n')
-}
-function system_prompt_split(text) {
-    // Given text with some number of {{macro}} items, split the text by these items and format the rest as system messages surrounding the macros
-    // It is assumed that the macros will be later replaced with appropriate text
-
-    // split on either {{...}} or {{#if ... /if}}.
-    // /g flag is for global, /s flag makes . match newlines so the {{#if ... /if}} can span multiple lines
-    let parts = text.split(/(\{\{#if.*?\/if}})|(\{\{.*?}})/gs);
-
-    let formatted = parts.map((part) => {
-        if (!part) return ""  // some parts are undefined
-        part = part.trim()  // trim whitespace
-        if (!part) return ""  // if empty after trimming
-        if (part.startsWith('{{') && part.endsWith('}}')) {
-            return part  // don't format macros
-        }
-        let formatted = formatInstructModeChat("assistant", part, false, true, "", "", "", null)
-        return `${formatted}`
-    })
-    return formatted.join('')
-}
-function substitute_conditionals(text, params) {
-    // substitute any {{#if macro}} ... {{/if}} blocks in the text with the corresponding content if the macro is present in the params object.
-    // Does NOT replace the actual macros, that is done in substitute_params()
-
-    let parts = text.split(/(\{\{#if.*?\/if}})/gs);
-    let formatted = parts.map((part) => {
-        if (!part) return ""
-        if (!part.startsWith('{{#if')) return part
-        part = part.trim()  // clean whitespace
-        let macro_name = part.match(/\{\{#if (.*?)}}/)[1]
-        let macro_present = Boolean(params[macro_name]?.trim())
-        let conditional_content = part.match(/\{\{#if.*?}}(.*?)\{\{\/if}}/s)[1] ?? ""
-        return macro_present ? conditional_content : ""
-    })
-    return formatted.join('')
-}
-function substitute_params(text, params) {
-    // custom function to parse macros because I literally cannot find where ST does it in their code.
-    // Does NOT take into account {{#if macro}} ... {{/if}} blocks, that is done in substitute_conditionals()
-    // If the macro is not found in the params object, it is replaced with an empty string
-
-    let parts = text.split(/(\{\{.*?}})/g);
-    let formatted = parts.map((part) => {
-        if (!part) return ""
-        if (!part.startsWith('{{') || !part.endsWith('}}')) return part
-        part = part.trim()  // clean whitespace
-        let macro = part.slice(2, -2)
-        return params[macro] ?? ""
-    })
-    return formatted.join('')
-}
-async function create_summary_prompt(index) {
-    // create the full summary prompt for the message at the given index.
-    // the instruct template will automatically add an input sequence to the beginning and an output sequence to the end.
-    // Therefore, if we are NOT using instructOverride, we have to remove the first system sequence at the very beginning which gets added by format_system_prompt.
-    // If we ARE using instructOverride, we have to add a final trailing output sequence
-
-    let ctx = getContext()
-    let chat = ctx.chat
-    let message = chat[index];
-
-    // get history of messages (formatted as system messages) leading up to the message
-    let history_text = get_message_history(index);
-
-    // format the message itself
-    let message_text = formatInstructModeChat(message.name, message.mes, message.is_user, false, "", ctx.name1, ctx.name2, null)
-
-    // get the full prompt template from settings
-    let prompt = get_settings('prompt');
-
-    // first substitute any global macros like {{persona}}, {{char}}, etc...
-    let words = await get_summary_preset_max_tokens()
-    prompt = ctx.substituteParamsExtended(prompt, {"words": words})
-
-    // then substitute any {{#if macro}} ... {{/if}} blocks
-    prompt = substitute_conditionals(prompt, {"message": message_text, "history": history_text})
-
-    // The conditional substitutions have to be done before splitting and making each section a system prompt, because the conditional content may contain regular text
-    //  that should be included in the system prompt.
-
-    // if nesting
-    if (get_settings('nest_messages_in_prompt')) {
-        // substitute custom macros
-        prompt = substitute_params(prompt, {"message": message_text, "history": history_text});  // substitute "message" and "history" macros
-
-        // then wrap it in the system prompt (if using instructOverride)
-        prompt = formatInstructModeChat("", prompt, false, true, "", "", "", null)
-    } else {  // otherwise
-        // first make each prompt section its own system prompt
-        prompt = system_prompt_split(prompt)
-
-        // now substitute the custom macros
-        prompt = substitute_params(prompt, {"message": message_text, "history": history_text});  // substitute "message" and "history" macros
-    }
-
-    // If using instructOverride, append the assistant starting message template to the text, replacing the name with "assistant" if needed
-    let output_sequence = ctx.substituteParamsExtended(power_user.instruct.output_sequence, {name: "assistant"});
-    prompt = `${prompt}\n${output_sequence}`
-
-    // finally, append the prefill
-    prompt = `${prompt} ${get_settings('prefill')}`
-
-    return prompt
-}
-
 function refresh_memory() {
     let ctx = getContext();
     if (!chat_enabled()) { // if chat not enabled, remove the injections
@@ -3226,18 +3715,7 @@ function initialize_settings_listeners() {
     bind_function('#edit_memory_state', () => memoryEditInterface.show())
     bind_function("#refresh_memory", () => refresh_memory());
 
-    bind_function('#edit_summary_prompt', async () => {
-        let max_tokens = await get_summary_preset_max_tokens()
-        let description = `
-Available Macros:
-<ul style="text-align: left; font-size: smaller;">
-    <li><b>{{message}}:</b> The message text.</li>
-    <li><b>{{history}}:</b> The message history as configured by the "Message History" setting.</li>
-    <li><b>{{words}}:</b> The token limit as defined by the chosen completion preset (Currently: ${max_tokens}).</li>
-</ul>
-`
-        get_user_setting_text_input('prompt', 'Edit Summary Prompt', description)
-    })
+    bind_function('#edit_summary_prompt', () => summaryPromptEditInterface.show())
     bind_function('#edit_long_term_memory_prompt', async () => {
         let description = `
 <ul style="text-align: left; font-size: smaller;">
@@ -3255,15 +3733,6 @@ Available Macros:
     <li>In this input, the <b>{{${generic_memories_macro}}}</b> macro will be replaced by all short-term memories.</li>
 </ul>`
         get_user_setting_text_input('short_template', `Edit Short-Term Memory Injection`, description)
-    })
-    bind_function('#preview_message_history', async () => {
-        let chat = getContext().chat;
-        let history = get_message_history(chat.length-1);
-        display_text_modal("{{history}} Macro Preview (Last Message)", history);
-    })
-    bind_function('#preview_summary_prompt', async () => {
-        let text = await create_summary_prompt(getContext().chat.length-1)
-        display_text_modal("Summary Prompt Preview (Last Message)", text);
     })
 
     bind_setting('#connection_profile', 'connection_profile', 'text')
@@ -3287,10 +3756,6 @@ Available Macros:
 
     bind_setting('#include_world_info', 'include_world_info', 'boolean');
     bind_setting('#block_chat', 'block_chat', 'boolean');
-    bind_setting('#nest_messages_in_prompt', 'nest_messages_in_prompt', 'boolean')
-    bind_setting('#include_message_history', 'include_message_history', 'number');
-    bind_setting('#include_message_history_mode', 'include_message_history_mode', 'text');
-    bind_setting('#include_user_messages_in_history', 'include_user_messages_in_history', 'boolean');
 
     bind_setting('#summary_injection_separator', 'summary_injection_separator', 'text')
     bind_setting('#summary_injection_threshold', 'summary_injection_threshold', 'number');
@@ -3604,6 +4069,16 @@ function initialize_slash_commands() {
             }),
         ],
     }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'get_summary_max_tokens',
+        callback: async (args) => {
+            // command has to return string
+            return String(await get_summary_preset_max_tokens())
+        },
+        helpString: 'Return the max tokens allowed for summarization given the current completion preset'
+    }));
+
 }
 
 function add_menu_button(text, fa_icon, callback, hover=null) {
@@ -3704,6 +4179,7 @@ function toggle_popout() {
 
 // Entry point
 let memoryEditInterface;
+let summaryPromptEditInterface
 jQuery(async function () {
     log(`Loading extension...`)
 
@@ -3720,6 +4196,7 @@ jQuery(async function () {
     initialize_settings();
 
     memoryEditInterface = new MemoryEditInterface()
+    summaryPromptEditInterface = new SummaryPromptEditInterface()
 
     // load settings html
     await load_settings_html();
