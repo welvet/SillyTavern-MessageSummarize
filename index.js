@@ -4124,7 +4124,7 @@ function initialize_popout() {
     $popout.attr('id', 'qmExtensionPopout').removeClass('zoomed_avatar').addClass('draggable').empty();
 
     // create the control bar with the close button
-    const controlBarHtml = `<div class="panelControlBar flex-container">
+    const controlBarHtml = `<div class="panelControlBar flex-container" id="qmExtensionPopoutheader">
     <div class="fa-solid fa-grip drag-grabber hoverglow"></div>
     <div class="fa-solid fa-circle-xmark hoverglow dragClose"></div>
     </div>`;
@@ -4150,6 +4150,8 @@ function initialize_popout() {
 function open_popout() {
     debug("Showing popout")
     $('body').append($popout);  // add the popout to the body
+    loadMovingUIState()
+    dragElement($popout)
 
     // setup listener for close button to remove the popout
     $popout.find('.dragClose').off('click').on('click', function () {
