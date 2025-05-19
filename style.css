@@ -1,10 +1,11 @@
 :root {
+    --qvink_default: grey;
     --qvink_short: #2E8B57;
     --qvink_long: #4682B4;
     --qvink_old: #8B0000;
     --qvink_excluded: #555;
     --qvink_redundant_opacity: 50%;
-    --qvink_message_removed: #555;
+    --qvink_message_removed: grey;
 }
 
 #drawer_content > hr {
@@ -65,7 +66,7 @@ By default, text is greyed to indicate that is it not injected.
     margin: 0 0 5px 0;
     font-size: small;
     font-style: italic;
-    color: grey;
+    color: var(--qvink_default);
 }
 
 /* to style short-term memories. */

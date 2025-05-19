@@ -5,13 +5,15 @@
 
 - **New Feature**: Reworked "Edit" interface for the summary prompt. This is now where the `{{history}}`, `{{message}}`, and `{{words}}` macro are defined and modified. You can also create custom macros for the summary prompt using either a message range or STScript.
 - **New Slash Command**: `/get_summary_max_tokens` returns the max tokens allowed for summarization given the current completion preset.
-- **Removed**: The "Message History" config section has been removed.
-- **Removed**: The "Nest messages in summary prompt" config option has been removed.
-- **Removed**: The "Include All Context Content" config option has been removed.
 - **Changed**: Messages that have been removed from context are now turned grey in the chat. This can be modified by using the `--qvink_message_removed` CSS variable.
+- **Changed**: Summaries that aren't included in memory can now be changed style with the `--qvink_default` CSS variable.
 - **Changed**: Modified how profile changes are detected under the hood. Shouldn't affect anything.
 - **Changed**: You won't believe it I moved settings around again. Auto-Summarization settings now get their own section.
 - **Fixed**: The config popout now works with MovingUI
+- **Removed**: The "Message History" config section has been removed.
+- **Removed**: The "Nest messages in summary prompt" config option has been removed.
+- **Removed**: The "Include All Context Content" config option has been removed.
+
 
 #### v0.9.5
 **ST Version Requirement:** You must be on ST version 1.12.14 or greater as it relies on this PR https://github.com/SillyTavern/SillyTavern/pull/3763#issue-2948421833
