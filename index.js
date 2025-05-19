@@ -298,6 +298,7 @@ function check_st_version() {
     if (getContext().symbols !== undefined) {
         return true
     } else {
+        log(`Symbols not found in context: [${getContext().symbols}]`)
         toast("Incompatible ST version - please update.", "error")
     }
 }
@@ -3712,9 +3713,7 @@ jQuery(async function () {
     const VERSION = manifest.version;
     log(`Version: ${VERSION}`)
 
-    if (!check_st_version()) {
-        return
-    }
+    check_st_version()
 
     // Load settings
     initialize_settings();
