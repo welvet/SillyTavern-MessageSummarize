@@ -76,7 +76,7 @@ Note: all commands have `/qvink-memory-` as an alias.
 ### Custom CSS
 You can easily customize the CSS for displayed memories by setting the following variables:
 - `--qm-short`: Summaries in short-term memory (default green)
-- `--qm_long`: Summaries in long-term memory (default blue)
+- `--qm-long`: Summaries in long-term memory (default blue)
 - `--qm-old`: Summaries marked for long-term memory, but now out of context (default red)
 - `--qm-default`: Summaries not included in any memory (default light grey)
 - `--qm-excluded`: Summaries manually force-excluded (default dark grey)
