@@ -101,7 +101,7 @@ Try them out if you want.
 - **The `{{words}}` macro doesn't always help**: While some models may reign themselves in if you tell them to keep it under X words, LLMs don't have a soul and therefore can't count, so don't bet on it.
 - **You can use global macros**: If your summaries aren't using names properly, keep in mind that you can use the `{{char}}` or `{{user}}` macro in the prompt.
 - **No need to pause roleplay**: You don't have to include anything like "ignore previous instructions" or "pause your roleplay". The summary prompt is completely independent and will only send what you see in the edit window.
-- **I don't recommend reasoning**: Reasoning models can summarize fine, but they do tend to blab for ages which makes summarizing slow, so I wouldn't recommend them for that reason.
+- **I don't recommend reasoning**: Reasoning models can summarize fine, but they do tend to blab for ages which makes summarizing slow, so I wouldn't recommend them for that reason. If you do use one, make sure to use the `<think>` prefill.
 - **Custom Macros**: In the `Edit` window for your summary prompt, you can create custom macros to use in your prompt with STScript. In your command, you can reference the ID of the message being summarized with `{{id}}`.
 - **Save your presets**: If you are using a different completion preset or connection profile for summaries, make sure to save any changes to your regular completion preset or instruct template. When summarizing, the extension has to temporarily switch presets or connection profiles, which will discard any unsaved changes to the one you are currently using.
 
@@ -129,6 +129,8 @@ You can also try toggling "Nest Message in Summary Prompt" in the settings - som
 - **Incomplete sentences aren't getting trimmed even though the option is checked in the advanced formatting settings:** If you are using a different connection profile for summaries, note that instruction templates are part of that so the option needs to be checked in the templated used for that connection profile.
 
 - **When I use a different completion preset for summaries, my regular completion preset get changed after summarizing:** When a summary is generated, we actually have to switch completion presets temporarily which discards any unsaved changes you might have made to your current completion preset. This is just how ST does things. The same applies to connection profiles (which in turn affects instruction templates.)
+
+- **Reasoning model thinking is included in summary**: Some reasoning models need to be prefilled with `<think>`, so make sure to add that in the "Prefill" field of the extension config (**not** the normal "start reply with" field in the Advanced Formatting tab).
 
 - **Just updated and things are broken:** try reloading the page first, and make sure you are on the most recent version of ST. If you are on the dev branch of this extension, you must also be on the staging branch of ST.
 
