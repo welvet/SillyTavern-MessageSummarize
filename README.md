@@ -75,19 +75,19 @@ Note: all commands have `/qvink-memory-` as an alias.
 
 ### Custom CSS
 You can easily customize the CSS for displayed memories by setting the following variables:
-- `--qvink_short`: Summaries in short-term memory (default green)
-- `--qvink_long`: Summaries in long-term memory (default blue)
-- `--qvink_old`: Summaries marked for long-term memory, but now out of context (default red)
-- `--qvink_default`: Summaries not included in any memory (default light grey)
-- `--qvink_excluded`: Summaries manually force-excluded (default dark grey)
-- `--qvink_message_removed`: Messages that have been removed from context and replaced by summaries (default light grey)
+- `--qm-short`: Summaries in short-term memory (default green)
+- `--qm_long`: Summaries in long-term memory (default blue)
+- `--qm-old`: Summaries marked for long-term memory, but now out of context (default red)
+- `--qm-default`: Summaries not included in any memory (default light grey)
+- `--qm-excluded`: Summaries manually force-excluded (default dark grey)
+- `--qm-message-removed`: Messages that have been removed from context and replaced by summaries (default light grey)
 
 Just make sure to use the `!important` directive to override the default styles.
 For example, to color short-term memories yellow and long-term memories black, you would put the following in your "Custom CSS" user settings:
 ```
 :root {
-   --qvink_short: yellow !important;
-   --qvink_long: black !important;
+   --qm-short: yellow !important;
+   --qm-long: black !important;
 }
 ```
 
