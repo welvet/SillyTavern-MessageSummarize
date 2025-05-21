@@ -58,19 +58,20 @@ To update the dev branch when changes are made, run:
 - `git pull origin dev` (pull any new changes)
 
 ### Slash Commands
-- `/get_memory_enabled`: Returns whether the extension is enabled in the current chat.
-- `/toggle_memory`: Toggles the extension on and off for the current chat. Same as clicking "Toggle Chat Memory" in the config. Can also provide a boolean argument to toggle the extension directly.
-- `/toggle_memory_display`: Toggles the display of summaries below each message. Same as clicking "Display Memories" in the config.
-- `/toggle_memory_popout`: Toggles the popout config menu.
-- `/toggle_memory_edit_interface`: Toggles the "Edit Memory" interface
-- `/toggle_memory_injection_preview`: Toggles a preview of the text that will be injected
-- `/summarize`: Summarizes the nth message in the chat (default to most recent message). Same as clicking the "quote" icon in the message button menu.
-- `/summarize_chat`: Performs a single auto-summarization on the chat, even if auto-summarization is disabled.
-- `/stop_summarization`: stops any summarization currently running. Same as clicking the "stop" button in the config or next to the progress bar.
-- `/remember <n>`: Mark the nth message for long-term memory, summarizing it if not already. Same as clicking the "brain" icon in the message button menu.
-- `/force_exclude_memory <n>`: Toggles the inclusion of the summary for the nth message. Same as clicking the "Force Exclude" button in the message button menu.
-- `/get_memory <n>`: Get the memory associated with the nth message. Defaults to the most recent message.
-- `/get_summary_max_tokens`: Get the max response tokens defined in the current completion preset used for summaries.
+Note: all commands have `/qvink-memory-` as an alias.
+- `/qm-enabled`: Returns whether the extension is enabled in the current chat.
+- `/qm-toggle`: Toggles the extension on and off for the current chat. Same as clicking "Toggle Chat Memory" in the config. Can also provide a boolean argument to toggle the extension directly.
+- `/qm-toggle-display`: Toggles the display of summaries below each message. Same as clicking "Display Memories" in the config.
+- `/qm-toggle-config`: Toggles the popout config menu.
+- `/qm-toggle-edit-interface`: Toggles the "Edit Memory" interface
+- `/qm-toggle-injection-preview`: Toggles a preview of the text that will be injected
+- `/qm-toggle-remember <n>`: Mark the nth message for long-term memory, summarizing it if not already. Same as clicking the "Brain" icon in the message button menu.
+- `/qm-toggle-exclude <n>`: Toggles the manual exclusion of the memory for the nth message. Same as clicking the "Force Exclude" button in the message button menu.
+- `/qm-get <n>`: Get the memory associated with the nth message. Defaults to the most recent message.
+- `/qm-summarize`: Summarizes the nth message in the chat (default to most recent message). Same as clicking the "Quote" icon in the message button menu.
+- `/qm-summarize-chat`: Performs a single auto-summarization on the chat, even if auto-summarization is disabled.
+- `/qm-stop-summarization`: stops any summarization currently running. Same as clicking the "stop" button in the config or next to the progress bar.
+- `/qm-max-summary-tokens`: Get the max response tokens defined in the current completion preset used for summaries.
 
 ### Custom CSS
 You can easily customize the CSS for displayed memories by setting the following variables:
@@ -189,3 +190,4 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Add dashed line to memory edit interface~~
 - detect response length change to update settings visuals
 - rework message history
+- fix prefill compatability with chat completion. Might need to hijack ST's prefill setting instead of adding it myself.

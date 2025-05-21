@@ -1,12 +1,16 @@
 # Changelog
 
-#### v0.9.6
-**IMPORTANT**: Due to changes in how message history (for the summary prompt) is constructed, your current {{history}} macro will no longer work as it did before. You will need to reconfigure it in the new interface by clicking "Edit" under "Summarization"
+#### v0.9.7
+**IMPORTANT 1**: All slash commands have been renamed. You will need to update any QRs that use them.
+**IMPORTANT 2**: All CSS variables have been renamed. You will need to update any custom CSS that use them.
+**IMPORTANT 2**: Your current `{{history}}` macro will no longer work as it did before. You will need to reconfigure it in the new interface by clicking "Edit" under "Summarization"
 
 - **New Feature**: Reworked "Edit" interface for the summary prompt. This is now where the `{{history}}`, `{{message}}`, and `{{words}}` macro are defined and modified. You can also create custom macros for the summary prompt using either a message range or STScript.
-- **New Slash Command**: `/get_summary_max_tokens` returns the max tokens allowed for summarization given the current completion preset.
-- **Changed**: Messages that have been removed from context are now turned grey in the chat. This can be modified by using the `--qvink_message_removed` CSS variable.
-- **Changed**: Summaries that aren't included in memory can now be changed style with the `--qvink_default` CSS variable.
+- **New Slash Command**: `/qm-max-summary-tokens` returns the max tokens allowed for summarization given the current completion preset.
+- **Changed**: All slash commands now use "-" instead of "_" and start with "qm-" (with "qvink-memory-" as an alias) to avoid overlapping with other commands. See the README for the updated list of all commands.
+- **Changed**: All CSS variables now use "-" instead of "_", and are prefixed with "--qm-"
+- **Changed**: Messages that have been removed from context are now turned grey in the chat. This can be modified by using the `--qm-message-removed` CSS variable.
+- **Changed**: Summaries that aren't included in memory can now be changed style with the `--qm-default` CSS variable.
 - **Changed**: Modified how profile changes are detected under the hood. Shouldn't affect anything.
 - **Changed**: You won't believe it I moved settings around again. Auto-Summarization settings now get their own section.
 - **Fixed**: The config popout now works with MovingUI

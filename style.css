@@ -1,11 +1,11 @@
 :root {
-    --qvink_default: grey;
-    --qvink_short: #2E8B57;
-    --qvink_long: #4682B4;
-    --qvink_old: #8B0000;
-    --qvink_excluded: #555;
-    --qvink_redundant_opacity: 50%;
-    --qvink_message_removed: grey;
+    --qm-default: grey;
+    --qm-short: #2E8B57;
+    --qm-long: #4682B4;
+    --qm-old: #8B0000;
+    --qm-excluded: #555;
+    --qm-redundant-opacity: 50%;
+    --qm-message-removed: grey;
 }
 
 #drawer_content > hr {
@@ -66,41 +66,41 @@ By default, text is greyed to indicate that is it not injected.
     margin: 0 0 5px 0;
     font-size: small;
     font-style: italic;
-    color: var(--qvink_default);
+    color: var(--qm-default);
 }
 
 /* to style short-term memories. */
 .qvink_short_memory {
-    color: var(--qvink_short);
+    color: var(--qm-short);
 }
 .qvink_short_memory.qvink_lagging_memory {
-    color: rgba(from var(--qvink_short) r g b / var(--qvink_redundant_opacity));
+    color: rgba(from var(--qm-short) r g b / var(--qm-redundant-opacity));
     text-shadow: none;
 }
 /* to style long-term memories. */
 .qvink_long_memory {
-    color: var(--qvink_long);
+    color: var(--qm-long);
 }
 .qvink_long_memory.qvink_lagging_memory {
-    color: rgba(from var(--qvink_long) r g b / var(--qvink_redundant_opacity));
+    color: rgba(from var(--qm-long) r g b / var(--qm-redundant-opacity));
     text-shadow: none;
 }
 /* to style memories marked for long-term, but are past the context limit */
 .qvink_old_memory {
-    color: var(--qvink_old)
+    color: var(--qm-old)
 }
 .qvink_old_memory.qvink_lagging_memory {
-    color: rgba(from var(--qvink_old) r g b / var(--qvink_redundant_opacity));
+    color: rgba(from var(--qm-old) r g b / var(--qm-redundant-opacity));
     text-shadow: none;
 }
 /* to style memories that are force-excluded */
 .qvink_exclude_memory {
-    color: var(--qvink_excluded)
+    color: var(--qm-excluded)
 }
 
 /* To style messages that have been removed from context */
 .qvink_removed_message {
-    color: var(--qvink_message_removed);
+    color: var(--qm-message-removed);
 }
 
 /* Style the message buttons, separating them from the rest */

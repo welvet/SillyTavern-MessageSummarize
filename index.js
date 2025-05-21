@@ -61,7 +61,6 @@ const remember_button_class = `${MODULE_NAME}_remember_button`
 const summarize_button_class = `${MODULE_NAME}_summarize_button`
 const edit_button_class = `${MODULE_NAME}_edit_button`
 const forget_button_class = `${MODULE_NAME}_forget_button`
-const delete_button_class = `${MODULE_NAME}_delete_button`
 
 // global flags and whatnot
 var STOP_SUMMARIZATION = false  // flag toggled when stopping summarization
@@ -87,7 +86,7 @@ const default_long_template = `[Following is a list of events that occurred in t
 const default_short_template = `[Following is a list of recent events]:\n{{${generic_memories_macro}}}\n`
 const default_summary_macros = {  // default set of macros for the summary prompt.
     "message": {name: "message", default: true, type: "special", instruct_template: true, description: "The message being summarized"},
-    "words": {name: "words", default: true, type: "custom", command: "/get_summary_max_tokens", description: "Max response tokens defined by the chosen completion preset"},
+    "words": {name: "words", default: true, type: "custom", command: "/qm-max-summary-tokens", description: "Max response tokens defined by the chosen completion preset"},
     "history": {name: "history", default: true, type: "preset", start: 1, end: 6, bot_messages: true, user_messages: true, instruct_template: true},
 }
 const default_settings = {
@@ -3889,66 +3888,41 @@ function initialize_slash_commands() {
     let ARGUMENT_TYPE = ctx.ARGUMENT_TYPE
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'qvink_log_chat',
+        name: 'qm-debug',
+        aliases: ['qvink-memory-debug'],
+        helpString: 'Logs the ST core context and Qvink Memory extension settings to console.',
         callback: (args) => {
             log(getContext())
-            log(getContext().chat)
-        },
-        helpString: 'log chat',
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'qvink_log_settings',
-        callback: async (args) => {
             log(extension_settings[MODULE_NAME])
         },
-        helpString: 'Log current settings',
+
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'hard_reset',
+        name: 'qm-hard-reset',
+        aliases: ['qvink-memory-hard-reset'],
+        helpString: 'WARNING: Hard reset all settings for this extension. All config profiles will be deleted.',
         callback: (args) => {
             hard_reset_settings()
             refresh_settings()
             refresh_memory()
         },
-        helpString: 'Hard reset all settings',
+
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'remember',
-        callback: (args, index) => {
-            if (index === "") index = null  // if not provided the index is an empty string, but we need it to be null to get the default behavior
-            remember_message_toggle(index);
+        name: 'qm-enabled',
+        aliases: ['qvink-memory-enabled'],
+        helpString: 'Return whether the extension is enabled in the current chat.',
+        callback: (args) => {
+            return chat_enabled()
         },
-        helpString: 'Toggle the remember status of a message (default is the most recent message)',
-        unnamedArgumentList: [
-            SlashCommandArgument.fromProps({
-                description: 'Index of the message to toggle',
-                isRequired: false,
-                typeList: ARGUMENT_TYPE.NUMBER,
-            }),
-        ],
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'force_exclude_memory',
-        callback: (args, index) => {
-            if (index === "") index = null  // if not provided the index is an empty string, but we need it to be null to get the default behavior
-            forget_message_toggle(index);
-        },
-        helpString: 'Toggle the ememory exclusion status of a message (default is the most recent message)',
-        unnamedArgumentList: [
-            SlashCommandArgument.fromProps({
-                description: 'Index of the message to toggle',
-                isRequired: false,
-                typeList: ARGUMENT_TYPE.NUMBER,
-            }),
-        ],
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'toggle_memory',
+        name: 'qm-toggle',
+        aliases: ['qvink-memory-toggle'],
+        helpString: 'Change whether the extension is enabled for the current chat. If no state is provided, it will toggle the current state.',
         callback: (args, state) => {
             if (state === "") {  // if not provided the state is an empty string, but we need it to be null to get the default behavior
                 state = null
@@ -3958,7 +3932,7 @@ function initialize_slash_commands() {
 
             toggle_chat_enabled(state);  // toggle the memory for the current chat
         },
-        helpString: 'Change whether memory is enabled for the current chat. If no state is provided, it will toggle the current state.',
+
         unnamedArgumentList: [
             SlashCommandArgument.fromProps({
                 description: 'Boolean value to set the memory state',
@@ -3969,65 +3943,52 @@ function initialize_slash_commands() {
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'get_memory_enabled',
-        callback: (args) => {
-            return chat_enabled()
-        },
-        helpString: 'Return whether memory is currently enabled.'
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'toggle_memory_display',
+        name: 'qm-toggle-display',
+        aliases: ['qvink-memory-toggle-display'],
+        helpString: "Toggle the \"display memories\" setting on the current profile (doesn't save the profile).",
         callback: (args) => {
             $(`.${settings_content_class} #display_memories`).click();  // toggle the memory display
         },
-        helpString: "Toggle the \"display memories\" setting on the current profile (doesn't save the profile).",
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'toggle_memory_popout',
+        name: 'qm-toggle-config',
+        aliases: ['qvink-memory-toggle-config'],
+        helpString: 'Toggle the extension config popout.',
         callback: (args) => {
             toggle_popout()
         },
-        helpString: 'Toggle the extension config popout',
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'toggle_memory_edit_interface',
+        name: 'qm-toggle-edit-interface',
+        aliases: ['qvink-memory-toggle-edit-interface'],
+        helpString: 'Toggle the memory editing interface.',
         callback: (args) => {
             memoryEditInterface.show()
         },
-        helpString: 'Toggle the memory editing interface',
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'toggle_memory_injection_preview',
+        name: 'qm-toggle-injection-preview',
+        aliases: ['qvink-memory-toggle-injection-preview'],
+        helpString: 'Toggle a preview of the current memory injection.',
         callback: (args) => {
             display_injection_preview()
         },
-        helpString: 'Toggle a preview of the current memory injection',
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'summarize_chat',
-        helpString: 'Summarize the chat using the auto-summarization criteria, even if auto-summarization is off.',
-        callback: async (args, limit) => {
-            let indexes = collect_messages_to_auto_summarize()
-            await summarize_messages(indexes);
-        },
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'summarize',
-        callback: async (args, index) => {
+        name: 'qm-toggle-remember',
+        aliases: ['qvink-memory-toggle-remember'],
+        callback: (args, index) => {
             if (index === "") index = null  // if not provided the index is an empty string, but we need it to be null to get the default behavior
-            await summarize_messages(index);  // summarize the message
-            refresh_memory();
+            remember_message_toggle(index);
         },
-        helpString: 'Summarize the given message index (defaults to most recent applicable message)',
+        helpString: 'Toggle whether a memory should be long-term (default is the most recent message).',
         unnamedArgumentList: [
             SlashCommandArgument.fromProps({
-                description: 'Index of the message to summarize',
+                description: 'Index of the message to toggle',
                 isRequired: false,
                 typeList: ARGUMENT_TYPE.NUMBER,
             }),
@@ -4035,15 +3996,25 @@ function initialize_slash_commands() {
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'stop_summarization',
-        callback: (args) => {
-            stop_summarization()
+        name: 'qm-toggle-exclude',
+        aliases: ['qvink-memory-toggle-exclude'],
+        helpString: 'Toggle to force-exclude a memory, regardless of other inclusion criteria (default is the most recent message).',
+        callback: (args, index) => {
+            if (index === "") index = null  // if not provided the index is an empty string, but we need it to be null to get the default behavior
+            forget_message_toggle(index);
         },
-        helpString: 'Abort any summarization taking place.',
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'Index of the message to toggle',
+                isRequired: false,
+                typeList: ARGUMENT_TYPE.NUMBER,
+            }),
+        ],
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'get_memory',
+        name: 'qm-get',
+        aliases: ['qvink-memory-get'],
         callback: async (args, index) => {
             let chat = getContext().chat
             if (index === "") index = chat.length - 1
@@ -4060,12 +4031,50 @@ function initialize_slash_commands() {
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'get_summary_max_tokens',
+        name: 'qm-summarize',
+        aliases: ['qvink-memory-summarize'],
+        callback: async (args, index) => {
+            if (index === "") index = null  // if not provided the index is an empty string, but we need it to be null to get the default behavior
+            await summarize_messages(index);  // summarize the message
+            refresh_memory();
+        },
+        helpString: 'Summarize the given message index (defaults to most recent applicable message).',
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'Index of the message to summarize',
+                isRequired: false,
+                typeList: ARGUMENT_TYPE.NUMBER,
+            }),
+        ],
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'qm-summarize-chat',
+        aliases: ['qvink-memory-summarize-chat'],
+        helpString: 'Summarize the chat using the auto-summarization criteria, even if auto-summarization is off.',
+        callback: async (args, limit) => {
+            let indexes = collect_messages_to_auto_summarize()
+            await summarize_messages(indexes);
+        },
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'qm-stop-summarization',
+        aliases: ['qvink-memory-stop-summarization'],
+        callback: (args) => {
+            stop_summarization()
+        },
+        helpString: 'Abort any summarization taking place.',
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'qm-max-summary-tokens',
+        aliases: ['qvink-memory-max-summary-tokens'],
         callback: async (args) => {
             // command has to return string
             return String(await get_summary_preset_max_tokens())
         },
-        helpString: 'Return the max tokens allowed for summarization given the current completion preset'
+        helpString: 'Return the max tokens allowed for summarization given the current completion preset.'
     }));
 
 }
