@@ -2702,6 +2702,8 @@ class SummaryPromptEditInterface {
         // substitute all defined macros (unrecognized macros will be replaced by an empty string)
         prompt = this.substitute_macros(prompt, macros);
 
+        // TODO when we get support for chat completion prefill, this next bit should be text completion only
+
         // If using instructOverride, append the assistant starting message template to the text, replacing the name with "assistant" if needed
         let output_sequence = this.ctx.substituteParamsExtended(power_user.instruct.output_sequence, {name: "assistant"});
         if (output_sequence) output_sequence += "\n"  // newline after output sequence if present

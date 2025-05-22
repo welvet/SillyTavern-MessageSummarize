@@ -98,8 +98,15 @@ By default, text is greyed to indicate that is it not injected.
     color: var(--qm-excluded)
 }
 
-/* To style messages that have been removed from context */
-.qvink_removed_message {
+/*
+To style messages that have been removed from context.
+We need the specificity to override some theme styles.
+*/
+.mes_text.qvink_removed_message,
+.mes_text.qvink_removed_message p,
+.mes_text.qvink_removed_message q,
+.mes_text.qvink_removed_message code,
+.mes_text.qvink_removed_message em {
     color: var(--qm-message-removed);
 }
 
