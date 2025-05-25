@@ -132,6 +132,8 @@ You can also try toggling "Nest Message in Summary Prompt" in the settings - som
 
 - **Reasoning model thinking is included in summary**: Some reasoning models need to be prefilled with `<think>`, so make sure to add that in the "Prefill" field of the extension config (**not** the normal "start reply with" field in the Advanced Formatting tab).
 
+- **An unknown error occurred while counting tokens**: This might indicate an issue with your custom chat-completion preset. ST expects there to be a prompt section called "main", which is where extension injections go by default. To fix this, you can go to this extension's config menu and click "No not inject" in both the short-term and long-term injection sections. This will prevent the extension from attempting to insert context, and you can instead use the `{{short_term_memory}}` and `{{long_term_memory}}` macros to place them anywhere you want.
+
 - **Just updated and things are broken:** try reloading the page first, and make sure you are on the most recent version of ST. If you are on the dev branch of this extension, you must also be on the staging branch of ST.
 
 If it's something else, please turn on "Debug Mode" in the settings and send me the output logs from your browser console and raise an issue or message on discord.

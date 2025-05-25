@@ -85,9 +85,9 @@ Following is the message to summarize:
 const default_long_template = `[Following is a list of events that occurred in the past]:\n{{${generic_memories_macro}}}\n`
 const default_short_template = `[Following is a list of recent events]:\n{{${generic_memories_macro}}}\n`
 const default_summary_macros = {  // default set of macros for the summary prompt.
-    "message": {name: "message", default: true, type: "special", instruct_template: true, description: "The message being summarized"},
-    "words": {name: "words", default: true, type: "custom", command: "/qm-max-summary-tokens", description: "Max response tokens defined by the chosen completion preset"},
-    "history": {name: "history", default: true, type: "preset", start: 1, end: 6, bot_messages: true, user_messages: true, instruct_template: true},
+    "message": {name: "message", default: true, enabled: true, type: "special", instruct_template: true, description: "The message being summarized"},
+    "words": {name: "words", default: true, enabled: true, type: "custom", command: "/qm-max-summary-tokens", description: "Max response tokens defined by the chosen completion preset"},
+    "history": {name: "history", default: true, enabled: false, type: "preset", start: 1, end: 6, bot_messages: true, user_messages: true, instruct_template: true},
 }
 const default_settings = {
     // inclusion criteria
@@ -290,7 +290,8 @@ function unescape_string(text) {
 }
 function assign_and_prune(target, source) {
     // Modifies target in-place while also deleting any keys not in source
-    for (const key in target) {
+    let keys = Object.keys(target).concat(Object.keys(source))
+    for (let key of keys) {
         if (!(key in source)) delete target[key];
         else target[key] = source[key];
     }
@@ -925,12 +926,6 @@ function refresh_settings() {
     update_preset_dropdown()
     check_preset_valid()
 
-    // if prompt doesn't have {{message}}, insert it
-    if (!get_settings('prompt').includes("{{message}}")) {
-        set_settings('prompt', get_settings('prompt') + "\n{{message}}")
-        debug("{{message}} macro not found in summary prompt. It has been added automatically.")
-    }
-
     // auto_summarize_message_limit must be >= auto_summarize_batch_size (unless the limit is disabled, i.e. -1)
     let auto_limit = get_settings('auto_summarize_message_limit')
     let batch_size = get_settings('auto_summarize_batch_size')
@@ -1220,7 +1215,7 @@ function new_profile() {
     save_profile(profile);
     load_profile(profile);
 }
-function delete_profile() {
+async function delete_profile() {
     // Delete the current profile
     if (get_settings('profiles').length === 1) {
         error("Cannot delete your last profile");
@@ -1228,6 +1223,11 @@ function delete_profile() {
     }
     let profile = get_settings('profile');
     let profiles = get_settings('profiles');
+
+    let result = await getContext().Popup.show.confirm(`Permanently delete profile: "${profile}"`, "", {okButton: 'Delete', cancelButton: 'Cancel'});
+    if (!result) {
+        return
+    }
 
     // delete the profile
     delete profiles[profile];
@@ -2236,6 +2236,7 @@ class SummaryPromptEditInterface {
     macro_definition_template = `
     <div class="macro_definition qvink_interface_card">
         <div class="flex-container justifyspacebetween alignitemscenter">
+            <button class="macro_enable menu_button fa-solid margin0"></button>
             <button class="macro_preview menu_button fa-solid fa-eye margin0" title="Preview the result of this macro"></button>
             <input class="macro_name flex1 text_pole" type="text" placeholder="name">
             <button class="macro_delete menu_button red_button fa-solid fa-trash margin0" title="Delete custom macro"></button>
@@ -2295,8 +2296,13 @@ class SummaryPromptEditInterface {
     `
     ctx = getContext();
 
+    // enable/disable icons
+    static fa_enabled = "fa-check"
+    static fa_disabled = "fa-xmark"
+
     default_macro_settings = {
         "name": "new_macro",
+        "enabled": true,
         "type": "preset",
         "start": 1, "end": 1,
         "bot_messages": true,
@@ -2396,8 +2402,25 @@ class SummaryPromptEditInterface {
         }
         show_settings_div()
 
+        function set_enabled() {
+            if (macro.enabled) {
+                $enable.removeClass(SummaryPromptEditInterface.fa_disabled)
+                $enable.addClass(SummaryPromptEditInterface.fa_enabled)
+                $enable.removeClass("red_button")
+                $enable.addClass("button_highlight")
+                $enable.prop('title', "Enabled")
+            } else {
+                $enable.removeClass(SummaryPromptEditInterface.fa_enabled)
+                $enable.addClass(SummaryPromptEditInterface.fa_disabled)
+                $enable.removeClass("button_highlight")
+                $enable.addClass("red_button")
+                $enable.prop('title', "Disabled")
+            }
+        }
+
         // set settings
         let $name = $macro.find("input.macro_name")
+        let $enable = $macro.find("button.macro_enable")
         let $preview = $macro.find("button.macro_preview")
         let $delete = $macro.find("button.macro_delete")
         let $restore = $macro.find("button.macro_restore")
@@ -2414,8 +2437,15 @@ class SummaryPromptEditInterface {
 
         // preview
         $preview.on('click', async () => {
-            let result = await this.compute_macro(this.ctx.chat.length-1, macro.name)
+            let result = await this.compute_macro(this.ctx.chat.length-1, macro.name, true)
             await display_text_modal(`Macro Preview: {{${macro.name}}}`, result)
+        })
+
+        // enable
+        set_enabled()
+        $enable.on('click', async () => {
+            macro.enabled = !macro.enabled
+            set_enabled()
         })
 
         // if it has a description, add it as the title for the name
@@ -2595,7 +2625,7 @@ class SummaryPromptEditInterface {
         let text = await this.create_summary_prompt(index, prompt)
         await display_text_modal("Summary Prompt Preview (Last Message)", text);
     }
-    async compute_macro(index, name) {
+    async compute_macro(index, name, ignore_enabled=false) {
         // get the result from the given custom macro for the given message index
 
         // special macro?
@@ -2605,6 +2635,7 @@ class SummaryPromptEditInterface {
 
         let macro = this.get_macro(name)
         if (!macro) return  // macro doesn't exist
+        if (!macro.enabled && !ignore_enabled) return
         if (macro.type === "preset") {  // range presets
            return this.compute_range_macro(index, macro)
         } else if (macro.type === "custom") {  // STScript
