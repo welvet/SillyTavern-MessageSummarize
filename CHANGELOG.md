@@ -1,6 +1,6 @@
 # Changelog
 
-#### v0.9.7
+#### v0.9.8
 **IMPORTANT 1**: All slash commands have been renamed. You will need to update any QRs that use them.
 **IMPORTANT 2**: All CSS variables have been renamed. You will need to update any custom CSS that use them.
 **IMPORTANT 2**: Your current `{{history}}` macro will no longer work as it did before. You will need to reconfigure it in the new interface by clicking "Edit" under "Summarization"
@@ -14,6 +14,7 @@
 - **Changed**: Modified how profile changes are detected under the hood. Shouldn't affect anything.
 - **Changed**: You won't believe it I moved settings around again. Auto-Summarization settings now get their own section.
 - **Fixed**: The config popout now works with MovingUI
+- **Fixed**: You can now properly save config profile for a group and their chats as if it were a character.
 - **Removed**: The "Message History" config section has been removed.
 - **Removed**: The "Nest messages in summary prompt" config option has been removed.
 - **Removed**: The "Include All Context Content" config option has been removed.

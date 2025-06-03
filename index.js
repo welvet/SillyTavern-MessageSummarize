@@ -214,11 +214,13 @@ function get_current_character_identifier() {
     // uniquely identify the current character
     // You have to use the character's avatar image path to uniquely identify them
     let context = getContext();
+
+    // If a group, we can use the group ID to uniquely identify it
     if (context.groupId) {
-        return  // if a group is selected, return
+        return context.groupId
     }
 
-    // otherwise get the avatar image path of the current character
+    // Otherwise get the avatar image path of the current character
     let index = context.characterId;
     if (!index) {  // not a character
         return null;
@@ -229,9 +231,6 @@ function get_current_character_identifier() {
 function get_current_chat_identifier() {
     // uniquely identify the current chat
     let context = getContext();
-    if (context.groupId) {
-        return context.groupId;
-    }
     return context.chatId
 
 }
