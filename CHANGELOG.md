@@ -3,7 +3,7 @@
 #### v0.9.8
 **IMPORTANT 1**: All slash commands have been renamed. You will need to update any QRs that use them.
 **IMPORTANT 2**: All CSS variables have been renamed. You will need to update any custom CSS that use them.
-**IMPORTANT 2**: Your current `{{history}}` macro will no longer work as it did before. You will need to reconfigure it in the new interface by clicking "Edit" under "Summarization"
+**IMPORTANT 3**: Your current `{{history}}` macro may no longer work as it did before. You will need to reconfigure it in the new interface by clicking "Edit" under "Summarization"
 
 - **New Feature**: Reworked "Edit" interface for the summary prompt. This is now where the `{{history}}`, `{{message}}`, and `{{words}}` macro are defined and modified. You can also create custom macros for the summary prompt using either a message range or STScript.
 - **New Slash Command**: `/qm-max-summary-tokens` returns the max tokens allowed for summarization given the current completion preset.
