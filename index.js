@@ -1,4 +1,4 @@
-import { getStringHash, debounce, copyText, trimToEndSentence, download, parseJsonFile, waitUntilCondition } from '../../../utils.js';
+import { getStringHash, debounce, copyText, trimToEndSentence, download, parseJsonFile, waitUntilCondition, stringToRange } from '../../../utils.js';
 import { getContext, getApiUrl, extension_settings } from '../../../extensions.js';
 import {
     animation_duration,
@@ -3176,16 +3176,16 @@ function update_message_inclusion_flags() {
 
     update_all_message_visuals()
 }
-function concatenate_summary(existing_text, message) {
+function concatenate_summary(existing_text, message, separator=null) {
     // given an existing text of concatenated summaries, concatenate the next one onto it
     let memory = get_memory(message)
     if (!memory) {  // if there's no summary, do nothing
         return existing_text
     }
-    let separator = get_settings('summary_injection_separator')
+    separator = separator ?? get_settings('summary_injection_separator')
     return existing_text + separator + memory
 }
-function concatenate_summaries(indexes) {
+function concatenate_summaries(indexes, separator=null) {
     // concatenate the summaries of the messages with the given indexes
     // Excludes messages that don't meet the inclusion criteria
 
@@ -3196,7 +3196,7 @@ function concatenate_summaries(indexes) {
     // iterate through given indexes
     for (let i of indexes) {
         let message = chat[i];
-        summary = concatenate_summary(summary, message)
+        summary = concatenate_summary(summary, message, separator)
     }
 
     return summary
@@ -4047,17 +4047,40 @@ function initialize_slash_commands() {
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'qm-get',
         aliases: ['qvink-memory-get'],
-        callback: async (args, index) => {
+        callback: async (args, value) => {
             let chat = getContext().chat
-            if (index === "") index = chat.length - 1
-            return get_memory(chat[index])
+            let separator = args.separator ?? get_settings('summary_injection_separator')
+            let range;
+            if (value === "") {
+                range = {start: chat.length-1, end: chat.length-1}
+            } else {
+                range = stringToRange(value, 0, chat.length - 1);
+                if (!range) {
+                    error(`Invalid range provided: "${value}"`);
+                    return '';
+                }
+            }
+
+            let indexes = []
+            for (let i=range.start; i<=range.end; i++) {
+                indexes.push(i)
+            }
+            return concatenate_summaries(indexes, separator)
         },
-        helpString: 'Return the memory associated with a given message index. If no index given, assumes the most recent message.',
+        helpString: 'Return the memory associated with a given message index or range. If no index given, assumes the most recent message.',
+        namedArgumentList: [
+            SlashCommandNamedArgument.fromProps({
+                name: 'separator',
+                description: 'String to separate memories. Defaults to the current profile\'s separator.',
+                isRequired: false,
+                typeList: [ARGUMENT_TYPE.STRING]
+            }),
+        ],
         unnamedArgumentList: [
             SlashCommandArgument.fromProps({
-                description: 'Index of the message',
+                description: 'Index of the message or range of messages',
                 isRequired: false,
-                typeList: ARGUMENT_TYPE.NUMBER,
+                typeList: [ARGUMENT_TYPE.NUMBER, ARGUMENT_TYPE.RANGE]
             }),
         ],
     }));
@@ -4068,12 +4091,21 @@ function initialize_slash_commands() {
         callback: async (args, value) => {
             let chat = getContext().chat
             let values = value.split(' ')
-            let index = Number(values[0])
-            let text = values[1]
+            let index = chat.length - 1
+            let text = ""
+            if (value !== "") {
+                index = Number(values[0])
+                text = values[1] ?? ""
+            }
+            if (isNaN(index)) {
+                error(`Invalid index: "${values[0]}"`)
+                return
+            }
+            debug(`Setting memory for message ${index} to "${text}"`)
             set_data(chat[index], "memory", text)
             refresh_memory()
         },
-        helpString: 'Set the memory for a given message index.',
+        helpString: 'Set the memory for a given message index. If no text provided, deletes the memory.',
         unnamedArgumentList: [
             SlashCommandArgument.fromProps({
                 description: 'Index of the message',
@@ -4081,8 +4113,8 @@ function initialize_slash_commands() {
                 typeList: ARGUMENT_TYPE.NUMBER,
             }),
             SlashCommandArgument.fromProps({
-                description: 'Text to set the memory to',
-                isRequired: true,
+                description: 'Text to set the memory to. If not provided, deletes the memory.',
+                isRequired: false,
                 typeList: ARGUMENT_TYPE.STRING,
             }),
         ],

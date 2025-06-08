@@ -12,6 +12,7 @@
 - **Changed**: All CSS variables now use "-" instead of "_", and are prefixed with "--qm-"
 - **Changed**: Messages that have been removed from context are now turned grey in the chat. This can be modified by using the `--qm-message-removed` CSS variable.
 - **Changed**: Summaries that aren't included in memory can now be changed style with the `--qm-default` CSS variable.
+- **Changed**: The slash command `/qm-get` (previously `/get_memory`) can now accept a range of indexes and a custom separator
 - **Changed**: Modified how profile changes are detected under the hood. Shouldn't affect anything.
 - **Changed**: You won't believe it I moved settings around again. Auto-Summarization settings now get their own section.
 - **Fixed**: The config popout now works with MovingUI

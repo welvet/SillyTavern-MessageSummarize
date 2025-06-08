@@ -65,10 +65,10 @@ Note: all commands have `/qvink-memory-` as an alias.
 - `/qm-toggle-config`: Toggles the popout config menu.
 - `/qm-toggle-edit-interface`: Toggles the "Edit Memory" interface
 - `/qm-toggle-injection-preview`: Toggles a preview of the text that will be injected
-- `/qm-toggle-remember <n>`: Mark the nth message for long-term memory, summarizing it if not already. Same as clicking the "Brain" icon in the message button menu.
-- `/qm-toggle-exclude <n>`: Toggles the manual exclusion of the memory for the nth message. Same as clicking the "Force Exclude" button in the message button menu.
-- `/qm-get <n>`: Get the memory associated with the nth message. Defaults to the most recent message.
-- `/qm-set <n> <text>`: Set the memory associated with the nth message to the given text.
+- `/qm-toggle-remember`: Mark a given message index for long-term memory, summarizing it if not already. Same as clicking the "Brain" icon in the message button menu.
+- `/qm-toggle-exclude`: Toggles the manual exclusion of the memory for the given message index. Same as clicking the "Force Exclude" button in the message button menu.
+- `/qm-get`: Get the memory associated with a message or range of messages. Defaults to the most recent message.
+- `/qm-set`: Set the memory associated with a message to the given text.
 - `/qm-summarize`: Summarizes the nth message in the chat (default to most recent message). Same as clicking the "Quote" icon in the message button menu.
 - `/qm-summarize-chat`: Performs a single auto-summarization on the chat, even if auto-summarization is disabled.
 - `/qm-stop-summarization`: stops any summarization currently running. Same as clicking the "stop" button in the config or next to the progress bar.
