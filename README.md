@@ -68,6 +68,7 @@ Note: all commands have `/qvink-memory-` as an alias.
 - `/qm-toggle-remember <n>`: Mark the nth message for long-term memory, summarizing it if not already. Same as clicking the "Brain" icon in the message button menu.
 - `/qm-toggle-exclude <n>`: Toggles the manual exclusion of the memory for the nth message. Same as clicking the "Force Exclude" button in the message button menu.
 - `/qm-get <n>`: Get the memory associated with the nth message. Defaults to the most recent message.
+- `/qm-set <n> <text>`: Set the memory associated with the nth message to the given text.
 - `/qm-summarize`: Summarizes the nth message in the chat (default to most recent message). Same as clicking the "Quote" icon in the message button menu.
 - `/qm-summarize-chat`: Performs a single auto-summarization on the chat, even if auto-summarization is disabled.
 - `/qm-stop-summarization`: stops any summarization currently running. Same as clicking the "stop" button in the config or next to the progress bar.

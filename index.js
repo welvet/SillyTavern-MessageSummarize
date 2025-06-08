@@ -2901,7 +2901,7 @@ function get_data(message, key) {
     return message?.extra?.[MODULE_NAME]?.[key];
 }
 function get_memory(message) {
-    // returns the memory (and reasoning, if present) properly prepended with the prefill (if present)
+    // returns the memory properly prepended with the prefill (if present)
     let memory = get_data(message, 'memory') ?? ""
     let prefill = get_data(message, 'prefill') ?? ""
 
@@ -4058,6 +4058,32 @@ function initialize_slash_commands() {
                 description: 'Index of the message',
                 isRequired: false,
                 typeList: ARGUMENT_TYPE.NUMBER,
+            }),
+        ],
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'qm-set',
+        aliases: ['qvink-memory-set'],
+        callback: async (args, value) => {
+            let chat = getContext().chat
+            let values = value.split(' ')
+            let index = Number(values[0])
+            let text = values[1]
+            set_data(chat[index], "memory", text)
+            refresh_memory()
+        },
+        helpString: 'Set the memory for a given message index.',
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'Index of the message',
+                isRequired: true,
+                typeList: ARGUMENT_TYPE.NUMBER,
+            }),
+            SlashCommandArgument.fromProps({
+                description: 'Text to set the memory to',
+                isRequired: true,
+                typeList: ARGUMENT_TYPE.STRING,
             }),
         ],
     }));
