@@ -194,5 +194,4 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Format injections as system prompt~~
 - ~~Add dashed line to memory edit interface~~
 - detect response length change to update settings visuals
-- rework message history
-- fix prefill compatability with chat completion. Might need to hijack ST's prefill setting instead of adding it myself.
+- fix prefill compatability with chat completion (generate_raw doesn't allow adding separate messages in chat completion). Might need to hijack ST's prefill setting instead of adding it myself?

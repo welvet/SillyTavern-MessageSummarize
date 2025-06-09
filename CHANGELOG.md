@@ -2,10 +2,13 @@
 
 #### v0.9.8
 **IMPORTANT 1**: All slash commands have been renamed. You will need to update any QRs that use them.
+
 **IMPORTANT 2**: All CSS variables have been renamed. You will need to update any custom CSS that use them.
+
 **IMPORTANT 3**: Your current `{{history}}` macro may no longer work as it did before. You will need to reconfigure it in the new interface by clicking "Edit" under "Summarization"
 
 - **New Feature**: Reworked "Edit" interface for the summary prompt. This is now where the `{{history}}`, `{{message}}`, and `{{words}}` macro are defined and modified. You can also create custom macros for the summary prompt using either a message range or STScript.
+- **New Feature**: A new setting called `Static Memory Mode` can be enabled in the general injection settings. This mode makes long-term memories always be injected separately from short-term memories, regardless of context. Disabled by default.
 - **New Slash Command**: `/qm-max-summary-tokens` returns the max tokens allowed for summarization given the current completion preset.
 - **New Slash Command**: `/qm-set` allows you to set the memory for a message.
 - **Changed**: All slash commands now use "-" instead of "_" and start with "qm-" (with "qvink-memory-" as an alias) to avoid overlapping with other commands. See the README for the updated list of all commands.

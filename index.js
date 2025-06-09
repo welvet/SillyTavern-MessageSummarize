@@ -117,6 +117,7 @@ const default_settings = {
     block_chat: true,  // block input when summarizing
 
     // injection settings
+    separate_long_term: false,  // whether to keep memories marked for long-term separate from short-term
     summary_injection_separator: "\n* ",  // separator when concatenating summaries
     summary_injection_threshold: 0,            // start injecting summaries after this many messages
     exclude_messages_after_threshold: false,   // remove messages from context after the summary injection threshold
@@ -3102,6 +3103,7 @@ function update_message_inclusion_flags() {
 
     debug("Updating message inclusion flags")
 
+    let separate_long_term = get_settings('separate_long_term')
     let injection_threshold = get_settings('summary_injection_threshold')
     let exclude_messages = get_settings('exclude_messages_after_threshold')
     let keep_last_user_message = get_settings('keep_last_user_message')
@@ -3111,10 +3113,13 @@ function update_message_inclusion_flags() {
     // iterate through the chat in reverse order and mark the messages that should be included in short-term and long-term memory
     let short_limit_reached = false;
     let long_limit_reached = false;
-    let long_term_end_index = null;  // index of the most recent message that doesn't fit in short-term memory
     let end = chat.length - 1;
-    let summary = ""  // total concatenated summary so far
-    let new_summary = ""  // temp summary storage to check token length
+
+    let short_summary = ""  // total concatenated summary so far
+    let long_summary = ""  // temp summary storage to check token length
+    let new_short_summary = ""
+    let new_long_summary = ""
+
     for (let i = end; i >= 0; i--) {
         let message = chat[i];
 
@@ -3143,29 +3148,30 @@ function update_message_inclusion_flags() {
                 continue
             }
 
-            new_summary = concatenate_summary(summary, message)  // concatenate this summary
-            let short_token_size = count_tokens(new_summary);
-            if (short_token_size > get_short_token_limit()) {  // over context limit
-                short_limit_reached = true;
-                long_term_end_index = i;  // this is where long-term memory ends and short-term begins
-                summary = ""  // reset summary
-            } else {  // under context limit
-                set_data(message, 'include', 'short');
-                summary = new_summary
-                continue
+            // consider this for short term memories as long as we aren't separating long-term or (if we are), this isn't a long-term
+            if (!separate_long_term || !get_data(message, 'remember')) {
+                new_short_summary = concatenate_summary(short_summary, message)  // concatenate this summary
+                let short_token_size = count_tokens(new_short_summary);
+                if (short_token_size > get_short_token_limit()) {  // over context limit
+                    short_limit_reached = true;
+                } else {  // under context limit
+                    set_data(message, 'include', 'short');
+                    short_summary = new_short_summary
+                    continue
+                }
             }
         }
 
-        // if the short-term limit has been reached, check the long-term limit
+        // if the short-term limit has been reached (or we are separating), check the long-term limit.
         let remember = get_data(message, 'remember');
         if (!long_limit_reached && remember) {  // long-term limit hasn't been reached yet and the message was marked to be remembered
-            new_summary = concatenate_summary(summary, message)  // concatenate this summary
-            let long_token_size = count_tokens(new_summary);
+            new_long_summary = concatenate_summary(long_summary, message)  // concatenate this summary
+            let long_token_size = count_tokens(new_long_summary);
             if (long_token_size > get_long_token_limit()) {  // over context limit
                 long_limit_reached = true;
             } else {
                 set_data(message, 'include', 'long');  // mark the message as long-term
-                summary = new_summary
+                long_summary = new_long_summary
                 continue
             }
         }
@@ -3781,6 +3787,7 @@ function initialize_settings_listeners() {
     bind_setting('#summary_injection_threshold', 'summary_injection_threshold', 'number');
     bind_setting('#exclude_messages_after_threshold', 'exclude_messages_after_threshold', 'boolean');
     bind_setting('#keep_last_user_message', 'keep_last_user_message', 'boolean')
+    bind_setting('#separate_long_term', 'separate_long_term', 'boolean');
 
     bind_setting('input[name="short_term_position"]', 'short_term_position', 'number');
     bind_setting('#short_term_depth', 'short_term_depth', 'number');
