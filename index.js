@@ -3601,7 +3601,7 @@ async function auto_summarize_chat() {
 var last_message_swiped = null  // if an index, that was the last message swiped
 async function on_chat_event(event=null, data=null) {
     // When the chat is updated, check if the summarization should be triggered
-    debug("Chat updated: " + event)
+    debug("Chat updated: " + event + " " + data)
 
     const context = getContext();
     let index = data
@@ -4312,7 +4312,7 @@ jQuery(async function () {
     let event_types = ctx.event_types;
     eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, (id) => on_chat_event('char_message', id));
     eventSource.on(event_types.USER_MESSAGE_RENDERED, (id) => on_chat_event('user_message', id));
-    eventSource.on(event_types.GENERATE_BEFORE_COMBINE_PROMPTS, (id, stuff) => on_chat_event('before_message', id));
+    eventSource.on(event_types.GENERATION_STARTED, (id, stuff, dry) => {if (dry) return; on_chat_event('before_message')})
     eventSource.on(event_types.MESSAGE_DELETED, (id) => on_chat_event('message_deleted', id));
     eventSource.on(event_types.MESSAGE_EDITED, (id) => on_chat_event('message_edited', id));
     eventSource.on(event_types.MESSAGE_SWIPED, (id) => on_chat_event('message_swiped', id));

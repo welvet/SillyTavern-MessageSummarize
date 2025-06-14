@@ -20,6 +20,7 @@
 - **Changed**: You won't believe it I moved settings around again. Auto-Summarization settings now get their own section.
 - **Fixed**: The config popout now works with MovingUI
 - **Fixed**: You can now properly save config profile for a group and their chats as if it were a character.
+- **Fixed**: Fixed `auto-summarization before generation` config not working for chat completion. 
 - **Removed**: The "Message History" config section has been removed.
 - **Removed**: The "Nest messages in summary prompt" config option has been removed.
 - **Removed**: The "Include All Context Content" config option has been removed.
