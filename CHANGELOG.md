@@ -22,6 +22,7 @@
 - **Fixed**: The config popout now works with MovingUI
 - **Fixed**: You can now properly save config profile for a group and their chats as if it were a character.
 - **Fixed**: Fixed `auto-summarization before generation` config not working for chat completion. 
+- **Fixed**: The `Edit Memory` interface now saves your selection for the number of messages per page.
 - **Removed**: The "Message History" config section has been removed.
 - **Removed**: The "Nest messages in summary prompt" config option has been removed.
 - **Removed**: The "Include All Context Content" config option has been removed.

@@ -1965,7 +1965,7 @@ class MemoryEditInterface {
         // re-initialize paginator with new data
         this.$pagination.pagination({
             dataSource: this.filtered,
-            pageSize: 100,
+            pageSize: this.settings.page_size ?? 100,
             pageNumber: preserve_page ? this.pagination?.pageNumber : 1,
             sizeChangerOptions: [10, 50, 100, 500, 1000],
             showSizeChanger: true,
@@ -1974,6 +1974,8 @@ class MemoryEditInterface {
                 if (this.settings.reverse_page_sort) {
                     data.reverse()
                 }
+                this.settings.page_size = pagination.pageSize
+                this.save_settings()
                 this.displayed = data
                 this.clear()
                 this.update_table()
