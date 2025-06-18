@@ -941,6 +941,10 @@ function refresh_settings() {
     // update the profile section
     update_profile_section()
 
+    // Update the context limit token displays
+    $(`.${settings_content_class} #short_term_context_limit_display`).text(get_short_token_limit());
+    $(`.${settings_content_class} #long_term_context_limit_display`).text(get_long_token_limit());
+
     // iterate through the settings map and set each element to the current setting value
     for (let [key, [element, type]] of Object.entries(settings_ui_map)) {
         set_setting_ui_element(key, element, type);
@@ -3794,23 +3798,15 @@ function initialize_settings_listeners() {
     bind_setting('#short_term_depth', 'short_term_depth', 'number');
     bind_setting('#short_term_role', 'short_term_role');
     bind_setting('#short_term_scan', 'short_term_scan', 'boolean');
-    bind_setting('#short_term_context_limit', 'short_term_context_limit', 'number', () => {
-        $('#short_term_context_limit_display').text(get_short_token_limit());
-    });
-    bind_setting('input[name="short_term_context_type"]', 'short_term_context_type', 'text', () => {
-        $('#short_term_context_limit_display').text(get_short_token_limit());
-    })
+    bind_setting('#short_term_context_limit', 'short_term_context_limit', 'number')
+    bind_setting('input[name="short_term_context_type"]', 'short_term_context_type', 'text')
 
     bind_setting('input[name="long_term_position"]', 'long_term_position', 'number');
     bind_setting('#long_term_depth', 'long_term_depth', 'number');
     bind_setting('#long_term_role', 'long_term_role');
     bind_setting('#long_term_scan', 'long_term_scan', 'boolean');
-    bind_setting('#long_term_context_limit', 'long_term_context_limit', 'number', () => {
-        $('#long_term_context_limit_display').text(get_long_token_limit());  // update the displayed token limit
-    });
-    bind_setting('input[name="long_term_context_type"]', 'long_term_context_type', 'text', () => {
-        $('#long_term_context_limit_display').text(get_long_token_limit());  // update the displayed token limit
-    })
+    bind_setting('#long_term_context_limit', 'long_term_context_limit', 'number')
+    bind_setting('input[name="long_term_context_type"]', 'long_term_context_type', 'text')
 
     bind_setting('#debug_mode', 'debug_mode', 'boolean');
     bind_setting('#display_memories', 'display_memories', 'boolean')
@@ -4321,6 +4317,7 @@ jQuery(async function () {
     eventSource.on(event_types.MORE_MESSAGES_LOADED, refresh_memory)
     eventSource.on('groupSelected', set_character_enabled_button_states)
     eventSource.on(event_types.GROUP_UPDATED, set_character_enabled_button_states)
+    eventSource.on(event_types.SETTINGS_UPDATED, refresh_settings)  // refresh extension settings when ST settings change
 
     // Global Macros
     MacrosParser.registerMacro(short_memory_macro, () => get_short_memory());
