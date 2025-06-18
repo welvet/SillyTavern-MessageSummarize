@@ -99,10 +99,16 @@
                     <span>Block Chat</span>
                 </label>
 
-                <label class="checkbox_label" title="Time in seconds to wait between summarizations. May be needed if you are using a external API with a rate limit.">
-                    <input id="summarization_time_delay" class="text_pole widthUnset inline_setting" type="number" min="0" max="999" />
-                    <span>Summary Time Delay</span>
-                </label>
+                <div class="flex-container justifyspacebetween alignitemscenter">
+                    <label class="checkbox_label" title="Time in seconds to wait before summarizing. May be needed if you are using a external API with a rate limit.">
+                        <input id="summarization_time_delay" class="text_pole widthUnset inline_setting" type="number" min="0" max="999" />
+                        <span>Time Delay</span>
+                    </label>
+                    <label class="checkbox_label" title="When auto-summarizing, don't delay the first summary right after a character message.">
+                        <input id="summarization_time_delay_skip_first" type="checkbox"/>
+                        <span>Skip First</span>
+                    </label>
+                </div>
 
                 <hr>
                 <h4 class="textAlignCenter">Auto-Summarization <i class="fa-solid fa-info-circle" title="Automatically perform summarizations when messages are sent. A message will only be auto-summarized if that summary would be included in short-term memory."></i></h4>

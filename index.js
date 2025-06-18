@@ -107,6 +107,7 @@ const default_settings = {
     auto_summarize: true,   // whether to automatically summarize new chat messages
     summarization_delay: 0,  // delay auto-summarization by this many messages (0 summarizes immediately after sending, 1 waits for one message, etc)
     summarization_time_delay: 0, // time in seconds to delay between summarizations
+    summarization_time_delay_skip_first: false,  // skip the first delay after a character message
     auto_summarize_batch_size: 1,  // number of messages to summarize at once when auto-summarizing
     auto_summarize_message_limit: 10,  // maximum number of messages to go back for auto-summarization.
     auto_summarize_on_edit: true,  // whether to automatically re-summarize edited chat messages
@@ -3276,7 +3277,7 @@ globalThis.memory_intercept_messages = function (chat, _contextSize, _abort, typ
 
 
 // Summarization
-async function summarize_messages(indexes=null, show_progress=true) {
+async function summarize_messages(indexes=null, show_progress=true, skip_initial_delay=true) {
     // Summarize the given list of message indexes (or a single index)
     let ctx = getContext();
 
@@ -3321,26 +3322,24 @@ async function summarize_messages(indexes=null, show_progress=true) {
             break;
         }
 
-        await summarize_message(i);
-
-        // wait for time delay if set
+        // Wait for time delay if set (only delay first if initial delay set)
         let time_delay = get_settings('summarization_time_delay')
-        if (time_delay > 0 && n < indexes.length-1) {  // delay all except the last
-
-            // check if summarization was stopped by the user during summarization
-            if (STOP_SUMMARIZATION) {
-                log('Summarization stopped');
-                break;
-            }
-
+        if (time_delay > 0 && (n > 0 || (n === 0 && !skip_initial_delay))) {
             debug(`Delaying generation by ${time_delay} seconds`)
             if (show_progress) progress_bar('summarize', null, null, "Delaying")
             await new Promise((resolve) => {
                 SUMMARIZATION_DELAY_TIMEOUT = setTimeout(resolve, time_delay * 1000)
                 SUMMARIZATION_DELAY_RESOLVE = resolve  // store the resolve function to call when cleared
             });
+
+            // check if summarization was stopped by the user during the delay
+            if (STOP_SUMMARIZATION) {
+                log('Summarization stopped');
+                break;
+            }
         }
 
+        await summarize_message(i);
         n += 1;
     }
 
@@ -3581,7 +3580,7 @@ function collect_messages_to_auto_summarize() {
     debug(`Messages to summarize (${messages_to_summarize.length}): ${messages_to_summarize}`)
     return messages_to_summarize.reverse()  // reverse for chronological order
 }
-async function auto_summarize_chat() {
+async function auto_summarize_chat(skip_initial_delay=true) {
     // Perform automatic summarization on the chat
     log('Auto-Summarizing chat...')
     let messages_to_summarize = collect_messages_to_auto_summarize()
@@ -3594,7 +3593,7 @@ async function auto_summarize_chat() {
     }
 
     let show_progress = get_settings('auto_summarize_progress');
-    await summarize_messages(messages_to_summarize, show_progress);
+    await summarize_messages(messages_to_summarize, show_progress, skip_initial_delay);
 }
 
 // Event handling
@@ -3633,7 +3632,6 @@ async function on_chat_event(event=null, data=null) {
             await auto_summarize_chat();  // auto-summarize the chat
             break;
 
-        // currently no triggers on user message rendered
         case 'user_message':
             last_message_swiped = null;
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
@@ -3665,7 +3663,7 @@ async function on_chat_event(event=null, data=null) {
                 if (!get_settings('auto_summarize')) break;  // if auto-summarize is disabled, do nothing
                 if (get_settings("auto_summarize_on_send")) break;  // if auto_summarize_on_send is enabled, don't auto-summarize on character message
                 debug("New message detected, summarizing")
-                await auto_summarize_chat();  // auto-summarize the chat (checks for exclusion criteria and whatnot)
+                await auto_summarize_chat(get_settings('summarization_time_delay_skip_first'));  // auto-summarize the chat, skipping first delay if needed
                 break;
             }
 
@@ -3773,6 +3771,7 @@ function initialize_settings_listeners() {
     bind_setting('#auto_summarize_on_send', 'auto_summarize_on_send', 'boolean');
     bind_setting('#summarization_delay', 'summarization_delay', 'number');
     bind_setting('#summarization_time_delay', 'summarization_time_delay', 'number')
+    bind_setting('#summarization_time_delay_skip_first', 'summarization_time_delay_skip_first', 'boolean')
     bind_setting('#prefill', 'prefill', 'text')
     bind_setting('#show_prefill', 'show_prefill', 'boolean')
 

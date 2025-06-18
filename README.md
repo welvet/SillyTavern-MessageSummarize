@@ -195,3 +195,4 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Add dashed line to memory edit interface~~
 - detect response length change to update settings visuals
 - fix prefill compatability with chat completion (generate_raw doesn't allow adding separate messages in chat completion). Might need to hijack ST's prefill setting instead of adding it myself?
+- ~~Add the time delay before the initial summarization where appropriate~~
