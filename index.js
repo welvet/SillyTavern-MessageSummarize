@@ -35,9 +35,9 @@ const MODULE_NAME_FANCY = 'Qvink Memory';
 const PROGRESS_BAR_ID = `${MODULE_NAME}_progress_bar`;
 
 // CSS classes (must match the CSS file because I'm too stupid to figure out how to do this properly)
-const css_message_div = "qvink_memory_display"
-const css_short_memory = "qvink_short_memory"
-const css_long_memory = "qvink_long_memory"
+const css_message_div = `qvink_memory_display`
+const css_short_memory = `qvink_short_memory`
+const css_long_memory = `qvink_long_memory`
 const css_remember_memory = `qvink_old_memory`
 const css_exclude_memory = `qvink_exclude_memory`
 const css_lagging_memory = `qvink_lagging_memory`
@@ -52,8 +52,8 @@ const group_member_enable_button = `qvink_memory_group_member_enable`
 const group_member_enable_button_highlight = `qvink_memory_group_member_enabled`
 
 // Macros for long-term and short-term memory injection
-const long_memory_macro = `long_term_memory`;
-const short_memory_macro = `short_term_memory`;
+const long_memory_macro = `qm-long-term-memory`;
+const short_memory_macro = `qm-short-term-memory`;
 const generic_memories_macro = `memories`;
 
 // message button classes
@@ -114,7 +114,6 @@ const default_settings = {
     auto_summarize_on_swipe: true,  // whether to automatically summarize new message swipes
     auto_summarize_progress: true,  // display a progress bar for auto-summarization
     auto_summarize_on_send: false,  // trigger auto-summarization right before a new message is sent
-
     block_chat: true,  // block input when summarizing
 
     // injection settings
@@ -1506,7 +1505,6 @@ async function display_text_modal(title, text="") {
     let ctx = getContext();
     text = text.replace(/\n/g, '<br>');
     let html = `<h2>${title}</h2><div style="text-align: left; overflow: auto;">${text}</div>`
-    //const popupResult = await ctx.callPopup(html, 'text', undefined, { okButton: `Close` });
     let popup = new ctx.Popup(html, ctx.POPUP_TYPE.TEXT, undefined, {okButton: 'Close', allowVerticalScrolling: true, wider: true});
     await popup.show()
 }
@@ -1527,7 +1525,7 @@ async function get_user_setting_text_input(key, title, description="") {
         }
     }
     let ctx = getContext();
-    let popup = new ctx.Popup(title, ctx.POPUP_TYPE.INPUT, value, {rows: 20, customButtons: [restore_button]});
+    let popup = new ctx.Popup(title, ctx.POPUP_TYPE.INPUT, value, {rows: 20, customButtons: [restore_button], wider: true});
 
     // Now remove the ".result-control" class to prevent it from submitting when you hit enter.
     popup.mainInput.classList.remove('result-control');
