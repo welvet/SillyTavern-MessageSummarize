@@ -14,6 +14,7 @@
 - **New Feature**: New setting next to `Summarization Time Delay` called `Skip First` determines whether the first summary right after a character message will be delayed or not when auto-summarizing (default false). Turning this on will be the same as the old behavior.
 - **New Slash Command**: `/qm-max-summary-tokens` returns the max tokens allowed for summarization given the current completion preset.
 - **New Slash Command**: `/qm-set` allows you to set the memory for a message.
+- **New Slash Command**: `/qm-toggle-auto-summarize` toggles whether auto-summarize is enabled. Does not save the profile.
 - **Changed**: All slash commands now use "-" instead of "_" and start with "qm-" (with "qvink-memory-" as an alias) to avoid overlapping with other commands. See the README for the updated list of all commands.
 - **Changed**: All CSS variables now use "-" instead of "_", and are prefixed with "--qm-"
 - **Changed**: The memory macros have been renamed to `{{qm-short-term-memory}}` and `{{qm-long-term-memory}}`.

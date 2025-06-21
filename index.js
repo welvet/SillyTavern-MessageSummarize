@@ -3986,6 +3986,15 @@ function initialize_slash_commands() {
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'qm-toggle-auto-summarize',
+        aliases: ['qvink-memory-toggle-auto-summarize'],
+        helpString: "Toggle the \"auto-summarize\" setting on the current profile (doesn't save the profile).",
+        callback: (args) => {
+            $(`.${settings_content_class} #auto_summarize`).click();  // toggle the memory display
+        },
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'qm-toggle-config',
         aliases: ['qvink-memory-toggle-config'],
         helpString: 'Toggle the extension config popout.',

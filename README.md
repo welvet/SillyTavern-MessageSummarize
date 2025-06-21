@@ -61,7 +61,8 @@ To update the dev branch when changes are made, run:
 Note: all commands have `/qvink-memory-` as an alias.
 - `/qm-enabled`: Returns whether the extension is enabled in the current chat.
 - `/qm-toggle`: Toggles the extension on and off for the current chat. Same as clicking "Toggle Chat Memory" in the config. Can also provide a boolean argument to toggle the extension directly.
-- `/qm-toggle-display`: Toggles the display of summaries below each message. Same as clicking "Display Memories" in the config.
+- `/qm-toggle-display`: Toggles the display of summaries below each message. Same as toggling the "Display Memories" setting in the config.
+- `/qm-toggle-auto-summarize`: Toggle whether auto-summarize is enabled. Same as toggling the "Auto-Summarize" setting in the config. 
 - `/qm-toggle-config`: Toggles the popout config menu.
 - `/qm-toggle-edit-interface`: Toggles the "Edit Memory" interface
 - `/qm-toggle-injection-preview`: Toggles a preview of the text that will be injected
