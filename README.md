@@ -119,13 +119,12 @@ Try them out if you want.
 Make sure you are using the correct template for your model, and make sure that system messages are properly distinct from user messages (the summaries use a system prompt). 
 This can be caused by the "System same as user" checkbox in your instruct template settings, which will cause all system messages to be treated like a user - uncheck that if your model can handle it.
 Some default instruct templates also may not have anything defined for the "System message sequences" field - that should be filled out.
-You can also try toggling "Nest Message in Summary Prompt" in the settings - some models behave better with this.
 
 - **My jailbreak isn't working:** You'll need to put a jailbreak in the summarization prompt if you want it to be included.
 
 - **The summaries refer to "a person" or "someone" rather than the character by name:** Try using the `{{user}}` or `{{char}}` macros in the summary prompt. There is also a "Message History" setting to include a few previous messages in the summarization prompt to give the model a little more context. 
 
-- **The summaries are too long:** You can select a custom completion preset in the settings to use for summarizations, and that can be used to set a maximum token length after which generation will be cut off. You can also use the {{words}} macro in the summarization prompt to try and guide the LLM according to that token length, though LLMs cannot actually count words so it's really just a suggestion.
+- **The summaries are too long:** You can select a custom completion preset in the settings to use for summarizations, and that can be used to set a maximum token length after which generation will be cut off. You can also use the `{{words}}` macro in the summarization prompt to try and guide the LLM according to that token length, though LLMs cannot actually count words so it's really just a suggestion.
 
 - **Incomplete sentences aren't getting trimmed even though the option is checked in the advanced formatting settings:** If you are using a different connection profile for summaries, note that instruction templates are part of that so the option needs to be checked in the templated used for that connection profile.
 
@@ -133,7 +132,7 @@ You can also try toggling "Nest Message in Summary Prompt" in the settings - som
 
 - **Reasoning model thinking is included in summary**: Some reasoning models need to be prefilled with `<think>`, so make sure to add that in the "Prefill" field of the extension config (**not** the normal "start reply with" field in the Advanced Formatting tab).
 
-- **An unknown error occurred while counting tokens**: This might indicate an issue with your custom chat-completion preset. ST expects there to be a prompt section called "main", which is where extension injections go by default. To fix this, you can go to this extension's config menu and click "No not inject" in both the short-term and long-term injection sections. This will prevent the extension from attempting to insert context, and you can instead use the `{{short_term_memory}}` and `{{long_term_memory}}` macros to place them anywhere you want.
+- **An unknown error occurred while counting tokens**: This might indicate an issue with your custom chat-completion preset. ST expects there to be a prompt section called "main", which is where extension injections go by default. To fix this, you can go to this extension's config menu and click "Do not inject" in both the short-term and long-term injection sections. This will prevent the extension from attempting to insert context, and you can instead use the `{{short_term_memory}}` and `{{long_term_memory}}` macros to place them anywhere you want.
 
 - **Just updated and things are broken:** try reloading the page first, and make sure you are on the most recent version of ST. If you are on the dev branch of this extension, you must also be on the staging branch of ST.
 
@@ -193,6 +192,6 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Fix message limit messing with world info timed effects. PR: https://github.com/SillyTavern/SillyTavern/pull/3763#issue-2948421833~~
 - ~~Format injections as system prompt~~
 - ~~Add dashed line to memory edit interface~~
-- detect response length change to update settings visuals
+- ~~detect response length change to update settings visuals~~
 - fix prefill compatability with chat completion (generate_raw doesn't allow adding separate messages in chat completion). Might need to hijack ST's prefill setting instead of adding it myself?
 - ~~Add the time delay before the initial summarization where appropriate~~

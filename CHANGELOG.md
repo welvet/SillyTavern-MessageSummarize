@@ -1,7 +1,7 @@
 # Changelog
 
-#### v0.9.8
-**IMPORTANT 1**: All slash commands have been renamed. You will need to update any QRs that use them.
+#### v1.0.0
+**IMPORTANT 1**: All slash commands have been renamed for consistency. You will need to update any QRs that use them.
 
 **IMPORTANT 2**: All CSS variables have been renamed. You will need to update any custom CSS that use them.
 
@@ -24,7 +24,7 @@
 - **Fixed**: Fixed `auto-summarization before generation` config not working for chat completion. 
 - **Fixed**: The `Edit Memory` interface now saves your selection for the number of messages per page.
 - **Fixed**: The displayed number of tokens in the config now visually updates when the completion preset updates (this was only a visual issue).
-- **Removed**: The "Message History" config section has been removed.
+- **Removed**: The old "Message History" config section has been removed.
 - **Removed**: The "Nest messages in summary prompt" config option has been removed.
 - **Removed**: The "Include All Context Content" config option has been removed.
 
