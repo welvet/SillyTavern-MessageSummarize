@@ -110,7 +110,7 @@ const default_settings = {
     summarization_time_delay_skip_first: false,  // skip the first delay after a character message
     auto_summarize_batch_size: 1,  // number of messages to summarize at once when auto-summarizing
     auto_summarize_message_limit: 10,  // maximum number of messages to go back for auto-summarization.
-    auto_summarize_on_edit: true,  // whether to automatically re-summarize edited chat messages
+    auto_summarize_on_edit: false,  // whether to automatically re-summarize edited chat messages
     auto_summarize_on_swipe: true,  // whether to automatically summarize new message swipes
     auto_summarize_progress: true,  // display a progress bar for auto-summarization
     auto_summarize_on_send: false,  // trigger auto-summarization right before a new message is sent
@@ -2632,15 +2632,15 @@ class SummaryPromptEditInterface {
     }
     async compute_macro(index, name, ignore_enabled=false) {
         // get the result from the given custom macro for the given message index
+        let macro = this.get_macro(name)
+        if (!macro) return  // macro doesn't exist
+        if (!macro.enabled && !ignore_enabled) return
 
         // special macro?
         if (name === "message") {
             return this.special_macro_message(index)
         }
 
-        let macro = this.get_macro(name)
-        if (!macro) return  // macro doesn't exist
-        if (!macro.enabled && !ignore_enabled) return
         if (macro.type === "preset") {  // range presets
            return this.compute_range_macro(index, macro)
         } else if (macro.type === "custom") {  // STScript
