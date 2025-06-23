@@ -1,5 +1,6 @@
 ### Contents
 - [Description](#description)
+- [Motivation](#motivation)
 - [Notable Features](#notable-features)
 - [Installation and Usage](#installation-and-usage)
 - [Slash Commands](#slash-commands)
