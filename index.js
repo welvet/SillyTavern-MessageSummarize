@@ -85,9 +85,9 @@ Following is the message to summarize:
 const default_long_template = `[Following is a list of events that occurred in the past]:\n{{${generic_memories_macro}}}\n`
 const default_short_template = `[Following is a list of recent events]:\n{{${generic_memories_macro}}}\n`
 const default_summary_macros = {  // default set of macros for the summary prompt.
-    "message": {name: "message", default: true, enabled: true, type: "special", instruct_template: true, description: "The message being summarized"},
-    "words": {name: "words", default: true, enabled: true, type: "custom", command: "/qm-max-summary-tokens", description: "Max response tokens defined by the chosen completion preset"},
-    "history": {name: "history", default: true, enabled: false, type: "preset", start: 1, end: 6, bot_messages: true, user_messages: true, instruct_template: true},
+    "message": {name: "message", default: true, enabled: true,  type: "special", instruct_template: true, apply_regex: true, description: "The message being summarized"},
+    "words":   {name: "words",   default: true, enabled: true,  type: "custom",  instruct_template: false, apply_regex: false, command: "/qm-max-summary-tokens", description: "Max response tokens defined by the chosen completion preset"},
+    "history": {name: "history", default: true, enabled: false, type: "preset",  instruct_template: true, apply_regex: true, start: 1, end: 6, bot_messages: true, user_messages: true, bot_summaries: false, user_summaries: false},
 }
 const default_settings = {
     // inclusion criteria
@@ -104,6 +104,8 @@ const default_settings = {
     show_prefill: false, // whether to show the prefill when memories are displayed
     completion_preset: "",  // completion preset to use for summarization. Empty ("") indicates the same as currently selected.
     connection_profile: "",
+    message_regex: "",  // regex filter
+
     auto_summarize: true,   // whether to automatically summarize new chat messages
     summarization_delay: 0,  // delay auto-summarization by this many messages (0 summarizes immediately after sending, 1 waits for one message, etc)
     summarization_time_delay: 0, // time in seconds to delay between summarizations
@@ -316,6 +318,15 @@ function regex(string, re) {
     // Returns an array of all matches in capturing groups
     let matches = [...string.matchAll(re)];
     return matches.flatMap(m => m.slice(1).filter(Boolean));
+}
+function get_regex_script(name) {
+    const scripts = getRegexScripts();
+    for (let script of scripts) {
+        if (script.scriptName === name) {
+            return script
+        }
+    }
+    error(`No regex script found: "${name}"`)
 }
 function check_st_version() {
     // Check to see if the current version of ST is acceptable.
@@ -909,6 +920,23 @@ async function update_connection_profile_dropdown() {
     // set a click event to refresh the dropdown
     $connection_select.off('click').on('click', () => update_connection_profile_dropdown());
 }
+function update_regex_dropdown() {
+    // populate the regex dropdown
+    let script_list = getRegexScripts()
+    let scripts = {}
+    Object.keys(script_list).forEach(function(i) {
+        let script = script_list[i]
+        scripts[script.scriptName] = script
+    });
+
+    let $regex_select = $(`.${settings_content_class} #message_regex`)
+    $regex_select.empty();
+    $regex_select.append(`<option value="">None</option>`)
+    for (let name of Object.keys(scripts)) {  // construct the dropdown options
+        $regex_select.append(`<option value="${name}">${name}</option>`)
+    }
+    $regex_select.val(get_settings('message_regex'))
+}
 function refresh_settings() {
     // Refresh all settings UI elements according to the current settings
     debug("Refreshing settings...")
@@ -925,6 +953,9 @@ function refresh_settings() {
     // completion presets
     update_preset_dropdown()
     check_preset_valid()
+
+    // regex
+    update_regex_dropdown()
 
     // auto_summarize_message_limit must be >= auto_summarize_batch_size (unless the limit is disabled, i.e. -1)
     let auto_limit = get_settings('auto_summarize_message_limit')
@@ -2295,6 +2326,10 @@ class SummaryPromptEditInterface {
                 <input class="macro_instruct_template" type="checkbox">
                 <span>Instruct Template</span>
             </label>
+            <label title="Apply the regex script for summarizing messages to the result of this macro." class="checkbox_label">
+                <input class="macro_apply_regex" type="checkbox">
+                <span>Apply Regex</span>
+            </label>
         </div>
 
     </div>
@@ -2315,6 +2350,7 @@ class SummaryPromptEditInterface {
         "user_messages": true,
         "user_summaries": true,
         "instruct_template": true,
+        "apply_regex": true,
         "command": ""
     }
 
@@ -2324,16 +2360,6 @@ class SummaryPromptEditInterface {
         this.from_settings()
     }
     init() {
-
-        // don't specify "result" key to not close the popup
-        let custom_buttons = [
-            {
-                text: 'Cancel',
-                appendAtEnd: true,
-                result: 0  // don't save
-            },
-        ]
-
         this.popup = new this.ctx.Popup(this.html_template, this.ctx.POPUP_TYPE.TEXT, undefined, {wider: true, okButton: 'Save', cancelButton: 'Cancel'});
         this.$content = $(this.popup.content)
         this.$buttons = this.$content.find('.popup-controls')
@@ -2439,6 +2465,7 @@ class SummaryPromptEditInterface {
         let $macro_preset_user_summaries = $macro.find(".macro_preset_user_summaries")
         let $macro_command = $macro.find("input.macro_command")
         let $macro_instruct = $macro.find(".macro_instruct_template")
+        let $macro_regex = $macro.find(".macro_apply_regex")
 
         // preview
         $preview.on('click', async () => {
@@ -2498,11 +2525,11 @@ class SummaryPromptEditInterface {
         })
 
         // start, end
-        $macro_preset_start.val(macro.start)
+        $macro_preset_start.val(macro.start ?? this.default_macro_settings.start)
         $macro_preset_start.on('change', () => {
             macro.start = Number($macro_preset_start.val())
         })
-        $macro_preset_end.val(macro.end)
+        $macro_preset_end.val(macro.end ?? this.default_macro_settings.end)
         $macro_preset_end.on('change', () => {
             macro.end = Number($macro_preset_end.val())
         })
@@ -2528,6 +2555,10 @@ class SummaryPromptEditInterface {
         $macro_instruct.on('change', () => {
             macro.instruct_template = $macro_instruct.is(':checked')
         })
+        $macro_regex.prop('checked', macro.apply_regex)
+        $macro_regex.on('change', () => {
+            macro.apply_regex = $macro_regex.is(':checked')
+        })
 
         // command
         $macro_command.val(macro.command)
@@ -2541,12 +2572,21 @@ class SummaryPromptEditInterface {
     special_macro_message(index) {
         let macro = this.get_macro("message")
         let message = this.ctx.chat[index]
-        let text
-        if (macro.instruct_template) {
-            text = formatInstructModeChat(message.name, message.mes, message.is_user, false, "", this.ctx.name1, this.ctx.name2, null)
-        } else {
-            text = message.mes
+        let text = message.mes
+
+        // apply regex if needed
+        if (macro.apply_regex) {
+            let regex = get_settings('message_regex')
+            if (regex) {
+                let script = get_regex_script(regex)
+                text = runRegexScript(script, text)
+            }
         }
+
+        if (macro.instruct_template) {
+            text = formatInstructModeChat(message.name, text, message.is_user, false, "", this.ctx.name1, this.ctx.name2, null)
+        }
+
         return text
     }
 
@@ -2559,6 +2599,11 @@ class SummaryPromptEditInterface {
         // set the interface from settings
         this.$prompt?.val(get_settings('prompt'))
         this.macros = get_settings('summary_prompt_macros', true)
+
+        // for each macro, ensure default settings if not specified
+        for (let name of Object.keys(this.macros)) {
+            this.macros[name] = Object.assign({}, this.default_macro_settings, this.macros[name])
+        }
     }
     save_settings() {
         // save settings in the interface
@@ -2665,6 +2710,13 @@ class SummaryPromptEditInterface {
         let end_index = Math.max(index-macro.start, 0)
         debug(`Getting Message History. Index: ${index}, Start: ${macro.start}, End: ${macro.end} (${start_index} to ${end_index})`)
 
+        // regex if set
+        let regex; let script;
+        if (macro.apply_regex) {
+            regex = get_settings('message_regex')
+            if (regex) script = get_regex_script(regex)
+        }
+
         for (let i = start_index; i <= end_index && i < chat.length; i++) {
             let m = chat[i];
             let include_message = true
@@ -2685,9 +2737,16 @@ class SummaryPromptEditInterface {
 
             if (include_message) {
                 let text = m.mes
-                if (macro.instruct_template) {
-                    text = formatInstructModeChat(m.name, m.mes, m.is_user, false, "", this.ctx.name1, this.ctx.name2, null)
+
+                // apply regex filter if needed
+                if (regex && script) {
+                    text = runRegexScript(script, text)
                 }
+
+                if (macro.instruct_template) {
+                    text = formatInstructModeChat(m.name, text, m.is_user, false, "", this.ctx.name1, this.ctx.name2, null)
+                }
+
                 history.push(text)
             }
 
@@ -3386,7 +3445,7 @@ async function summarize_message(index) {
     update_message_visuals(index, false, "Summarizing...")
     memoryEditInterface.update_message_visuals(index, null, false, "Summarizing...")
 
-    // If the most recent message, scroll to the bottom to get the summary in view.
+    // If the most recent message, scroll to the bottom to get the summary in view (affected by ST settings)
     if (index === chat.length - 1) {
         scrollChatToBottom();
     }
@@ -3766,6 +3825,7 @@ function initialize_settings_listeners() {
 
     bind_setting('#connection_profile', 'connection_profile', 'text')
     bind_setting('#completion_preset', 'completion_preset', 'text')
+    bind_setting('#message_regex', 'message_regex', 'text')
     bind_setting('#auto_summarize', 'auto_summarize', 'boolean');
     bind_setting('#auto_summarize_on_edit', 'auto_summarize_on_edit', 'boolean');
     bind_setting('#auto_summarize_on_swipe', 'auto_summarize_on_swipe', 'boolean');

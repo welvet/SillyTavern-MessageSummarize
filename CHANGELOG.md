@@ -1,17 +1,14 @@
 # Changelog
 
-#### v1.0.0
-**IMPORTANT 1**: All slash commands have been renamed for consistency. You will need to update any QRs that use them.
+#### v1.0.1
+**IMPORTANT 1**: All slash commands, CSS variables, and macros have been renamed for consistency. You will need to update any QRs, custom CSS, or prompts that use these.
 
-**IMPORTANT 2**: All CSS variables have been renamed. You will need to update any custom CSS that use them.
-
-**IMPORTANT 3**: The short-term and long-term memory macros have been renamed. You will need to update anywhere you use them.
-
-**IMPORTANT 4**: Your current `{{history}}` macro may no longer work as it did before. You will need to reconfigure it in the new interface by clicking "Edit" under "Summarization"
+**IMPORTANT 2**: Your current `{{history}}` macro may no longer work as it did before. You will need to reconfigure it in the new interface by clicking "Edit" under "Summarization"
 
 - **New Feature**: Reworked "Edit" interface for the summary prompt. This is now where the `{{history}}`, `{{message}}`, and `{{words}}` macro are defined and modified. You can also create custom macros for the summary prompt using either a message range or STScript.
 - **New Feature**: A new setting called `Static Memory Mode` can be enabled in the general injection settings. This mode makes long-term memories always be injected separately from short-term memories, regardless of context. Disabled by default.
 - **New Feature**: New setting next to `Summarization Time Delay` called `Skip First` determines whether the first summary right after a character message will be delayed or not when auto-summarizing (default false). Turning this on will be the same as the old behavior.
+- **New Feature**: New setting to allow applying a regex script to messages before summarizing.
 - **New Slash Command**: `/qm-max-summary-tokens` returns the max tokens allowed for summarization given the current completion preset.
 - **New Slash Command**: `/qm-set` allows you to set the memory for a message.
 - **New Slash Command**: `/qm-toggle-auto-summarize` toggles whether auto-summarize is enabled. Does not save the profile.
