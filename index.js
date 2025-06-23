@@ -2247,8 +2247,8 @@ class MemoryEditInterface {
 class SummaryPromptEditInterface {
 
     html_template = `
-<div id="qvink_summary_prompt_interface">
-<div class="flex-container justifyspacebetween" style="height: calc(90vh - 120px)">
+<div id="qvink_summary_prompt_interface" style="height: 100%">
+<div class="flex-container justifyspacebetween">
     <div class="flex2">
         <div class="flex-container justifyspacebetween alignitemscenter">
             <h4>Summary Prompt</h4>
@@ -2256,16 +2256,23 @@ class SummaryPromptEditInterface {
             <button id="preview_summary_prompt" class="menu_button fa-solid fa-eye margin0" title="Preview current summary prompt (the exact text that will be sent to the model)"></button>
             <button id="restore_default_prompt" class="menu_button fa-solid fa-recycle margin0 red_button" title="Restore the default prompt"></button>
         </div>
-        <textarea id="prompt" class="" style="height: 100%; overflow-y: auto"></textarea>
     </div>
-
     <div class="flex1" style="height: 100%">
         <div class="flex-container justifyspacebetween alignitemscenter">
             <h4 class="flex2">Available Macros <i class="fa-solid fa-info-circle" title="Dynamic macros only available for the summary prompt."></i></h4>
             <button id="add_macro" class="flex1 menu_button" title="Add a new macro">New</button>
         </div>
+    </div>
+</div>
+
+<div class="flex-container justifyspacebetween" style="height: calc(100% - 45px);">
+    <div class="flex2">
+        <textarea id="prompt" class="" style="height: 100%; overflow-y: auto"></textarea>
+    </div>
+    <div class="flex1" style="height: 100%">
         <div id="macro_definitions" style="height: 100%; overflow-y: auto"></div>
     </div>
+</div>
 </div>
 `
     // remember to set the name of the radio group for each separate instance

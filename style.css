@@ -181,6 +181,7 @@ We need the specificity to override some theme styles.
 /* Summary Prompt Interface */
 dialog:has(#qvink_summary_prompt_interface) {
     height: 90vh;  /* always full height */
+    max-height: 90vh;
 }
 #qvink_summary_prompt_interface .qvink_interface_card {
     margin: 1em;
@@ -189,6 +190,7 @@ dialog:has(#qvink_summary_prompt_interface) {
 /* Memory state interface */
 dialog:has(#qvink_memory_state_interface) {
     height: 90vh;  /* make the memory edit dialog always full height */
+    max-height: 90vh;
 }
 #qvink_memory_state_interface {
     height: 100%;
