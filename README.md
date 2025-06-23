@@ -2,7 +2,6 @@
 - [Description](#description)
 - [Notable Features](#notable-features)
 - [Installation and Usage](#installation-and-usage)
-- [How to use the Dev branch](#how-to-use-the-dev-branch)
 - [Slash Commands](#slash-commands)
 - [Custom CSS](#custom-css)
 - [Tips](#tips)
@@ -16,46 +15,40 @@
 - Short term memory rotates out the most recent message summaries automatically.
 - Long-term memory stores summaries of manually-marked messages beyond the short-term limit.
 
-Benefits compared to the built-in summarization:
+### Motivation
+The built-in summarization extension has several problems:
+- Summarizing the whole chat all at once is prone to inaccuracies and missing details.
+- Letting an LLM determine how to update the chat summary means that it will degrade over time, and one bad generation can completely ruin it.
+- Modifying the chat doesn't necessarily affect the summary (because again, it's handled by an LLM).
+- No reliable way to keep recent memories more relevant or differentiate from long-term memories.
+- Letting the LLM decide what long-term memories to keep may not align with that you want.
+
+How this extension addresses these issues:
 - Summarizing messages individually (as opposed to all at once) gets more accurate summaries and is less likely to miss details.
-- Because memory storage is not handled by an LLM, old summaries will never change over time.
-- Each summary is attached to the message it summarizes, so deleting a message removes only the associated memory.
+- Summaries don't degrade over time because memory storage is not handled by an LLM.
+- Each summary is attached to the message it summarizes, so editing/deleting a message only affects the associated memory.
 - Short-term memory guarantees that relevant info is always available from the most recent messages, but goes away once no longer relevant according to a set limit.
-- Long-term memory allows you to choose which details are important to remember, keeping them available for longer, up to a separate limit.
+- Long-term memory allows you to choose which messages are important to remember, keeping them available for longer (up to a separate limit).
 
 ### Notable Features
-- Configuration profiles: save and load different configurations profiles and set one to be auto-loaded for each character or chat.
-- Popout config menu: customize summarization settings, injection settings, and auto-summarization message inclusion criteria.
-- A separate interface for viewing and editing all memories in your chat.
-- Summaries are optionally displayed in small text below each message, colored according to their status:
+- **Configuration profiles:** save and load different configurations profiles and set one to be auto-loaded for each character, group, or chat.
+- **Separate Completion Preset / Connection Profile**: Choose one of your completion presets and connection profiles to be used for summaries.
+- **Popout config menu:** customize summarization settings, injection settings, and auto-summarization message inclusion criteria.
+- **Compact Interface:** A separate popout interface for viewing and editing all memories in your chat.
+- **Save Context:** Optionally remove full messages from your context that have been summarized to reduce token usage.
+- **Unobtrusive Display:** Summaries are optionally displayed in small text below each message, colored according to their status:
   - Green: Included in short-term memory
   - Blue: Marked for long-term memory (included in short-term or long-term memory)
   - Red: Marked for long-term memory, but now out of context.
   - Grey: Excluded
 
 ### Installation and Usage
-- Install the extension in ST using the github link: https://github.com/qvink/qvink_memory
+- Install the extension in ST using the github link: https://github.com/qvink/SillyTavern-MessageSummarize
 - To mark a message for long-term memory, click the "brain" icon in the message button menu.
 - To re-summarize a message, click the "Quote" icon in the message button menu.
 - To edit a summary, click on the summary text directly or click the "pen" icon in the message button menu.
 - To perform actions on multiple summaries at once, go to the config and click "Edit Memory". Here you can filter for specific memories or manually select memories to modify.
 - To only summarize certain characters in a group chat, open the group chat edit menu and scroll down to the member list. Click the glowing "brain" icon to toggle whether that character will be automatically summarized (if you have auto-summarization enabled).
-
-### How to use the Dev branch
-**Note: The dev branch requires that you use the latest version of the SillyTavern staging branch.**
-
-ST doesn't have an easy way to switch extension branches, so you'll need to use git. 
-In your command line, go to the folder where extension is stored.
-This should look something like`SillyTavern/data/<user>/extensions/qvink_memory`.
-Then run the following git commands in your command line:
-- `git fetch origin dev:dev` (gets the dev branch info)
-- `git checkout dev` (switch to the dev branch)
-
-Then to switch back and forth, you can use `git checkout master` and `git checkout dev`.
-
-To update the dev branch when changes are made, run:
-- `git checkout dev` (make sure you are on the dev branch first)
-- `git pull origin dev` (pull any new changes)
 
 ### Slash Commands
 Note: all commands have `/qvink-memory-` as an alias.
@@ -71,8 +64,8 @@ Note: all commands have `/qvink-memory-` as an alias.
 - `/qm-get`: Get the memory associated with a message or range of messages. Defaults to the most recent message.
 - `/qm-set`: Set the memory associated with a message to the given text.
 - `/qm-summarize`: Summarizes the nth message in the chat (default to most recent message). Same as clicking the "Quote" icon in the message button menu.
-- `/qm-summarize-chat`: Performs a single auto-summarization on the chat, even if auto-summarization is disabled.
-- `/qm-stop-summarization`: stops any summarization currently running. Same as clicking the "stop" button in the config or next to the progress bar.
+- `/qm-summarize-chat`: Performs a single auto-summarization on the chat, even if auto-summarization is disabled. This takes into account the auto-summarization inclusion criteria and message limit.
+- `/qm-stop-summarization`: stops any sequence of summarizations currently running. Same as clicking the "stop" button in the config or next to the progress bar.
 - `/qm-max-summary-tokens`: Get the max response tokens defined in the current completion preset used for summaries.
 
 ### Custom CSS
@@ -194,5 +187,7 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Format injections as system prompt~~
 - ~~Add dashed line to memory edit interface~~
 - ~~detect response length change to update settings visuals~~
-- fix prefill compatability with chat completion (generate_raw doesn't allow adding separate messages in chat completion). Might need to hijack ST's prefill setting instead of adding it myself?
+- ~~apply optional regex to messages~~
+- ~~Reworded summary prompt interface~~
 - ~~Add the time delay before the initial summarization where appropriate~~
+- fix prefill compatability with chat completion (generate_raw doesn't allow adding separate messages in chat completion). Might need to hijack ST's prefill setting instead of adding it myself?
