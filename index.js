@@ -26,6 +26,7 @@ import { MacrosParser } from '../../../macros.js';
 import { commonEnumProviders } from '../../../slash-commands/SlashCommandCommonEnumsProvider.js';
 import { getRegexScripts } from '../../../../scripts/extensions/regex/index.js'
 import { runRegexScript } from '../../../../scripts/extensions/regex/engine.js'
+import { t, translate } from '../../../i18n.js';
 
 export { MODULE_NAME };
 
@@ -339,6 +340,38 @@ function check_st_version() {
         log(`Symbols not found in context: [${getContext().symbols}]`)
         toast("Incompatible ST version - please update.", "error")
     }
+}
+function add_i18n($element=null) {
+    // dynamically translate config settings
+    log("Translating with i18n...")
+    if ($element === null) {
+        $element = $(`.${settings_content_class}`)
+    }
+
+    $element.each(function () {
+        let $this = $(this);
+        // Find all elements with either text or a title
+        $this.find('*').each(function () {
+            let $el = $(this);
+
+            // translate title attribute if present
+            if ($el.attr('title')) {
+                $el.attr('title', translate($el.attr('title')));
+            }
+
+            if ($el.attr('placeholder')) {
+                $el.attr('placeholder', translate($el.attr('placeholder')));
+            }
+
+            // translate the inner text, if present
+            if (!this.childNodes) return
+            for (let child of this.childNodes) {  // each child node (including text nodes)
+                let text = child.nodeValue
+                if (!text?.trim()) continue  // null or just whitespace
+                child.nodeValue = text?.replace(text?.trim(), translate(text?.trim()))  // replace text with translated text
+            }
+        });
+    })
 }
 
 // Completion presets
@@ -847,9 +880,9 @@ function update_profile_section() {
         // if the current character/chat has a default profile, indicate as such
         let text = profile
         if (profile === current_character_profile) {
-            text = `${profile} (character)`
+            text = `${profile} (${t`Character`})`
         } else if (profile === current_chat_profile) {
-            text = `${profile} (chat)`
+            text = `${profile} (${t`Chat`})`
         }
         $choose_profile_dropdown.append(`<option value="${profile}">${text}</option>`);
     }
@@ -896,7 +929,7 @@ async function update_preset_dropdown() {
     let summary_preset = get_settings('completion_preset')
     let preset_options = await get_presets()
     $preset_select.empty();
-    $preset_select.append(`<option value="">Same as Current</option>`)
+    $preset_select.append(`<option value="">${t`Same as Current`}</option>`)
     for (let option of preset_options) {  // construct the dropdown options
         $preset_select.append(`<option value="${option}">${option}</option>`)
     }
@@ -912,7 +945,7 @@ async function update_connection_profile_dropdown() {
     let summary_connection = get_settings('connection_profile')
     let connection_options = await get_connection_profiles()
     $connection_select.empty();
-    $connection_select.append(`<option value="">Same as Current</option>`)
+    $connection_select.append(`<option value="">${t`Same as Current`}</option>`)
     for (let option of connection_options) {  // construct the dropdown options
         $connection_select.append(`<option value="${option}">${option}</option>`)
     }
@@ -932,7 +965,7 @@ function update_regex_dropdown() {
 
     let $regex_select = $(`.${settings_content_class} #message_regex`)
     $regex_select.empty();
-    $regex_select.append(`<option value="">None</option>`)
+    $regex_select.append(`<option value="">${t`None`}</option>`)
     for (let name of Object.keys(scripts)) {  // construct the dropdown options
         $regex_select.append(`<option value="${name}">${name}</option>`)
     }
@@ -1427,7 +1460,7 @@ function update_message_visuals(i, style=true, text=null) {
 
     let chat = getContext().chat;
     let message = chat[i];
-    let error_message = get_data(message, 'error');
+    let error_message = translate(get_data(message, 'error'));
     let reasoning = get_data(message, 'reasoning')
     let memory = get_memory(message)
     let lagging = get_data(message, 'lagging')  // lagging behind injection threshold
@@ -1461,7 +1494,7 @@ function update_message_visuals(i, style=true, text=null) {
     let memory_div = $(`<div class="${summary_div_class} ${css_message_div}"><span class="${style_class}">${text}</span></div>`)
     if (reasoning) {
         reasoning = clean_string_for_title(reasoning)
-        memory_div.prepend($(`<span class="${summary_reasoning_class}" title="${reasoning}">[Reasoning] </span>`))
+        memory_div.prepend($(`<span class="${summary_reasoning_class}" title="${reasoning}">[${t`Reasoning`}] </span>`))
     }
     message_element.after(memory_div);
 
@@ -1592,7 +1625,7 @@ function progress_bar(id, progress, total, title) {
     <div class="title">${title}</div>
     <div>(<span class="progress">${progress}</span> / <span class="total">${total}</span>)</div>
     <progress value="${progress}" max="${total}" class="flex1"></progress>
-    <button class="menu_button fa-solid fa-stop" title="Abort summarization"></button>
+    <button class="menu_button fa-solid fa-stop" title="${t`Abort summarization`}"></button>
 </div>`)
 
     // add a click event to abort the summarization
@@ -1740,9 +1773,9 @@ class MemoryEditInterface {
 `
     html_button_template = `
     <div class="interface_actions">
-        <div title="Remember (toggle inclusion of summary in long-term memory)"     class="mes_button fa-solid fa-brain ${remember_button_class}"></div>
-        <div title="Force Exclude (toggle inclusion of summary from all memory)"    class="mes_button fa-solid fa-ban ${forget_button_class}"></div>
-        <div title="Re-Summarize (AI)"                                              class="mes_button fa-solid fa-quote-left ${summarize_button_class}"></div>
+        <div title="${t`Remember (toggle inclusion of summary in long-term memory)`}"     class="mes_button fa-solid fa-brain ${remember_button_class}"></div>
+        <div title="${t`Force Exclude (toggle inclusion of summary from all memory)`}"    class="mes_button fa-solid fa-ban ${forget_button_class}"></div>
+        <div title="${t`Summarize (AI)`}"                                                 class="mes_button fa-solid fa-quote-left ${summarize_button_class}"></div>
     </div>
     `
     ctx = getContext();
@@ -1892,6 +1925,8 @@ class MemoryEditInterface {
             let message_id = Number($(this).closest('tr').attr('message_id'));  // get the message ID from the row's "message_id" attribute
             await summarize_messages(message_id);
         });
+
+        add_i18n(this.$content)
     }
 
     async show() {
@@ -1958,6 +1993,7 @@ class MemoryEditInterface {
 
         this.update_selected()
         this.update_context_line()
+        add_i18n(this.$content)  // need to translate any text in the table after being populated
     }
     update_filters(preserve_page=false) {
         // update list of indexes to include based on current filters
@@ -2158,7 +2194,7 @@ class MemoryEditInterface {
 
         let msg = this.ctx.chat[i];
         let memory = text ?? get_memory(msg)
-        let error = get_data(msg, 'error') || ""
+        let error = translate(get_data(msg, 'error') || "")
         let edited = get_data(msg, 'edited')
         let row_id = `memory_${i}`
 
@@ -2173,9 +2209,9 @@ class MemoryEditInterface {
             $select_checkbox = $(`<input class="interface_message_select" type="checkbox" value="${i}">`)
             $buttons = $(this.html_button_template)
             if (msg.is_user) {
-                $sender = $(`<i class="fa-solid fa-user" title="User message"></i>`)
+                $sender = $(`<i class="fa-solid fa-user" title="User"></i>`)
             } else {
-                $sender = $(`<i class="fa-solid" title="Character message"></i>`)
+                $sender = $(`<i class="fa-solid" title="Character"></i>`)
             }
 
             // create the row. The "message_id" attribute tells all handlers what message ID this is.
@@ -2391,6 +2427,9 @@ class SummaryPromptEditInterface {
 
         // set the prompt text and the macro settings
         this.from_settings()
+
+        // translate
+        add_i18n(this.$content)
     }
 
     async show() {
@@ -2414,6 +2453,7 @@ class SummaryPromptEditInterface {
             let macro = this.get_macro(name)
             this.create_macro_interface(macro)
         }
+        add_i18n(this.$content)
     }
     create_macro_interface(macro) {
         // Create a new macro interface item with the given settings
@@ -3506,7 +3546,7 @@ async function summarize_message(index) {
         set_data(message, 'reasoning', reasoning)
     } else {  // generation failed
         error(`Failed to summarize message ${index} - generation failed.`);
-        set_data(message, 'error', err || "Summarization failed");  // store the error message
+        set_data(message, 'error', err || `Summarization failed`);  // store the error message
         set_data(message, 'memory', null);  // clear the memory if generation failed
         set_data(message, 'edited', false);  // clear the error message
         set_data(message, 'prefill', null)
@@ -3815,18 +3855,18 @@ function initialize_settings_listeners() {
     bind_function('#edit_long_term_memory_prompt', async () => {
         let description = `
 <ul style="text-align: left; font-size: smaller;">
-    <li>This will be the content of the <b>{{${long_memory_macro}}}</b> macro.</li>
+    <li>This will be the content of <b>{{${long_memory_macro}}}</b></li>
     <li>If there is nothing in long-term memory, the whole macro will be empty.</li>
-    <li>In this input, the <b>{{${generic_memories_macro}}}</b> macro will be replaced by all long-term memories.</li>
+    <li><b>{{${generic_memories_macro}}}</b> will be replaced by all long-term memories.</li>
 </ul>`
         get_user_setting_text_input('long_template', `Edit Long-Term Memory Injection`, description)
     })
     bind_function('#edit_short_term_memory_prompt', async () => {
         let description = `
 <ul style="text-align: left; font-size: smaller;">
-    <li>This will be the content of the <b>{{${short_memory_macro}}}</b> macro.</li>
+    <li>This will be the content of <b>{{${short_memory_macro}}}</b></li>
     <li>If there is nothing in short-term memory, the whole macro will be empty.</li>
-    <li>In this input, the <b>{{${generic_memories_macro}}}</b> macro will be replaced by all short-term memories.</li>
+    <li><b>{{${generic_memories_macro}}}</b> will be replaced by all short-term memories.</li>
 </ul>`
         get_user_setting_text_input('short_template', `Edit Short-Term Memory Injection`, description)
     })
@@ -3891,10 +3931,10 @@ function initialize_message_buttons() {
     let ctx = getContext()
 
     let html = `
-<div title="Remember (toggle inclusion of summary in long-term memory)" class="mes_button ${remember_button_class} fa-solid fa-brain" tabindex="0"></div>
-<div title="Force Exclude (toggle inclusion of summary from all memory)" class="mes_button ${forget_button_class} fa-solid fa-ban" tabindex="0"></div>
-<div title="Edit Summary" class="mes_button ${edit_button_class} fa-solid fa-pen-fancy" tabindex="0"></div>
-<div title="Summarize (AI)" class="mes_button ${summarize_button_class} fa-solid fa-quote-left" tabindex="0"></div>
+<div title="${t`Remember (toggle inclusion of summary in long-term memory)`}" class="mes_button ${remember_button_class} fa-solid fa-brain" tabindex="0"></div>
+<div title="${t`Force Exclude (toggle inclusion of summary from all memory)`}" class="mes_button ${forget_button_class} fa-solid fa-ban" tabindex="0"></div>
+<div title="${t`Edit Summary`}" class="mes_button ${edit_button_class} fa-solid fa-pen-fancy" tabindex="0"></div>
+<div title="${t`Summarize (AI)`}" class="mes_button ${summarize_button_class} fa-solid fa-quote-left" tabindex="0"></div>
 <span class="${css_button_separator}"></span>
 `
 
@@ -3939,7 +3979,7 @@ function initialize_group_member_buttons() {
     debug("Initializing group member buttons")
 
     let $template = $('#group_member_template').find('.group_member_icon')
-    let $button = $(`<div title="Toggle summarization for memory" class="right_menu_button fa-solid fa-lg fa-brain ${group_member_enable_button}"></div>`)
+    let $button = $(`<div title="${t`Toggle summarization for memory`}" class="right_menu_button fa-solid fa-lg fa-brain ${group_member_enable_button}"></div>`)
 
     // add listeners
     $(document).on("click", `.${group_member_enable_button}`, (e) => {
@@ -4265,7 +4305,7 @@ function add_menu_button(text, fa_icon, callback, hover=null) {
     $button.click(() => callback());
 }
 function initialize_menu_buttons() {
-    add_menu_button("Toggle Memory", "fa-solid fa-brain", toggle_chat_enabled, "Toggle memory for the current chat.")
+    add_menu_button(t`Toggle Memory`, "fa-solid fa-brain", toggle_chat_enabled, t`Toggle memory for the current chat.`)
 }
 
 
@@ -4362,6 +4402,7 @@ jQuery(async function () {
     // Load settings
     initialize_settings();
 
+    // initialize interfaces
     memoryEditInterface = new MemoryEditInterface()
     summaryPromptEditInterface = new SummaryPromptEditInterface()
 
@@ -4375,6 +4416,9 @@ jQuery(async function () {
     initialize_group_member_buttons();
     initialize_slash_commands();
     initialize_menu_buttons();
+
+    // Add i18n
+    add_i18n()
 
     // ST event listeners
     let ctx = getContext();
