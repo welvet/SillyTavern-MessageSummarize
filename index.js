@@ -1692,7 +1692,7 @@ class MemoryEditInterface {
     html_template = `
 <div id="qvink_memory_state_interface">
 <div class="flex-container justifyspacebetween alignitemscenter">
-    <h4>Memory State</h4>
+    <h3>Memory State</h3>
     <button id="preview_memory_state" class="menu_button fa-solid fa-eye margin0" title="Preview current memory state (the exact text that will be injected into your context)."></button>
     <button id="expand_filter_bar" class="menu_button fa-solid fa-list-check margin0" title="Toggle chat filters"></button>
     <label class="checkbox_label" title="Selecting message subsets applies to the entire chat history. When unchecked, it only applies to the current page.">
@@ -2252,7 +2252,7 @@ class SummaryPromptEditInterface {
 <div class="flex-container justifyspacebetween">
     <div class="flex2">
         <div class="flex-container justifyspacebetween alignitemscenter">
-            <h4>Summary Prompt</h4>
+            <h3>Summary Prompt</h3>
             <i class="fa-solid fa-info-circle" style="margin-right: 1em" title="Customize the prompt used for summarizing messages."></i>
             <button id="preview_summary_prompt" class="menu_button fa-solid fa-eye margin0" title="Preview current summary prompt (the exact text that will be sent to the model)"></button>
             <button id="restore_default_prompt" class="menu_button fa-solid fa-recycle margin0 red_button" title="Restore the default prompt"></button>
@@ -2260,7 +2260,7 @@ class SummaryPromptEditInterface {
     </div>
     <div class="flex1" style="height: 100%">
         <div class="flex-container justifyspacebetween alignitemscenter">
-            <h4 class="flex2">Available Macros <i class="fa-solid fa-info-circle" title="Dynamic macros only available for the summary prompt."></i></h4>
+            <h3 class="flex2">Available Macros <i class="fa-solid fa-info-circle" title="Dynamic macros only available for the summary prompt."></i></h3>
             <button id="add_macro" class="flex1 menu_button" title="Add a new macro">New</button>
         </div>
     </div>
