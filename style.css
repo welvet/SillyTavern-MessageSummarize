@@ -44,7 +44,7 @@ select.inline_setting {
     line-height: 1em;
 }
 /* text input in a line of text */
-input.inline_setting     {
+input.inline_setting {
     margin: 0;
     padding: 0 0 0 5px;
     width: unset !important;
@@ -178,6 +178,9 @@ We need the specificity to override some theme styles.
     box-shadow: -1px 1px 5px black;
 }
 
+
+
+
 /* Summary Prompt Interface */
 dialog:has(#qvink_summary_prompt_interface) {
     height: 90vh;  /* always full height */
@@ -186,6 +189,25 @@ dialog:has(#qvink_summary_prompt_interface) {
 #qvink_summary_prompt_interface .qvink_interface_card {
     margin: 1em;
 }
+#qvink_summary_prompt_interface .qvink_interface_card .inline-drawer-toggle {
+    padding: 10px;
+    padding-right: 0;  /* account for the padding of the card to keep the icon visually centered */
+}
+
+/* remove the background and styling form the dropdown drawers inside the summry prompt interface */
+#qvink_summary_prompt_interface .inline-drawer-header {
+    background: unset;
+    border: unset;
+    margin: unset;
+    padding: unset;
+}
+#qvink_summary_prompt_interface .select2-container {
+    flex: 1;  /* ensures the select2 respects the surrounding flex container */
+}
+
+
+
+
 
 /* Memory state interface */
 dialog:has(#qvink_memory_state_interface) {

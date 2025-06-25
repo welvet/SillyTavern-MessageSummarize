@@ -192,3 +192,4 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Reworded summary prompt interface~~
 - ~~Add the time delay before the initial summarization where appropriate~~
 - fix prefill compatability with chat completion (generate_raw doesn't allow adding separate messages in chat completion). Might need to hijack ST's prefill setting instead of adding it myself?
+- /qm-toggle-config returns null

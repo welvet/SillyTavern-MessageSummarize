@@ -105,7 +105,6 @@ const default_settings = {
     show_prefill: false, // whether to show the prefill when memories are displayed
     completion_preset: "",  // completion preset to use for summarization. Empty ("") indicates the same as currently selected.
     connection_profile: "",
-    message_regex: "",  // regex filter
 
     auto_summarize: true,   // whether to automatically summarize new chat messages
     summarization_delay: 0,  // delay auto-summarization by this many messages (0 summarizes immediately after sending, 1 waits for one message, etc)
@@ -954,23 +953,6 @@ async function update_connection_profile_dropdown() {
     // set a click event to refresh the dropdown
     $connection_select.off('click').on('click', () => update_connection_profile_dropdown());
 }
-function update_regex_dropdown() {
-    // populate the regex dropdown
-    let script_list = getRegexScripts()
-    let scripts = {}
-    Object.keys(script_list).forEach(function(i) {
-        let script = script_list[i]
-        scripts[script.scriptName] = script
-    });
-
-    let $regex_select = $(`.${settings_content_class} #message_regex`)
-    $regex_select.empty();
-    $regex_select.append(`<option value="">${t`None`}</option>`)
-    for (let name of Object.keys(scripts)) {  // construct the dropdown options
-        $regex_select.append(`<option value="${name}">${name}</option>`)
-    }
-    $regex_select.val(get_settings('message_regex'))
-}
 function refresh_settings() {
     // Refresh all settings UI elements according to the current settings
     debug("Refreshing settings...")
@@ -987,9 +969,6 @@ function refresh_settings() {
     // completion presets
     update_preset_dropdown()
     check_preset_valid()
-
-    // regex
-    update_regex_dropdown()
 
     // auto_summarize_message_limit must be >= auto_summarize_batch_size (unless the limit is disabled, i.e. -1)
     let auto_limit = get_settings('auto_summarize_message_limit')
@@ -1085,8 +1064,16 @@ Use like this:
     </label>
 </div>
  */
-function refresh_select2_element(id, selected, options, placeholder="") {
-    // Refresh a select2 element with the given ID (a select element) and set the options
+function refresh_select2_element(element, selected, options, placeholder="", callback) {
+    // Refresh a select2 element with the given select element (or ID) and set the options
+    let $select = element
+    let id;
+    if (typeof(element) === "string") {
+        $select = $(`#${element}`)
+        id = element
+    } else {
+        id = element.attr('id')
+    }
 
     // check whether the dropdown is open. If so, don't update the options (it messes with the widget)
     let $dropdown = $(`#select2-${id}-results`)
@@ -1094,7 +1081,6 @@ function refresh_select2_element(id, selected, options, placeholder="") {
         return
     }
 
-    let $select = $(`#${id}`)
     $select.empty()  // clear current options
 
     // add the options to the dropdown
@@ -1111,7 +1097,16 @@ function refresh_select2_element(id, selected, options, placeholder="") {
             placeholder: placeholder,
             allowClear: true,
             closeOnSelect: false,
+            dropdownParent: $select.parent()
         });
+
+        $select.on('change', () => {
+            let values = []
+            for (let value of $select.select2('data')) {
+                values.push(value.text)
+            }
+            callback(values)
+        })
 
         // select2ChoiceClickSubscribe($select, () => {
         //     log("CLICKED")
@@ -1569,7 +1564,7 @@ async function display_text_modal(title, text="") {
     // replace newlines in text with <br> for HTML
     let ctx = getContext();
     text = text.replace(/\n/g, '<br>');
-    let html = `<h2>${title}</h2><div style="text-align: left; overflow: auto;">${text}</div>`
+    let html = `<h3>${title}</h3><div style="text-align: left; overflow: auto;">${text}</div>`
     let popup = new ctx.Popup(html, ctx.POPUP_TYPE.TEXT, undefined, {okButton: 'Close', allowVerticalScrolling: true, wider: true});
     await popup.show()
 }
@@ -1591,6 +1586,8 @@ async function get_user_setting_text_input(key, title, description="") {
     }
     let ctx = getContext();
     let popup = new ctx.Popup(title, ctx.POPUP_TYPE.INPUT, value, {rows: 20, customButtons: [restore_button], wider: true});
+
+    add_i18n($(popup.content))  // translate any content
 
     // Now remove the ".result-control" class to prevent it from submitting when you hit enter.
     popup.mainInput.classList.remove('result-control');
@@ -1725,7 +1722,7 @@ class MemoryEditInterface {
     html_template = `
 <div id="qvink_memory_state_interface">
 <div class="flex-container justifyspacebetween alignitemscenter">
-    <h4>Memory State</h4>
+    <h3>Memory State</h3>
     <button id="preview_memory_state" class="menu_button fa-solid fa-eye margin0" title="Preview current memory state (the exact text that will be injected into your context)."></button>
     <button id="expand_filter_bar" class="menu_button fa-solid fa-list-check margin0" title="Toggle chat filters"></button>
     <label class="checkbox_label" title="Selecting message subsets applies to the entire chat history. When unchecked, it only applies to the current page.">
@@ -1773,9 +1770,9 @@ class MemoryEditInterface {
 `
     html_button_template = `
     <div class="interface_actions">
-        <div title="${t`Remember (toggle inclusion of summary in long-term memory)`}"     class="mes_button fa-solid fa-brain ${remember_button_class}"></div>
-        <div title="${t`Force Exclude (toggle inclusion of summary from all memory)`}"    class="mes_button fa-solid fa-ban ${forget_button_class}"></div>
-        <div title="${t`Summarize (AI)`}"                                                 class="mes_button fa-solid fa-quote-left ${summarize_button_class}"></div>
+        <div title="Remember (toggle inclusion of summary in long-term memory)"     class="mes_button fa-solid fa-brain ${remember_button_class}"></div>
+        <div title="Force Exclude (toggle inclusion of summary from all memory)"    class="mes_button fa-solid fa-ban ${forget_button_class}"></div>
+        <div title="Summarize (AI)"                                                 class="mes_button fa-solid fa-quote-left ${summarize_button_class}"></div>
     </div>
     `
     ctx = getContext();
@@ -2104,7 +2101,7 @@ class MemoryEditInterface {
         });
 
         this.$regex_selector.empty();
-        this.$regex_selector.append(`<option value="">Select Script</option>`)
+        this.$regex_selector.append(`<option value="">None</option>`)
         for (let name of Object.keys(scripts)) {  // construct the dropdown options
             this.$regex_selector.append(`<option value="${name}">${name}</option>`)
         }
@@ -2194,7 +2191,7 @@ class MemoryEditInterface {
 
         let msg = this.ctx.chat[i];
         let memory = text ?? get_memory(msg)
-        let error = translate(get_data(msg, 'error') || "")
+        let error = get_data(msg, 'error') || ""
         let edited = get_data(msg, 'edited')
         let row_id = `memory_${i}`
 
@@ -2209,9 +2206,9 @@ class MemoryEditInterface {
             $select_checkbox = $(`<input class="interface_message_select" type="checkbox" value="${i}">`)
             $buttons = $(this.html_button_template)
             if (msg.is_user) {
-                $sender = $(`<i class="fa-solid fa-user" title="User"></i>`)
+                $sender = $(`<i class="fa-solid fa-user" title="User message"></i>`)
             } else {
-                $sender = $(`<i class="fa-solid" title="Character"></i>`)
+                $sender = $(`<i class="fa-solid" title="Character message"></i>`)
             }
 
             // create the row. The "message_id" attribute tells all handlers what message ID this is.
@@ -2288,7 +2285,7 @@ class SummaryPromptEditInterface {
 <div class="flex-container justifyspacebetween">
     <div class="flex2">
         <div class="flex-container justifyspacebetween alignitemscenter">
-            <h4>Summary Prompt</h4>
+            <h3>Summary Prompt</h3>
             <i class="fa-solid fa-info-circle" style="margin-right: 1em" title="Customize the prompt used for summarizing messages."></i>
             <button id="preview_summary_prompt" class="menu_button fa-solid fa-eye margin0" title="Preview current summary prompt (the exact text that will be sent to the model)"></button>
             <button id="restore_default_prompt" class="menu_button fa-solid fa-recycle margin0 red_button" title="Restore the default prompt"></button>
@@ -2296,7 +2293,7 @@ class SummaryPromptEditInterface {
     </div>
     <div class="flex1" style="height: 100%">
         <div class="flex-container justifyspacebetween alignitemscenter">
-            <h4 class="flex2">Available Macros <i class="fa-solid fa-info-circle" title="Dynamic macros only available for the summary prompt."></i></h4>
+            <h3 class="flex2">Available Macros <i class="fa-solid fa-info-circle" title="Dynamic macros only available for the summary prompt."></i></h3>
             <button id="add_macro" class="flex1 menu_button" title="Add a new macro">New</button>
         </div>
     </div>
@@ -2314,31 +2311,39 @@ class SummaryPromptEditInterface {
 `
     // remember to set the name of the radio group for each separate instance
     macro_definition_template = `
-    <div class="macro_definition qvink_interface_card">
-        <div class="flex-container justifyspacebetween alignitemscenter">
+
+<div class="macro_definition qvink_interface_card">
+<div class="inline-drawer">
+    <div class="inline-drawer-header">
+        <div class="flex-container alignitemscenter margin0 flex1">
             <button class="macro_enable menu_button fa-solid margin0"></button>
             <button class="macro_preview menu_button fa-solid fa-eye margin0" title="Preview the result of this macro"></button>
             <input class="macro_name flex1 text_pole" type="text" placeholder="name">
-            <button class="macro_delete menu_button red_button fa-solid fa-trash margin0" title="Delete custom macro"></button>
-            <button class="macro_restore menu_button red_button fa-solid fa-recycle margin0" title="Restore default macro"></button>
+        </div>
+        <div class="inline-drawer-toggle">
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+    </div>
+
+    <div class="inline-drawer-content">
+        <div class="flex-container alignitemscenter justifyCenter">
+            <div class="macro_type flex2">
+                <label>
+                    <input type="radio" value="preset" />
+                    <span>Range</span>
+                </label>
+                <label>
+                    <input type="radio" value="custom" />
+                    <span>STScript</span>
+                </label>
+            </div>
         </div>
 
-        <div class="macro_type">
-            <label>
-                <input type="radio" value="preset" />
-                <span>Range</span>
-            </label>
-            <label>
-                <input type="radio" value="custom" />
-                <span>Script</span>
-            </label>
-        </div>
-
-        <div class="macro_type_presets">
-            <div title="The range of messages to replace this macro, relative to the message being summarized. For example, setting this to (3, 10) will include from the 3rd to the 10th message back in the chat.">
-                <input class="macro_preset_start text_pole widthUnset" type="number" min="1" max="99" />
+        <div class="macro_type_range">
+            <div title="The range of messages to replace this macro, relative to the message being summarized (which is at 0). For example, setting this to (3, 10) will include from the 3rd to the 10th message back in the chat.">
+                <input class="macro_preset_start text_pole widthUnset" type="number" min="0" max="99" />
                 <span> - </span>
-                <input class="macro_preset_end text_pole widthUnset" type="number" min="1" max="99" />
+                <input class="macro_preset_end text_pole widthUnset" type="number" min="0" max="99" />
             </div>
 
             <label title="Bot messages within the range above will be included" class="checkbox_label">
@@ -2359,24 +2364,39 @@ class SummaryPromptEditInterface {
             </label>
         </div>
 
-        <div class="macro_type_custom">
-            <label title="The macro will be replaced by the return value of the command when run. Use {{id}} for the ID of the message being summarized." class="checkbox_label">
-                <input class="macro_command text_pole" type="text" placeholder="command">
+        <div class="macro_type_message">
+            <table style="width: 100%;">
+                <tr title="Each message will be replaced by the return value of the script when run. Use {{message}} for the text of the message and {{id}} for the ID of the message.">
+                    <td><span>STScript</span></td>
+                    <td><input class="macro_command text_pole" type="text" placeholder="STScript"></td>
+                </tr>
+                <tr title="Select regex scripts to run on each message. This will occur before the messages are passed to the above script.">
+                    <td><span>Regex</span></td>
+                    <td><select multiple="multiple" class="regex_select select2_multi_sameline"></select></td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="macro_type_script">
+            <label title="The macro will be replaced by the return value of the script when run. Use {{message}} for the text of the message and {{id}} for the ID of the message." class="checkbox_label">
+                <input class="macro_command text_pole" type="text" placeholder="STScript">
             </label>
         </div>
 
-        <div class="macro_type_any">
+        <div class="macro_type_any flex-container alignitemscenter">
             <label title="The result of this macro will be wrapped in your instruct template. Recommended for messages." class="checkbox_label">
                 <input class="macro_instruct_template" type="checkbox">
                 <span>Instruct Template</span>
             </label>
-            <label title="Apply the regex script for summarizing messages to the result of this macro." class="checkbox_label">
-                <input class="macro_apply_regex" type="checkbox">
-                <span>Apply Regex</span>
-            </label>
+
+            <button class="macro_delete menu_button red_button fa-solid fa-trash" title="Delete custom macro" style="margin-left: auto;"></button>
+            <button class="macro_restore menu_button red_button fa-solid fa-recycle" title="Restore default macro" style="margin-left: auto;"></button>
         </div>
 
     </div>
+</div>
+</div>
+
     `
     ctx = getContext();
 
@@ -2394,8 +2414,8 @@ class SummaryPromptEditInterface {
         "user_messages": true,
         "user_summaries": true,
         "instruct_template": true,
-        "apply_regex": true,
-        "command": ""
+        "command": "",
+        "regex_scripts": [],
     }
 
     // If you define the popup in the constructor so you don't have to recreate it every time, then clicking the "ok" button has like a .5-second lag before closing the popup.
@@ -2444,42 +2464,49 @@ class SummaryPromptEditInterface {
     }
 
     // building interface
-    update_macros() {
-        // clear all macros from the interface
-        this.$definitions.find(".macro_definition").remove()
-
-        // Update the interface from settings
-        for (let name of this.list_macros()) {
-            let macro = this.get_macro(name)
+    update_macros(macro=null) {
+        // Update the interface from settings (all macros or just the specified macro)
+        if (macro === null) {
+            for (let name of this.list_macros()) {
+                let macro = this.get_macro(name)
+                this.create_macro_interface(macro)
+            }
+        } else {
             this.create_macro_interface(macro)
         }
         add_i18n(this.$content)
     }
     create_macro_interface(macro) {
-        // Create a new macro interface item with the given settings
-        let $template = $(this.macro_definition_template)
-        let $macro = $template.prependTo(this.$definitions)
+        // Create or update a macro interface item with the given settings
+        let id = `summary_macro_definition_${macro.name}`
+
+        // first check if it already exists
+        let $macro = this.$definitions.find(`#${id}`)
+        if ($macro.length > 0) {  // if it exists, remove it and replace with the template
+            // Need to only replace the items inside the drawer so it says open if it's already open
+            let $template = $(this.macro_definition_template)
+
+            let $drawer_content = $macro.find('.inline-drawer-content')
+            $drawer_content.empty()
+            $drawer_content.append($template.find('.inline-drawer-content').children())
+
+            let $header_content = $macro.find('.inline-drawer-header')
+            $header_content.children().first().remove()  // remove the first div in the header (not the toggle)
+            $header_content.prepend($template.find('.inline-drawer-header').children().first())
+
+        } else { // doesn't exist - add it
+            $macro = $(this.macro_definition_template).prependTo(this.$definitions)
+            $macro.attr('id', id)
+        }
 
         // handling the macro type radio group
         let radio_group_name = `macro_type_radio_${macro.name}`
         $macro.find(`.macro_type input`).attr('name', radio_group_name)  // set the radio group name
 
-        let $preset_div = $macro.find(".macro_type_presets")
-        let $custom_div = $macro.find(".macro_type_custom")
+        let $range_div = $macro.find(".macro_type_range")
+        let $message_div = $macro.find(".macro_type_message")
+        let $script_div = $macro.find(".macro_type_script")
         let $any_div = $macro.find(".macro_type_any")
-
-        function show_settings_div() {
-            // hide/show the appropriate settings divs.
-            // .show() fails if the object isn't in the DOM yet, so we have to try/catch since the popup isn't inserted yet.
-            if (macro.type === "preset") {
-                try {$preset_div.show()} catch {}
-                $custom_div.hide()
-            } else if (macro.type === "custom") {
-                $preset_div.hide()
-                try{$custom_div.show()} catch {}
-            }
-        }
-        show_settings_div()
 
         function set_enabled() {
             if (macro.enabled) {
@@ -2511,14 +2538,37 @@ class SummaryPromptEditInterface {
         let $macro_preset_bot_summaries = $macro.find(".macro_preset_bot_summaries")
         let $macro_preset_user_messages = $macro.find(".macro_preset_user_messages")
         let $macro_preset_user_summaries = $macro.find(".macro_preset_user_summaries")
-        let $macro_command = $macro.find("input.macro_command")
+        let $macro_command_message = $macro.find(".macro_type_message input.macro_command")
+        let $macro_command_script  = $macro.find(".macro_type_script input.macro_command")
         let $macro_instruct = $macro.find(".macro_instruct_template")
-        let $macro_regex = $macro.find(".macro_apply_regex")
+        let $regex_select = $macro.find(".regex_select")
+
+        function show_settings_div() {
+            // hide/show the appropriate settings divs.
+            // .show() fails if the object isn't in the DOM yet, so we have to try/catch since the popup isn't inserted yet.
+            if (macro.type === "preset") {
+                try {
+                    $range_div.show()
+                    $message_div.show()
+                    $macro_command_message.change()  // trigger a change event on the command input so the macro's script actually changes
+                } catch {}
+                $script_div.hide()
+
+            } else if (macro.type === "custom") {
+                $range_div.hide()
+                $message_div.hide()
+                try {
+                    $script_div.show()
+                    $macro_command_script.change()
+                } catch {}
+            }
+        }
+        show_settings_div()
 
         // preview
         $preview.on('click', async () => {
             let result = await this.compute_macro(this.ctx.chat.length-1, macro.name, true)
-            await display_text_modal(`Macro Preview: {{${macro.name}}}`, result)
+            await display_text_modal(t`Macro Preview:`+` {{${macro.name}}}`, result)
         })
 
         // enable
@@ -2533,18 +2583,11 @@ class SummaryPromptEditInterface {
             $name.attr('title', macro.description)
         }
 
-        // if special, disable all inputs except in the "any" div
-        if (macro.type === "special") {
-            $name.prop('disabled', true)  // prevent name change
+        // special case for the {{message}} macro
+        if (macro.name === "message") {
             $macro_type_div.remove()
-            $preset_div.remove()
-            $custom_div.remove()
-        }
-
-        // special case for the {{words}} macro
-        if (macro.name === "words") {
-            $macro_command.prop('disabled', true)
-            $any_div.remove()
+            $range_div.remove()
+            $script_div.remove()
         }
 
         // delete / restore
@@ -2552,7 +2595,6 @@ class SummaryPromptEditInterface {
             $name.prop('disabled', true)  // prevent name change (or else we couldn't restore default)
             $delete.remove()
             $restore.on('click', () => this.restore_macro_default(macro.name))
-            $macro_type_div.remove()
         } else {
             $restore.remove()
             $delete.on('click', () => {
@@ -2603,34 +2645,38 @@ class SummaryPromptEditInterface {
         $macro_instruct.on('change', () => {
             macro.instruct_template = $macro_instruct.is(':checked')
         })
-        $macro_regex.prop('checked', macro.apply_regex)
-        $macro_regex.on('change', () => {
-            macro.apply_regex = $macro_regex.is(':checked')
+
+        // update the regex Select2 (gotta add an ID to the template too)
+        let regex_select_id = `macro_regex_select_${macro.name}`
+        let options = []
+        for (let script of getRegexScripts()) {
+            options.push({id: script.scriptName, name: script.scriptName})
+        }
+        refresh_select2_element($regex_select, macro.regex_scripts, options, t`Select regex scripts`, (values) => {
+            macro.regex_scripts = values
         })
 
-        // command
-        $macro_command.val(macro.command)
-        $macro_command.on('change', () => {
-            macro.command = $macro_command.val()
+        // commands
+        $macro_command_message.val(macro.command)
+        $macro_command_message.on('change', () => {
+            macro.command = $macro_command_message.val()
         })
 
+        $macro_command_script.val(macro.command)
+        $macro_command_script.on('change', () => {
+            macro.command = $macro_command_script.val()
+        })
     }
 
     // special macros
-    special_macro_message(index) {
+    async special_macro_message(index) {
         let macro = this.get_macro("message")
         let message = this.ctx.chat[index]
-        let text = message.mes
 
-        // apply regex if needed
-        if (macro.apply_regex) {
-            let regex = get_settings('message_regex')
-            if (regex) {
-                let script = get_regex_script(regex)
-                text = runRegexScript(script, text)
-            }
-        }
+        // apply script and regex
+        let text = await this.evaluate_script(macro, index)
 
+        // apply template
         if (macro.instruct_template) {
             text = formatInstructModeChat(message.name, text, message.is_user, false, "", this.ctx.name1, this.ctx.name2, null)
         }
@@ -2686,7 +2732,7 @@ class SummaryPromptEditInterface {
         if (name) macro.name = name
         macro.name = this.get_unique_name(macro.name)  // ensure unique name from existing macros
         this.macros[macro.name] = macro
-        this.update_macros()
+        this.create_macro_interface(macro)
     }
     set_macro_name(old_name, new_name) {
         // change the name of a macro
@@ -2711,7 +2757,7 @@ class SummaryPromptEditInterface {
         let default_macro = default_summary_macros[name]
         if (!default_macro) error(`Attempted to restore default summary macro, but no default was found: "${name}"`)
         assign_and_prune(macro, default_macro)
-        this.update_macros()
+        this.update_macros(macro)
     }
 
 
@@ -2721,7 +2767,34 @@ class SummaryPromptEditInterface {
         let index = this.ctx.chat.length-1
         let prompt = this.$prompt.val()
         let text = await this.create_summary_prompt(index, prompt)
-        await display_text_modal("Summary Prompt Preview (Last Message)", text);
+        await display_text_modal(t`Summary Prompt Preview (Last Message)`, text);
+    }
+    async evaluate_script(macro, id, text=null) {
+        // Evaluate any regex and scripts on the macro for the given message index
+        if (text === null) {
+            text = this.ctx.chat[id].mes
+        }
+
+        // evaluate regex if present
+        for (let regex of macro.regex_scripts ?? []) {
+            text = runRegexScript(get_regex_script(regex), text)
+        }
+
+        // evaluate script if present
+        let command = macro.command
+        if (command?.trim()) {
+            // replace {{id}} in the command with the message index
+            command = command.replace(/\{\{id}}/g, id.toString())
+
+            // replace {{message}} with the text of the message
+            command = command.replace(/\{\{message}}/g, text)
+
+            let result = await this.ctx.executeSlashCommandsWithOptions(command)
+            text = result?.pipe ?? ""
+
+        }
+
+        return text
     }
     async compute_macro(index, name, ignore_enabled=false) {
         // get the result from the given custom macro for the given message index
@@ -2737,9 +2810,7 @@ class SummaryPromptEditInterface {
         if (macro.type === "preset") {  // range presets
            return this.compute_range_macro(index, macro)
         } else if (macro.type === "custom") {  // STScript
-            let command = macro.command.replace(/\{\{id}}/g, index.toString())  // replace {{id}} in the command with the message index
-            let result = await this.ctx.executeSlashCommandsWithOptions(command)
-            let text = result?.pipe ?? ""
+            let text = await this.evaluate_script(macro, index, "")
             if (text && macro.instruct_template) {
                 text = formatInstructModeChat("", text, false, true, "", this.ctx.name1, this.ctx.name2, null)
             }
@@ -2748,7 +2819,7 @@ class SummaryPromptEditInterface {
             error(`Unknown summary prompt macro type: "${macro.type}"`)
         }
     }
-    compute_range_macro(index, macro) {
+    async compute_range_macro(index, macro) {
         // Get a history of messages from index-end to index-start
         let chat = this.ctx.chat
         let history = []
@@ -2757,13 +2828,6 @@ class SummaryPromptEditInterface {
         let start_index = Math.max(index-macro.end, 0)
         let end_index = Math.max(index-macro.start, 0)
         debug(`Getting Message History. Index: ${index}, Start: ${macro.start}, End: ${macro.end} (${start_index} to ${end_index})`)
-
-        // regex if set
-        let regex; let script;
-        if (macro.apply_regex) {
-            regex = get_settings('message_regex')
-            if (regex) script = get_regex_script(regex)
-        }
 
         for (let i = start_index; i <= end_index && i < chat.length; i++) {
             let m = chat[i];
@@ -2784,13 +2848,10 @@ class SummaryPromptEditInterface {
             }
 
             if (include_message) {
-                let text = m.mes
+                // apply script and regex
+                let text = await this.evaluate_script(macro, i)
 
-                // apply regex filter if needed
-                if (regex && script) {
-                    text = runRegexScript(script, text)
-                }
-
+                // apply template
                 if (macro.instruct_template) {
                     text = formatInstructModeChat(m.name, text, m.is_user, false, "", this.ctx.name1, this.ctx.name2, null)
                 }
@@ -3546,7 +3607,7 @@ async function summarize_message(index) {
         set_data(message, 'reasoning', reasoning)
     } else {  // generation failed
         error(`Failed to summarize message ${index} - generation failed.`);
-        set_data(message, 'error', err || `Summarization failed`);  // store the error message
+        set_data(message, 'error', err || "Summarization failed");  // store the error message
         set_data(message, 'memory', null);  // clear the memory if generation failed
         set_data(message, 'edited', false);  // clear the error message
         set_data(message, 'prefill', null)
@@ -3859,7 +3920,7 @@ function initialize_settings_listeners() {
     <li>If there is nothing in long-term memory, the whole macro will be empty.</li>
     <li><b>{{${generic_memories_macro}}}</b> will be replaced by all long-term memories.</li>
 </ul>`
-        get_user_setting_text_input('long_template', `Edit Long-Term Memory Injection`, description)
+        get_user_setting_text_input('long_template', t`Edit Long-Term Memory Injection`, description)
     })
     bind_function('#edit_short_term_memory_prompt', async () => {
         let description = `
@@ -3868,12 +3929,11 @@ function initialize_settings_listeners() {
     <li>If there is nothing in short-term memory, the whole macro will be empty.</li>
     <li><b>{{${generic_memories_macro}}}</b> will be replaced by all short-term memories.</li>
 </ul>`
-        get_user_setting_text_input('short_template', `Edit Short-Term Memory Injection`, description)
+        get_user_setting_text_input('short_template', t`Edit Short-Term Memory Injection`, description)
     })
 
     bind_setting('#connection_profile', 'connection_profile', 'text')
     bind_setting('#completion_preset', 'completion_preset', 'text')
-    bind_setting('#message_regex', 'message_regex', 'text')
     bind_setting('#auto_summarize', 'auto_summarize', 'boolean');
     bind_setting('#auto_summarize_on_edit', 'auto_summarize_on_edit', 'boolean');
     bind_setting('#auto_summarize_on_swipe', 'auto_summarize_on_swipe', 'boolean');
