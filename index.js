@@ -2548,17 +2548,11 @@ class SummaryPromptEditInterface {
             $script_div.remove()
         }
 
-        // special case for the {{words}} script macro
-        if (macro.name === "words") {
-            $macro_command_script.prop('disabled', true)
-        }
-
         // delete / restore
         if (macro.default) {
             $name.prop('disabled', true)  // prevent name change (or else we couldn't restore default)
             $delete.remove()
             $restore.on('click', () => this.restore_macro_default(macro.name))
-            $macro_type_div.remove()
         } else {
             $restore.remove()
             $delete.on('click', () => {
