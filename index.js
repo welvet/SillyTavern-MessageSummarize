@@ -1060,7 +1060,7 @@ Use like this:
 <div class="flex-container justifySpaceBetween alignItemsCenter">
     <label title="description here">
         <span>label here</span>
-        <select id="id_here" multiple="multiple" class="select2_multi_sameline"></select>
+        <select id="id_here" multiple="multiple"></select>
     </label>
 </div>
  */
@@ -2372,7 +2372,7 @@ class SummaryPromptEditInterface {
                 </tr>
                 <tr title="Select regex scripts to run on each message. This will occur before the messages are passed to the above script.">
                     <td><span>Regex</span></td>
-                    <td><select multiple="multiple" class="regex_select select2_multi_sameline"></select></td>
+                    <td><select multiple="multiple" class="regex_select"></select></td>
                 </tr>
             </table>
         </div>
