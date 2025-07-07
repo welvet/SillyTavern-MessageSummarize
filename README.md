@@ -2,11 +2,13 @@
 - [Description](#description)
 - [Motivation](#motivation)
 - [Notable Features](#notable-features)
-- [Installation and Usage](#installation-and-usage)
+- [Installation and Basic Usage](#installation-and-basic-usage)
+- [Advanced Usage](#advanced-usage)
+- [Tips](#tips)
 - [Slash Commands](#slash-commands)
 - [Custom CSS](#custom-css)
-- [Tips](#tips)
 - [Troubleshooting](#troubleshooting)
+- [Contact](#contact)
 - [Known Issues](#known-issues)
 
 
@@ -43,13 +45,81 @@ How this extension addresses these issues:
   - Red: Marked for long-term memory, but now out of context.
   - Grey: Excluded
 
-### Installation and Usage
+### Installation and Basic Usage
 - Install the extension in ST using the github link: https://github.com/qvink/SillyTavern-MessageSummarize
 - To mark a message for long-term memory, click the "brain" icon in the message button menu.
 - To re-summarize a message, click the "Quote" icon in the message button menu.
 - To edit a summary, click on the summary text directly or click the "pen" icon in the message button menu.
-- To perform actions on multiple summaries at once, go to the config and click "Edit Memory". Here you can filter for specific memories or manually select memories to modify.
 - To only summarize certain characters in a group chat, open the group chat edit menu and scroll down to the member list. Click the glowing "brain" icon to toggle whether that character will be automatically summarized (if you have auto-summarization enabled).
+- If you want to know what any particular configuration setting does, hover over it and read the tooltip.
+
+### Advanced Usage
+- This extension has extensive configuration settings that control its function, separated into the sections listed below.
+- To toggle whether the extension is active in the current chat, click the `Toggle Memory` button at the top.
+- To perform actions on multiple summaries at once, click the `Edit Memory` button at the top. Here you can filter for specific memories or manually select memories to modify.
+
+#### Configuration Profiles
+- This extension allows you to create configuration profiles that can be set to active for specific characters or specific chats.
+- Config profiles don't save automatically, you must click the `save` icon for any changes to be stored permanently.
+- You can also restore a profile to it's last saved state by clicking the `restore` icon.
+
+#### Summarization:
+- This section of the config menu is where you control how your messages are summarized.
+- Click the `Edit` button to bring up a popup that allows you to edit the summarization prompt itself, along with custom macros that will paste in messages from your chat.
+- You can also set a separate `Connection Profile` or `Completion Preset` to be used specifically for summarizations. Note that due to a limitation of ST (ST can only have one connection and preset active at a time), when summaries occur the extension switches to that connection profile and completion preset until summarization is complete.
+- You can set a prefill for summarization, which can be useful for thinking models.
+- You can control whether messages get re-summarized when they are edited or swiped.
+- If you are using a cloud model with an API request limit, you can also set a `Time Delay` between summaries.
+
+#### Auto-Summarization
+- Here you can control how often your messages are automatically summarized, if at all.
+- By default, summaries will occur automatically after a message is sent in the chat. If you instead want previous messages to be summarized right before a new one is sent, choose `Before Generation`
+- The `Message Lag` setting will make auto-summarization lag behind by the specific number of messages, useful if you only want things summarized once they've been in the chat for awhile.
+- The `Batch Size` setting will wait the specified number of messages before summarizing all of them in sequence.
+- The `Message Limit` setting will set an upper limit to how many messages to look backward in the chat when auto-summarizing.
+
+#### General Injection Settings
+- This controls how summaries are injected into your context (applies to both `short-term` and `long-term`)
+- Here the `Start Injecting After` setting controls how many messages to wait before summaries even start to be injected into your context.
+- You can then optionally remove the original messages associated with those summaries from your context to free up space.
+
+#### Short-Term Memory Injection
+- These settings affect how `short-term` summaries are injected specifically.
+- Note that the inclusion criteria from this section will determine which messages are `auto-summarized`.
+- By default, messages from the character are included in short-term memory, but you can choose to include `User` messages, `Hidden` messages, and `System` messages.
+- The `Message Length Threshold` determines how long a message has to be in order to summarize it.
+- The `Context` determines how many tokens in your context all `short-term` summaries are allowed to take up. Once older summaries exceed this limit, they are then moved into `long-term` memory.
+- You can also select where in your context to inject `short-term` summaries, or choose not to inject them at all (in which case you would need to use the `{{qm-short-term-memory}}` to manually put them into your context).
+
+#### Long-Term Memory Injection
+- These settings affect how `long-term` summaries are injected specifically.
+- Because `long-term` summaries are manually selected, there is no inclusion criteria.
+- The `Context` determines how many tokens in your context all `long-term` summaries are allowed to take up. Once older summaries exceed this limit, they are removed from context completely.
+- You can also select where in your context to inject `long-term` summaries, or choose not to inject them at all (in which case you would need to use the `{{qm-long-term-memory}}` to manually put them into your context).
+
+#### Misc.
+- This section contains a few miscellaneous settings.
+- `Debug Mode` cause the extension to output additional logs in your browser console, useful for debugging.
+- `Display Memories` toggles whether memories are displayed in small text below each message in the chat.
+- `Enable Memory in New Chats` toggles whether the extension will be enabled when you create a new chat.
+- `Use Global Toggle State` will make all configuration profiles that have this option enabled share an on/off state. If this is enabled, toggling the extension on/off will do the same for any configuration profile that also has this option enabled. If this is disabled, then toggling the extension will only apply for the currently selected profile.
+
+
+### Tips & Tricks
+Each model is different of course, but here are just some general things that I have found help getting clean summarizations.
+Try them out if you want.
+
+- **Keep it simple**: Longer summary prompts tend to muddy the waters and get less accurate results. Just in general LLMs have trouble with information overload (hence the reason for this extension in the first place).
+- **Low temperature**: I like to use a temp of 0 to reduce creativity and just get down to the facts. No need for flowery language.
+- **No repetition penalty**: Again, no need for creativity, in fact I want it to repeat what happened.
+- **The `{{words}}` macro doesn't always help**: While some models may reign themselves in if you tell them to keep it under X words, LLMs don't have a soul and therefore can't count, so don't bet on it.
+- **You can use global macros**: If your summaries aren't using names properly, keep in mind that you can use the `{{char}}` or `{{user}}` macro in the prompt.
+- **No need to pause roleplay**: You don't have to include anything like "ignore previous instructions" or "pause your roleplay". The summary prompt is completely independent and will only send what you see in the edit window.
+- **I don't recommend reasoning**: Reasoning models can summarize fine, but they do tend to blab for ages which makes summarizing slow, so I wouldn't recommend them for that reason. If you do use one, make sure to use the `<think>` prefill.
+- **Custom Macros**: In the `Edit` window for your summary prompt, you can create custom macros to use in your prompt with STScript. In your command, you can reference the ID of the message being summarized with `{{id}}`.
+- **Save your presets**: If you are using a different completion preset or connection profile for summaries, make sure to save any changes to your regular completion preset or instruct template. When summarizing, the extension has to temporarily switch presets or connection profiles, which will discard any unsaved changes to the one you are currently using.
+
+
 
 ### Slash Commands
 Note: all commands have `/qvink-memory-` as an alias.
@@ -87,21 +157,6 @@ For example, to color short-term memories yellow and long-term memories black, y
 }
 ```
 
-### Summary Prompt Tips & Tricks
-Each model is different of course, but here are just some general things that I have found help getting clean summarizations.
-Try them out if you want.
-
-- **Keep it simple**: Longer summary prompts tend to muddy the waters and get less accurate results. Just in general LLMs have trouble with information overload (hence the reason for this extension in the first place).
-- **Low temperature**: I like to use a temp of 0 to reduce creativity and just get down to the facts. No need for flowery language.
-- **No repetition penalty**: Again, no need for creativity, in fact I want it to repeat what happened.
-- **The `{{words}}` macro doesn't always help**: While some models may reign themselves in if you tell them to keep it under X words, LLMs don't have a soul and therefore can't count, so don't bet on it.
-- **You can use global macros**: If your summaries aren't using names properly, keep in mind that you can use the `{{char}}` or `{{user}}` macro in the prompt.
-- **No need to pause roleplay**: You don't have to include anything like "ignore previous instructions" or "pause your roleplay". The summary prompt is completely independent and will only send what you see in the edit window.
-- **I don't recommend reasoning**: Reasoning models can summarize fine, but they do tend to blab for ages which makes summarizing slow, so I wouldn't recommend them for that reason. If you do use one, make sure to use the `<think>` prefill.
-- **Custom Macros**: In the `Edit` window for your summary prompt, you can create custom macros to use in your prompt with STScript. In your command, you can reference the ID of the message being summarized with `{{id}}`.
-- **Save your presets**: If you are using a different completion preset or connection profile for summaries, make sure to save any changes to your regular completion preset or instruct template. When summarizing, the extension has to temporarily switch presets or connection profiles, which will discard any unsaved changes to the one you are currently using.
-
-
 ### Troubleshooting:
 
 - **"ForbiddenError: invalid csrf token":** You opened ST in multiple tabs.
@@ -133,6 +188,10 @@ Some default instruct templates also may not have anything defined for the "Syst
 
 If it's something else, please turn on "Debug Mode" in the settings and send me the output logs from your browser console and raise an issue or message on discord.
 
+### Contact
+You can raise an issue here, but I am more responsive on discord on the SillyTavern [Discord server](https://discord.gg/sillytavern) as Qvink (#qvink1). 
+
+There you will find [forum thread](https://discord.com/channels/1100685673633153084/1318109682329587722) dedicated to this extension (and others).
 
 ### Known Issues
 - When editing a message that already has a memory, the memory displayed below the message does not have the right color. This is just a visual bug, and it will correct itself after the next summarization.
@@ -193,3 +252,5 @@ If it's something else, please turn on "Debug Mode" in the settings and send me 
 - ~~Add the time delay before the initial summarization where appropriate~~
 - fix prefill compatability with chat completion (generate_raw doesn't allow adding separate messages in chat completion). Might need to hijack ST's prefill setting instead of adding it myself?
 - /qm-toggle-config returns null
+- Re-summarize on continue
+- Render markdown in summaries
