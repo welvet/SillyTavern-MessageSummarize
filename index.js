@@ -2954,28 +2954,19 @@ class SummaryPromptEditInterface {
     substitute_conditionals(text, macros) {
         // substitute any {{#if macro}} ... {{/if}} blocks in the text with the corresponding content if the macro is in the passed map
         // Does NOT replace the actual macros, that is done in substitute_macros()
+        // We use Handlebars.js to parse out the {{#if}} ... {{/if}} blocks
+        // ignoreStandalone=true: blocks and partials that are on their own line will not remove the whitespace on that line.
 
-        // TODO: should I trim those newlines since they are really only there for readability?
-        // Note this preserves newlines. Ex:
-        // {{#if macro}}
-        // text
-        // {{/if}}
-        // will result in:
-        //
-        // text
-        //
-
-        let parts = text.split(/(\{\{#if.*?\/if}})/gs);
-        let formatted = parts.map((part) => {
-            if (!part) return ""
-            if (!part.startsWith('{{#if')) return part  // not a conditional
-            part = part.trim()  // clean whitespace
-            let macro_name = part.match(/\{\{#if (.*?)}}/)[1]  // what macro is this for?
-            let macro_present = Boolean(macros[macro_name]?.trim())  // does this macro have a value?
-            let conditional_content = part.match(/\{\{#if.*?}}(.*?)\{\{\/if}}/s)[1] ?? ""  // content inside the #if block
-            return macro_present ? conditional_content : ""
-        })
-        return formatted.join('')
+        let template_data = {};
+        for (let name of Object.keys(macros)) {
+            template_data[name] = `{{${name}}}`  // replace any instance of the macro with itself
+        }
+        try {
+            return Handlebars.compile(text, {ignoreStandalone: true})(template_data)
+        } catch (e) {
+            error(`ERROR: ${e}`)
+            return text
+        }
     }
     system_prompt_split(text, macros) {
         // Given text with some number of {{macro}} items, split the text by these items and format the rest as system messages surrounding the macros

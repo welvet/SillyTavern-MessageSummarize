@@ -1,6 +1,6 @@
 # Changelog
 
-#### v1.0.3
+#### v1.0.5
 **IMPORTANT 1**: All slash commands, CSS variables, and macros have been renamed for consistency. You will need to update any QRs, custom CSS, or prompts that use these.
 
 **IMPORTANT 2**: Your current `{{history}}` macro may no longer work as it did before. You will need to reconfigure it in the new interface by clicking "Edit" under "Summarization"
