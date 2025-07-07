@@ -2478,7 +2478,7 @@ class SummaryPromptEditInterface {
     }
     create_macro_interface(macro) {
         // Create or update a macro interface item with the given settings
-        let id = `summary_macro_definition_${macro.name}`
+        let id = this.get_id(macro.name)
 
         // first check if it already exists
         let $macro = this.$definitions.find(`#${id}`)
@@ -2605,7 +2605,26 @@ class SummaryPromptEditInterface {
 
         // name
         $name.val(macro.name)
-        $name.on('change', () => this.set_macro_name(macro.name, $name.val()))
+        $name.on('change', () => {
+            let old_name = macro.name
+            let new_name = $name.val()
+            if (old_name === new_name) return  // no change
+
+            // can't change the name of a default or special macro
+            if (macro.default || macro.type === "special") {
+                $name.val(old_name)  // set the field to the old value
+                return
+            }
+
+            new_name = this.get_unique_name(new_name)  // ensure unique name
+            macro.name = new_name
+            this.macros[new_name] = macro
+            delete this.macros[old_name]
+
+            // change the ID of the card
+            $macro.attr('id', this.get_id(new_name))
+            $name.val(new_name)  // set the field
+        })
 
         // type
         $macro_type_radios.filter(`[value=${macro.type}]`).prop('checked', true)
@@ -2718,6 +2737,10 @@ class SummaryPromptEditInterface {
         }
         return name
     }
+    get_id(name) {
+        // get the HTML ID for the given macro name
+        return `summary_macro_definition_${name}`
+    }
     list_macros() {
         return Object.keys(this.macros)
     }
@@ -2733,21 +2756,6 @@ class SummaryPromptEditInterface {
         macro.name = this.get_unique_name(macro.name)  // ensure unique name from existing macros
         this.macros[macro.name] = macro
         this.create_macro_interface(macro)
-    }
-    set_macro_name(old_name, new_name) {
-        // change the name of a macro
-        if (old_name === new_name) return  // no change
-
-        let macro = this.get_macro(old_name)
-        if (!macro) return  // macro doesn't exist
-
-        // can't change the name of a default or special macro
-        if (macro.default || macro.type === "special") return
-
-        new_name = this.get_unique_name(new_name)  // ensure unique name
-        macro.name = new_name
-        this.macros[new_name] = macro
-        delete this.macros[old_name]
     }
     restore_macro_default(name) {
         // Restore the macro to default (does nothing for non-default macros).
@@ -2789,9 +2797,13 @@ class SummaryPromptEditInterface {
             // replace {{message}} with the text of the message
             command = command.replace(/\{\{message}}/g, text)
 
-            let result = await this.ctx.executeSlashCommandsWithOptions(command)
-            text = result?.pipe ?? ""
-
+            try {
+                let result = await this.ctx.executeSlashCommandsWithOptions(command)
+                text = result?.pipe ?? ""
+            } catch (e) {
+                error(e)
+                return ""
+            }
         }
 
         return text
