@@ -1,5 +1,12 @@
-import { getStringHash, debounce, copyText, trimToEndSentence, download, parseJsonFile, waitUntilCondition, stringToRange } from '../../../utils.js';
-import { getContext, getApiUrl, extension_settings } from '../../../extensions.js';
+import {
+    getStringHash,
+    debounce,
+    copyText,
+    trimToEndSentence,
+    download,
+    parseJsonFile,
+    stringToRange,
+} from '../../../utils.js';
 import {
     animation_duration,
     scrollChatToBottom,
@@ -15,7 +22,9 @@ import {
     CONNECT_API_MAP,
     main_api,
     chat_metadata,
+    messageFormatting
 } from '../../../../script.js';
+import { getContext, getApiUrl, extension_settings } from '../../../extensions.js';
 import { getPresetManager } from '../../../preset-manager.js'
 import { formatInstructModeChat } from '../../../instruct-mode.js';
 import { is_group_generating, selected_group, openGroupId } from '../../../group-chats.js';
@@ -1484,6 +1493,10 @@ function update_message_visuals(i, style=true, text=null) {
             text = `Error: ${error_message}`
         }
     }
+
+    // parse markdown
+    // text, ch_name, isSystem, isUser, messageId
+    text = messageFormatting(text, null, false, false, -1)
 
     // create the div element for the memory and add it to the message div
     let memory_div = $(`<div class="${summary_div_class} ${css_message_div}"><span class="${style_class}">${text}</span></div>`)

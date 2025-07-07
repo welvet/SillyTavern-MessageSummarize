@@ -65,7 +65,6 @@ By default, text is greyed to indicate that is it not injected.
 .qvink_memory_display {
     margin: 0 0 5px 0;
     font-size: small;
-    font-style: italic;
     color: var(--qm-default);
 }
 

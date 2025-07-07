@@ -253,4 +253,4 @@ There you will find [forum thread](https://discord.com/channels/1100685673633153
 - fix prefill compatability with chat completion (generate_raw doesn't allow adding separate messages in chat completion). Might need to hijack ST's prefill setting instead of adding it myself?
 - /qm-toggle-config returns null
 - Re-summarize on continue
-- Render markdown in summaries
+- ~~Render markdown in summaries~~
