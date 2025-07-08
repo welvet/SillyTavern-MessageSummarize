@@ -4121,8 +4121,9 @@ function initialize_slash_commands() {
         aliases: ['qvink-memory-debug'],
         helpString: 'Logs the ST core context and Qvink Memory extension settings to console.',
         callback: (args) => {
-            log(getContext())
-            log(extension_settings[MODULE_NAME])
+            log(getContext());
+            log(extension_settings[MODULE_NAME]);
+            return "";
         },
 
     }));
@@ -4132,9 +4133,10 @@ function initialize_slash_commands() {
         aliases: ['qvink-memory-hard-reset'],
         helpString: 'WARNING: Hard reset all settings for this extension. All config profiles will be deleted.',
         callback: (args) => {
-            hard_reset_settings()
-            refresh_settings()
-            refresh_memory()
+            hard_reset_settings();
+            refresh_settings();
+            refresh_memory();
+            return "";
         },
 
     }));
@@ -4144,7 +4146,7 @@ function initialize_slash_commands() {
         aliases: ['qvink-memory-enabled'],
         helpString: 'Return whether the extension is enabled in the current chat.',
         callback: (args) => {
-            return chat_enabled()
+            return String(chat_enabled());
         },
     }));
 
@@ -4154,12 +4156,13 @@ function initialize_slash_commands() {
         helpString: 'Change whether the extension is enabled for the current chat. If no state is provided, it will toggle the current state.',
         callback: (args, state) => {
             if (state === "") {  // if not provided the state is an empty string, but we need it to be null to get the default behavior
-                state = null
+                state = null;
             } else {
-                state = state === "true"  // convert to boolean
+                state = state === "true";  // convert to boolean
             }
 
             toggle_chat_enabled(state);  // toggle the memory for the current chat
+            return "";
         },
 
         unnamedArgumentList: [
@@ -4177,6 +4180,7 @@ function initialize_slash_commands() {
         helpString: "Toggle the \"display memories\" setting on the current profile (doesn't save the profile).",
         callback: (args) => {
             $(`.${settings_content_class} #display_memories`).click();  // toggle the memory display
+            return "";
         },
     }));
 
@@ -4186,6 +4190,7 @@ function initialize_slash_commands() {
         helpString: "Toggle the \"auto-summarize\" setting on the current profile (doesn't save the profile).",
         callback: (args) => {
             $(`.${settings_content_class} #auto_summarize`).click();  // toggle the memory display
+            return "";
         },
     }));
 
@@ -4194,7 +4199,8 @@ function initialize_slash_commands() {
         aliases: ['qvink-memory-toggle-config'],
         helpString: 'Toggle the extension config popout.',
         callback: (args) => {
-            toggle_popout()
+            toggle_popout();
+            return "";
         },
     }));
 
@@ -4203,7 +4209,8 @@ function initialize_slash_commands() {
         aliases: ['qvink-memory-toggle-edit-interface'],
         helpString: 'Toggle the memory editing interface.',
         callback: (args) => {
-            memoryEditInterface.show()
+            memoryEditInterface.show();
+            return "";
         },
     }));
 
@@ -4212,7 +4219,8 @@ function initialize_slash_commands() {
         aliases: ['qvink-memory-toggle-injection-preview'],
         helpString: 'Toggle a preview of the current memory injection.',
         callback: (args) => {
-            display_injection_preview()
+            display_injection_preview();
+            return "";
         },
     }));
 
@@ -4222,6 +4230,7 @@ function initialize_slash_commands() {
         callback: (args, index) => {
             if (index === "") index = null  // if not provided the index is an empty string, but we need it to be null to get the default behavior
             remember_message_toggle(index);
+            return "";
         },
         helpString: 'Toggle whether a memory should be long-term (default is the most recent message).',
         unnamedArgumentList: [
@@ -4240,6 +4249,7 @@ function initialize_slash_commands() {
         callback: (args, index) => {
             if (index === "") index = null  // if not provided the index is an empty string, but we need it to be null to get the default behavior
             forget_message_toggle(index);
+            return "";
         },
         unnamedArgumentList: [
             SlashCommandArgument.fromProps({
@@ -4263,7 +4273,7 @@ function initialize_slash_commands() {
                 range = stringToRange(value, 0, chat.length - 1);
                 if (!range) {
                     error(`Invalid range provided: "${value}"`);
-                    return '';
+                    return "";
                 }
             }
 
@@ -4296,20 +4306,21 @@ function initialize_slash_commands() {
         aliases: ['qvink-memory-set'],
         callback: async (args, value) => {
             let chat = getContext().chat
-            let values = value.split(' ')
-            let index = chat.length - 1
-            let text = ""
+            let values = value.split(' ');
+            let index = chat.length - 1;
+            let text = "";
             if (value !== "") {
-                index = Number(values[0])
-                text = values[1] ?? ""
+                index = Number(values[0]);
+                text = values[1] ?? "";
             }
             if (isNaN(index)) {
-                error(`Invalid index: "${values[0]}"`)
-                return
+                error(`Invalid index: "${values[0]}"`);
+                return "";
             }
             debug(`Setting memory for message ${index} to "${text}"`)
-            set_data(chat[index], "memory", text)
-            refresh_memory()
+            set_data(chat[index], "memory", text);
+            refresh_memory();
+            return "";
         },
         helpString: 'Set the memory for a given message index. If no text provided, deletes the memory.',
         unnamedArgumentList: [
@@ -4333,6 +4344,7 @@ function initialize_slash_commands() {
             if (index === "") index = null  // if not provided the index is an empty string, but we need it to be null to get the default behavior
             await summarize_messages(index);  // summarize the message
             refresh_memory();
+            return "";
         },
         helpString: 'Summarize the given message index (defaults to most recent applicable message).',
         unnamedArgumentList: [
@@ -4349,8 +4361,9 @@ function initialize_slash_commands() {
         aliases: ['qvink-memory-summarize-chat'],
         helpString: 'Summarize the chat using the auto-summarization criteria, even if auto-summarization is off.',
         callback: async (args, limit) => {
-            let indexes = collect_messages_to_auto_summarize()
+            let indexes = collect_messages_to_auto_summarize();
             await summarize_messages(indexes);
+            return ""
         },
     }));
 
@@ -4358,7 +4371,8 @@ function initialize_slash_commands() {
         name: 'qm-stop-summarization',
         aliases: ['qvink-memory-stop-summarization'],
         callback: (args) => {
-            stop_summarization()
+            stop_summarization();
+            return "";
         },
         helpString: 'Abort any summarization taking place.',
     }));
@@ -4367,8 +4381,7 @@ function initialize_slash_commands() {
         name: 'qm-max-summary-tokens',
         aliases: ['qvink-memory-max-summary-tokens'],
         callback: async (args) => {
-            // command has to return string
-            return String(await get_summary_preset_max_tokens())
+            return String(await get_summary_preset_max_tokens());
         },
         helpString: 'Return the max tokens allowed for summarization given the current completion preset.'
     }));
