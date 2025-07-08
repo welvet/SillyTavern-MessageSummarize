@@ -10,6 +10,7 @@
 - **New Feature**: New setting next to `Summarization Time Delay` called `Skip First` determines whether the first summary right after a character message will be delayed or not when auto-summarizing (default false). Turning this on will be the same as the old behavior.
 - **New Feature**: Now supports i18n translations. First translation into Traditional Chinese provided by Rivelle <3
 - **New Feature**: Summaries displayed below messages now parse markdown
+- **New Feature**: Option to re-summarize on continue
 - **New Slash Command**: `/qm-max-summary-tokens` returns the max tokens allowed for summarization given the current completion preset.
 - **New Slash Command**: `/qm-set` allows you to set the memory for a message.
 - **New Slash Command**: `/qm-toggle-auto-summarize` toggles whether auto-summarize is enabled. Does not save the profile.

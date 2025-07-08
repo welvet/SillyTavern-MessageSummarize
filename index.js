@@ -123,6 +123,7 @@ const default_settings = {
     auto_summarize_message_limit: 10,  // maximum number of messages to go back for auto-summarization.
     auto_summarize_on_edit: false,  // whether to automatically re-summarize edited chat messages
     auto_summarize_on_swipe: true,  // whether to automatically summarize new message swipes
+    auto_summarize_on_continue: false, // whether automatically re-summarize after a continue
     auto_summarize_progress: true,  // display a progress bar for auto-summarization
     auto_summarize_on_send: false,  // trigger auto-summarization right before a new message is sent
     block_chat: true,  // block input when summarizing
@@ -3786,6 +3787,7 @@ async function auto_summarize_chat(skip_initial_delay=true) {
 
 // Event handling
 var last_message_swiped = null  // if an index, that was the last message swiped
+var last_message = null // if an index, that was the last message sent
 async function on_chat_event(event=null, data=null) {
     // When the chat is updated, check if the summarization should be triggered
     debug("Chat updated: " + event + " " + data)
@@ -3845,15 +3847,23 @@ async function on_chat_event(event=null, data=null) {
                 debug("re-summarizing on swipe")
                 await summarize_messages(index);  // summarize the swiped message
                 refresh_memory()
-                break;
-            } else { // not a swipe
-                last_message_swiped = null;
+            } else if (last_message === index) {  // not a swipe, but the same index as last message - must be a continue
+                last_message_swiped = null
+                let message = context.chat[index];
+                if (!get_settings("auto_summarize_on_continue")) break;  // if auto_summarize_on_continue is disabled, no nothing
+                if (!get_memory(message, 'memory')) break;  // if the message doesn't have a memory, skip.
+                debug("re-summarizing on continue")
+                await summarize_messages(index);  // summarize the swiped message
+                refresh_memory()
+            } else { // not a swipe or continue
+                last_message_swiped = null
                 if (!get_settings('auto_summarize')) break;  // if auto-summarize is disabled, do nothing
                 if (get_settings("auto_summarize_on_send")) break;  // if auto_summarize_on_send is enabled, don't auto-summarize on character message
                 debug("New message detected, summarizing")
                 await auto_summarize_chat(get_settings('summarization_time_delay_skip_first'));  // auto-summarize the chat, skipping first delay if needed
-                break;
             }
+            last_message = index;
+            break;
 
         case 'message_edited':  // Message has been edited
             last_message_swiped = null;
@@ -3870,6 +3880,7 @@ async function on_chat_event(event=null, data=null) {
             break;
 
         case 'message_swiped':  // when this event occurs, don't summarize yet (a new_message event will follow)
+            last_message_swiped = index;
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
             debug("Message swiped, reloading memory")
 
@@ -3882,7 +3893,6 @@ async function on_chat_event(event=null, data=null) {
             }
 
             refresh_memory()
-            last_message_swiped = index;
 
             // make sure the chat is scrolled to the bottom because the memory will change
             scrollChatToBottom();
@@ -3953,6 +3963,7 @@ function initialize_settings_listeners() {
     bind_setting('#auto_summarize', 'auto_summarize', 'boolean');
     bind_setting('#auto_summarize_on_edit', 'auto_summarize_on_edit', 'boolean');
     bind_setting('#auto_summarize_on_swipe', 'auto_summarize_on_swipe', 'boolean');
+    bind_setting('#auto_summarize_on_continue', 'auto_summarize_on_continue', 'boolean');
     bind_setting('#auto_summarize_batch_size', 'auto_summarize_batch_size', 'number');
     bind_setting('#auto_summarize_message_limit', 'auto_summarize_message_limit', 'number');
     bind_setting('#auto_summarize_progress', 'auto_summarize_progress', 'boolean');
