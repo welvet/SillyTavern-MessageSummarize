@@ -263,6 +263,7 @@ function clean_string_for_title(text) {
             case ">": return "&gt;";
         }
     })
+    // return $('<div/>').text(text).html();
 }
 function escape_string(text) {
     // escape control characters in the text
@@ -1095,6 +1096,7 @@ function refresh_select2_element(element, selected, options, placeholder="", cal
 
     // add the options to the dropdown
     for (let {id, name} of options) {
+        name = clean_string_for_title(name)
         let option = $(`<option value="${id}">${name}</option>`)
         $select.append(option);
     }
@@ -2680,12 +2682,15 @@ class SummaryPromptEditInterface {
         })
 
         // update the regex Select2 (gotta add an ID to the template too)
-        let regex_select_id = `macro_regex_select_${macro.name}`
         let options = []
-        for (let script of getRegexScripts()) {
-            options.push({id: script.scriptName, name: script.scriptName})
+        let selected = []
+        let regex_scripts = getRegexScripts()
+        for (let i in regex_scripts) {
+            let name = regex_scripts[i].scriptName
+            options.push({id: i, name: name})
+            if (macro.regex_scripts.includes(name)) selected.push(i)
         }
-        refresh_select2_element($regex_select, macro.regex_scripts, options, t`Select regex scripts`, (values) => {
+        refresh_select2_element($regex_select, selected, options, t`Select regex scripts`, (values) => {
             macro.regex_scripts = values
         })
 
