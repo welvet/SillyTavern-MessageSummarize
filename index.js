@@ -27,7 +27,7 @@ import {
 } from '../../../../script.js';
 import { getContext, getApiUrl, extension_settings } from '../../../extensions.js';
 import { getPresetManager } from '../../../preset-manager.js'
-import { formatInstructModeChat } from '../../../instruct-mode.js';
+import { formatInstructModeChat, formatInstructModePrompt } from '../../../instruct-mode.js';
 import { is_group_generating, selected_group, openGroupId } from '../../../group-chats.js';
 import { loadMovingUIState, renderStoryString, power_user } from '../../../power-user.js';
 import { dragElement } from '../../../RossAscends-mods.js';
@@ -2849,7 +2849,7 @@ class SummaryPromptEditInterface {
         let index = this.ctx.chat.length-1
         let text = this.$prompt.val()
         let messages = await this.create_summary_prompt(index, text)
-        let prompt = createRawPrompt(messages, this.api, false, false, '')  // build prompt
+        let prompt = createRawPrompt(messages, this.api, false, false, '', this.get_prefill())  // build prompt
         if (typeof prompt === 'string') {
             prompt = clean_string_for_html(prompt)
         } else {  // array
@@ -2862,8 +2862,14 @@ class SummaryPromptEditInterface {
         let messages = await this.compute_macro(this.ctx.chat.length-1, macro.name, true)
         let result;
         if (macro.instruct_template) {
-            result = createRawPrompt(messages, this.api, false, false, '')  // build prompt with instruct template
+            result = createRawPrompt(messages, this.api, false, false, '', '')  // build prompt with instruct template
             if (typeof result === 'string') {
+                // remove the end line (which for TC include the assistant start sequence)
+                let end_line = formatInstructModePrompt(this.ctx.name2, false, '', this.ctx.name1, this.ctx.name2, true, false)
+                if (result.slice(result.length-end_line.length, result.length) === end_line) {  // end line present
+                    result = result.slice(0, result.length-end_line.length)
+                }
+
                 result = clean_string_for_html(result)  // if string, clean it
             } else {  // list of message objects
                 result = result.map(m => {  // need to clean text before we stringify because of the &emsp;
@@ -2873,7 +2879,7 @@ class SummaryPromptEditInterface {
                 result = JSON.stringify(result, null, "&emsp;")
             }
         } else {
-            result = createRawPrompt(messages, this.api, true, false, '')  // build prompt ignoring instruct
+            result = createRawPrompt(messages, this.api, true, false, '', '')  // build prompt ignoring instruct
             result = result?.[0]?.content ?? result
             result = clean_string_for_html(result)
         }
@@ -3034,9 +3040,6 @@ class SummaryPromptEditInterface {
         for (let message of messages) {
             message.content = this.ctx.substituteParamsExtended(message.content)
         }
-
-        let prefill = this.get_prefill()
-        if (prefill) messages.push({role: "assistant", content: prefill})
         return messages
     }
     async compute_used_macros(index, text) {
@@ -3711,8 +3714,8 @@ async function summarize_text(messages) {
         error(`Text (${token_size}) exceeds context size (${context_size}).`);
     }
 
-    // prompt, api, instructOverride, systemMode, systemPrompt, responseLength, trimNames
-    let result = await generateRaw(messages, '', false, false, '', null, false);
+    // prompt, api, instructOverride, systemMode, systemPrompt, responseLength, trimNames, prefill
+    let result = await generateRaw(messages, '', false, false, '', null, false, get_settings('prefill'));
 
     // trim incomplete sentences if set in ST settings
     if (ctx.powerUserSettings.trim_sentences) {
