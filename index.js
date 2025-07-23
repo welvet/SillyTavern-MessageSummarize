@@ -3715,7 +3715,11 @@ async function summarize_text(messages) {
     }
 
     // prompt, api, instructOverride, systemMode, systemPrompt, responseLength, trimNames, prefill
-    let result = await generateRaw(messages, '', false, false, '', null, false, get_settings('prefill'));
+    let result = await generateRaw({
+        prompt: messages,
+        trimNames: false,
+        prefill: get_settings('prefill')
+    });
 
     // trim incomplete sentences if set in ST settings
     if (ctx.powerUserSettings.trim_sentences) {
