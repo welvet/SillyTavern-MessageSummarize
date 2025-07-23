@@ -180,7 +180,9 @@ Some default instruct templates also may not have anything defined for the "Syst
 
 - **When I use a different completion preset for summaries, my regular completion preset get changed after summarizing:** When a summary is generated, we actually have to switch completion presets temporarily which discards any unsaved changes you might have made to your current completion preset. This is just how ST does things. The same applies to connection profiles (which in turn affects instruction templates.)
 
-- **Reasoning model thinking is included in summary**: Some reasoning models need to be prefilled with `<think>`, so make sure to add that in the "Prefill" field of the extension config (**not** the normal "start reply with" field in the Advanced Formatting tab).
+- **Reasoning model won't do any reasoning**: Some reasoning models need to be prefilled, so make sure to add that in the `Prefill` field of the extension config (**not** the normal "start reply with" field in the Advanced Formatting tab).
+
+- **Reasoning model thinking is included in summary**: In the `Advanced Formatting` tab, make sure to fill in the thinking tags (e.g. `<think>` and `</think>`). This will let the extension identify the thinking section in memories and parse them separately.
 
 - **An unknown error occurred while counting tokens**: This might indicate an issue with your custom chat-completion preset. ST expects there to be a prompt section called "main", which is where extension injections go by default. To fix this, you can go to this extension's config menu and click "Do not inject" in both the short-term and long-term injection sections. This will prevent the extension from attempting to insert context, and you can instead use the `{{short_term_memory}}` and `{{long_term_memory}}` macros to place them anywhere you want.
 
