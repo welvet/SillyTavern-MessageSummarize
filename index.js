@@ -15,6 +15,7 @@ import {
     is_send_press,
     saveSettingsDebounced,
     generateRaw,
+    createRawPrompt,
     getMaxContextSize,
     streamingProcessor,
     amount_gen,
@@ -26,7 +27,7 @@ import {
 } from '../../../../script.js';
 import { getContext, getApiUrl, extension_settings } from '../../../extensions.js';
 import { getPresetManager } from '../../../preset-manager.js'
-import { formatInstructModeChat } from '../../../instruct-mode.js';
+import { formatInstructModeChat, formatInstructModePrompt } from '../../../instruct-mode.js';
 import { is_group_generating, selected_group, openGroupId } from '../../../group-chats.js';
 import { loadMovingUIState, renderStoryString, power_user } from '../../../power-user.js';
 import { dragElement } from '../../../RossAscends-mods.js';
@@ -110,6 +111,7 @@ const default_settings = {
     // summarization settings
     prompt: default_prompt,
     summary_prompt_macros: default_summary_macros,  // macros for the summary prompt interface
+    prompt_role: extension_prompt_roles.SYSTEM,
     prefill: "",   // summary prompt prefill
     show_prefill: false, // whether to show the prefill when memories are displayed
     completion_preset: "",  // completion preset to use for summarization. Empty ("") indicates the same as currently selected.
@@ -252,7 +254,7 @@ function get_extension_directory() {
     let index_path = new URL(import.meta.url).pathname
     return index_path.substring(0, index_path.lastIndexOf('/'))  // remove the /index.js from the path
 }
-function clean_string_for_title(text) {
+function clean_string_for_html(text) {
     // clean a given string for use in a div title.
     return text.replace(/["&'<>]/g, function(match) {
         switch (match) {
@@ -1096,7 +1098,7 @@ function refresh_select2_element(element, selected, options, placeholder="", cal
 
     // add the options to the dropdown
     for (let {id, name} of options) {
-        name = clean_string_for_title(name)
+        name = clean_string_for_html(name)
         let option = $(`<option value="${id}">${name}</option>`)
         $select.append(option);
     }
@@ -1490,7 +1492,7 @@ function update_message_visuals(i, style=true, text=null) {
     if (!text) {
         text = ""  // default text when no memory
         if (memory) {
-            text = clean_string_for_title(`Memory: ${memory}`)
+            text = clean_string_for_html(`Memory: ${memory}`)
         } else if (error_message) {
             style_class = ''  // clear the style class if there's an error
             text = `Error: ${error_message}`
@@ -1504,7 +1506,7 @@ function update_message_visuals(i, style=true, text=null) {
     // create the div element for the memory and add it to the message div
     let memory_div = $(`<div class="${summary_div_class} ${css_message_div}"><span class="${style_class}">${text}</span></div>`)
     if (reasoning) {
-        reasoning = clean_string_for_title(reasoning)
+        reasoning = clean_string_for_html(reasoning)
         memory_div.prepend($(`<span class="${summary_reasoning_class}" title="${reasoning}">[${t`Reasoning`}] </span>`))
     }
     message_element.after(memory_div);
@@ -2305,17 +2307,26 @@ class SummaryPromptEditInterface {
             <i class="fa-solid fa-info-circle" style="margin-right: 1em" title="Customize the prompt used for summarizing messages."></i>
             <button id="preview_summary_prompt" class="menu_button fa-solid fa-eye margin0" title="Preview current summary prompt (the exact text that will be sent to the model)"></button>
             <button id="restore_default_prompt" class="menu_button fa-solid fa-recycle margin0 red_button" title="Restore the default prompt"></button>
+
+            <label class="flex-container alignItemsCenter" title="Role used for the summary prompt" style="margin-left: auto;">
+                <span>Role: </span>
+                <select id="prompt_role" class="text_pole inline_setting">
+                    <option value="0">System</option>
+                    <option value="1">User</option>
+                    <option value="2">Assistant</option>
+                </select>
+            </label>
         </div>
     </div>
     <div class="flex1" style="height: 100%">
         <div class="flex-container justifyspacebetween alignitemscenter">
-            <h3 class="flex2">Available Macros <i class="fa-solid fa-info-circle" title="Dynamic macros only available for the summary prompt."></i></h3>
+            <h3 class="flex2">Macros <i class="fa-solid fa-info-circle" title="Dynamic macros only available for the summary prompt."></i></h3>
             <button id="add_macro" class="flex1 menu_button" title="Add a new macro">New</button>
         </div>
     </div>
 </div>
 
-<div class="flex-container justifyspacebetween" style="height: calc(100% - 45px);">
+<div class="flex-container justifyspacebetween" style="height: calc(100% - 120px);">
     <div class="flex2">
         <textarea id="prompt" class="" style="height: 100%; overflow-y: auto"></textarea>
     </div>
@@ -2323,6 +2334,19 @@ class SummaryPromptEditInterface {
         <div id="macro_definitions" style="height: 100%; overflow-y: auto"></div>
     </div>
 </div>
+
+<div class="flex-container justifyspacebetween alignitemscenter">
+    <label title="Start the summarization with this prefilled text." class="checkbox_label">
+        <span>Prefill</span>
+        <input id="prefill" class="text_pole" type="text" placeholder="Start reply with...">
+    </label>
+
+    <label title="Include the prefill in displayed memories and injections (no effect with reasoning models)" class="checkbox_label">
+        <input id="show_prefill" type="checkbox" />
+        <span>Include in Memories</span>
+    </label>
+</div>
+
 </div>
 `
     // remember to set the name of the radio group for each separate instance
@@ -2400,9 +2424,9 @@ class SummaryPromptEditInterface {
         </div>
 
         <div class="macro_type_any flex-container alignitemscenter">
-            <label title="The result of this macro will be wrapped in your instruct template. Recommended for messages." class="checkbox_label">
+            <label title="[Text Completion]: The result of this macro will be wrapped in your instruct template. [Chat Completion]: The result of this macro will be added as a separate message." class="checkbox_label">
                 <input class="macro_instruct_template" type="checkbox">
-                <span>Instruct Template</span>
+                <span>Separate Block</span>
             </label>
 
             <button class="macro_delete menu_button red_button fa-solid fa-trash" title="Delete custom macro" style="margin-left: auto;"></button>
@@ -2439,15 +2463,21 @@ class SummaryPromptEditInterface {
     constructor() {
         this.from_settings()
     }
-    init() {
+    async init() {
         this.popup = new this.ctx.Popup(this.html_template, this.ctx.POPUP_TYPE.TEXT, undefined, {wider: true, okButton: 'Save', cancelButton: 'Cancel'});
         this.$content = $(this.popup.content)
         this.$buttons = this.$content.find('.popup-controls')
-        this.$prompt = this.$content.find('#prompt')
         this.$preview = this.$content.find('#preview_summary_prompt')
         this.$restore = this.$content.find('#restore_default_prompt')
         this.$definitions = this.$content.find('#macro_definitions')
         this.$add_macro = this.$content.find('#add_macro')
+
+        // settings
+        this.$prompt = this.$content.find('#prompt')
+        this.$prompt_role = this.$content.find('#prompt_role')
+        this.$prefill = this.$content.find('#prefill')
+        this.$show_prefill = this.$content.find('#show_prefill')
+
 
         // manually set a larger width
         this.$content.closest('dialog').css('min-width', '80%')
@@ -2463,6 +2493,9 @@ class SummaryPromptEditInterface {
 
         // set the prompt text and the macro settings
         this.from_settings()
+
+        let summary_profile = await get_summary_connection_profile()
+        this.api = await get_connection_profile_api(summary_profile)
 
         // translate
         add_i18n(this.$content)
@@ -2582,10 +2615,7 @@ class SummaryPromptEditInterface {
         show_settings_div()
 
         // preview
-        $preview.on('click', async () => {
-            let result = await this.compute_macro(this.ctx.chat.length-1, macro.name, true)
-            await display_text_modal(t`Macro Preview:`+` {{${macro.name}}}`, result)
-        })
+        $preview.on('click', async () => await this.preview_macro(macro))
 
         // enable
         set_enabled()
@@ -2710,16 +2740,17 @@ class SummaryPromptEditInterface {
     async special_macro_message(index) {
         let macro = this.get_macro("message")
         let message = this.ctx.chat[index]
+        let role = message.is_user ? 'user' : message.is_system ? 'system' : 'assistant'
 
         // apply script and regex
         let text = await this.evaluate_script(macro, index)
 
-        // apply template
-        if (macro.instruct_template) {
-            text = formatInstructModeChat(message.name, text, message.is_user, false, "", this.ctx.name1, this.ctx.name2, null)
+        if (macro.instruct_template) {  // apply template
+            return [{role: role, name: message.name, content: text}]
+        } else {
+            return [{content: text}]
         }
 
-        return text
     }
 
     // utilities
@@ -2730,6 +2761,9 @@ class SummaryPromptEditInterface {
     from_settings() {
         // set the interface from settings
         this.$prompt?.val(get_settings('prompt'))
+        this.$prompt_role?.val(get_settings('prompt_role'))
+        this.$prefill?.val(get_settings('prefill'))
+        this.$show_prefill?.prop('checked', get_settings('show_prefill', true))
         this.macros = get_settings('summary_prompt_macros', true)
 
         // for each macro, ensure default settings if not specified
@@ -2740,7 +2774,30 @@ class SummaryPromptEditInterface {
     save_settings() {
         // save settings in the interface
         set_settings('prompt', this.$prompt.val())  // save the prompt
+        set_settings('prompt_role', Number(this.$prompt_role.val()))
+        set_settings('prefill', this.$prefill.val())
+        set_settings('show_prefill', this.$show_prefill.is(':checked'))
         set_settings('summary_prompt_macros', this.macros, true)
+    }
+    get_prompt_role(name=false) {
+        let role = this.is_open() ? Number(this.$prompt_role.val()) : get_settings('prompt_role')
+        if (name) {
+            switch (role) {
+                case extension_prompt_roles.USER:
+                    role = 'user'
+                    break
+                case extension_prompt_roles.ASSISTANT:
+                    role = 'assistant'
+                    break
+                default:
+                    role = 'system'
+                    break
+            }
+        }
+        return role
+    }
+    get_prefill() {
+        return this.is_open() ? this.$prefill.val() : get_settings('prefill')
     }
     get_unique_name(name) {
         // if the given name isn't unique, make it unique
@@ -2787,15 +2844,51 @@ class SummaryPromptEditInterface {
         this.update_macros(macro)
     }
 
-
-    // creating the prompt
     async preview_prompt() {
         // show the summary prompt preview popup using the current interface settings
         let index = this.ctx.chat.length-1
-        let prompt = this.$prompt.val()
-        let text = await this.create_summary_prompt(index, prompt)
-        await display_text_modal(t`Summary Prompt Preview (Last Message)`, text);
+        let text = this.$prompt.val()
+        let messages = await this.create_summary_prompt(index, text)
+        let prompt = createRawPrompt(messages, this.api, false, false, '', this.get_prefill())  // build prompt
+        if (typeof prompt === 'string') {
+            prompt = clean_string_for_html(prompt)
+        } else {  // array
+            prompt = JSON.stringify(prompt, null, "&emsp;")
+        }
+        await display_text_modal(t`Summary Prompt Preview (Last Message)`, prompt);
     }
+    async preview_macro(macro) {
+        // show the result of the given macro
+        let messages = await this.compute_macro(this.ctx.chat.length-1, macro.name, true)
+        let result;
+        if (macro.instruct_template) {
+            result = createRawPrompt(messages, this.api, false, false, '', '')  // build prompt with instruct template
+            if (typeof result === 'string') {
+                // remove the end line (which for TC include the assistant start sequence)
+                let end_line = formatInstructModePrompt(this.ctx.name2, false, '', this.ctx.name1, this.ctx.name2, true, false)
+                if (result.slice(result.length-end_line.length, result.length) === end_line) {  // end line present
+                    result = result.slice(0, result.length-end_line.length)
+                }
+
+                result = clean_string_for_html(result)  // if string, clean it
+            } else {  // list of message objects
+                result = result.map(m => {  // need to clean text before we stringify because of the &emsp;
+                    m.content = clean_string_for_html(m.content)
+                    return m
+                })
+                result = JSON.stringify(result, null, "&emsp;")
+            }
+        } else {
+            result = createRawPrompt(messages, this.api, true, false, '', '')  // build prompt ignoring instruct
+            result = result?.[0]?.content ?? result
+            result = clean_string_for_html(result)
+        }
+
+        await display_text_modal(t`Macro Preview:`+` {{${macro.name}}}`, result)
+    }
+
+
+    // creating the prompt
     async evaluate_script(macro, id, text=null) {
         // Evaluate any regex and scripts on the macro for the given message index
         if (text === null) {
@@ -2829,9 +2922,12 @@ class SummaryPromptEditInterface {
     }
     async compute_macro(index, name, ignore_enabled=false) {
         // get the result from the given custom macro for the given message index
+        // Returns a list of message objects, i.e.: [{role: '', content: ''}, ...]
         let macro = this.get_macro(name)
         if (!macro) return  // macro doesn't exist
         if (!macro.enabled && !ignore_enabled) return
+
+        console.log("COMPUTING: ", name)
 
         // special macro?
         if (name === "message") {
@@ -2843,15 +2939,18 @@ class SummaryPromptEditInterface {
         } else if (macro.type === "custom") {  // STScript
             let text = await this.evaluate_script(macro, index, "")
             if (text && macro.instruct_template) {
-                text = formatInstructModeChat("", text, false, true, "", this.ctx.name1, this.ctx.name2, null)
+                return [{role: this.get_prompt_role(true), content: text}]
+            } else {
+                return [{content: text}]
             }
-            return text
+
         } else {
             error(`Unknown summary prompt macro type: "${macro.type}"`)
         }
     }
     async compute_range_macro(index, macro) {
         // Get a history of messages from index-end to index-start
+        // Returns a list of message objects
         let chat = this.ctx.chat
         let history = []
 
@@ -2881,13 +2980,14 @@ class SummaryPromptEditInterface {
             if (include_message) {
                 // apply script and regex
                 let text = await this.evaluate_script(macro, i)
+                let role = m.is_user ? 'user' : m.is_system ? 'system' : 'assistant'
 
                 // apply template
                 if (macro.instruct_template) {
-                    text = formatInstructModeChat(m.name, text, m.is_user, false, "", this.ctx.name1, this.ctx.name2, null)
+                    history.push({role: role, name: m.name, content: text})
+                } else {
+                    history.push(text)
                 }
-
-                history.push(text)
             }
 
             if (include_summary) {
@@ -2898,15 +2998,20 @@ class SummaryPromptEditInterface {
                 if (include_summary && memory) {  // if there is a memory to include
                     memory = `Summary: ${memory}`
                     if (macro.instruct_template) {
-                        memory = formatInstructModeChat("", memory, false, false, "", "", "", null)
+                        history.push({role: 'system', content: memory})
+                    } else {
+                        history.push(memory)
                     }
-                    history.push(memory)
                 }
             }
         }
 
         // join with newlines
-        return history.join('\n')
+        if (macro.instruct_template) {
+            return history
+        } else {
+            return [{content: history.join('\n')}]
+        }
     }
 
     async create_summary_prompt(index, prompt=null) {
@@ -2928,26 +3033,14 @@ class SummaryPromptEditInterface {
         //   because the conditional content may contain regular text that should be included in the system prompt.
         prompt = this.substitute_conditionals(prompt, macros)
 
-        // now split the prompt into separate system prompts where needed
-        prompt = this.system_prompt_split(prompt, macros)
+        // now split the prompt into messages and substitute macros
+        let messages = this.evaluate_prompt(prompt, macros)
 
         // substitute any global macros like {{persona}}, {{char}}, etc...
-        prompt = this.ctx.substituteParamsExtended(prompt)
-
-        // substitute all defined macros (unrecognized macros will be replaced by an empty string)
-        prompt = this.substitute_macros(prompt, macros);
-
-        // TODO when we get support for chat completion prefill, this next bit should be text completion only
-
-        // If using instructOverride, append the assistant starting message template to the text, replacing the name with "assistant" if needed
-        let output_sequence = this.ctx.substituteParamsExtended(power_user.instruct.output_sequence, {name: "assistant"});
-        if (output_sequence) output_sequence += "\n"  // newline after output sequence if present
-        prompt = `${prompt}\n${output_sequence}`
-
-        // finally, append the prefill
-        prompt = `${prompt}${get_settings('prefill')}`
-
-        return prompt
+        for (let message of messages) {
+            message.content = this.ctx.substituteParamsExtended(message.content)
+        }
+        return messages
     }
     async compute_used_macros(index, text) {
         // return a mapping of the macros used in this text and their return value
@@ -2987,27 +3080,33 @@ class SummaryPromptEditInterface {
             return text
         }
     }
-    system_prompt_split(text, macros) {
-        // Given text with some number of {{macro}} items, split the text by these items and format the rest as system messages surrounding the macros
+    evaluate_prompt(text, macros) {
+        // Convert the prompt into chat-style messages, i.e. [{role: '', content: ''}, ...]
+        // Any {{macro}} items present will become a separate message if they need to be wrapped in an instruct template.
         // It is assumed that the macros will be later replaced with appropriate text
 
-        // split on either {{...}} or {{#if ... /if}}.
+        // split on {{...}}
         // /g flag is for global, /s flag makes . match newlines so the {{#if ... /if}} can span multiple lines
         // You need the capturing groups for the matches to be included in the parts.
         // However this results in some parts being undefined for some reason, I think because only one capturing group is used for each match
-        let parts = text.split(/(\{\{#if.*?\/if}})|(\{\{.*?}})/gs);
-
-        // macros that have an instruct template will cause the regular text around it to get wrapped in the system sequence.
-        // Therefore, macros that don't have an instruct template should be merged with the surrounding text.
-        let adjusted = []
+        let parts = text.split(/(\{\{.*?}})/g);
+        let messages = []
         let merge_next = false
 
-        function add(p, merge=false) {
-            // add a part to the adjusted list
-            if (merge && adjusted.length > 0) {
-                adjusted[adjusted.length-1] += p
-            } else {
-                adjusted.push(p)
+        let add = (content) => {
+            // add content to the message list
+            for (let message of content) {
+                if (message.role) {  // if a role is present, don't merge it.
+                    messages.push(message)
+                    merge_next = false  // don't merge the next one
+                } else {  // no role - merge with last message if possible
+                    if (merge_next && messages.length > 0) {
+                        messages[messages.length - 1].content += message.content
+                    } else {  // can't merge or first item
+                        messages.push({role: this.get_prompt_role(true), content: message.content})  // use default role
+                    }
+                    merge_next = true  // can merge next one with this
+                }
             }
         }
 
@@ -3016,55 +3115,14 @@ class SummaryPromptEditInterface {
             if (!part) continue  // some parts are undefined
             if (part.startsWith('{{') && part.endsWith('}}')) {  // this is a macro
                 let macro_name = part.slice(2, -2)  // get the macro name
-                let macro = this.get_macro(macro_name)  // get the macro info
-
-                // don't merge if the macro has a value and was wrapped (if there was no value, it wouldn't have been wrapped)
-                if (macro?.instruct_template && macros[macro_name]) {
-                    add(parts[i], false)  // don't merge
-                    merge_next = false  // don't merge the next part
-                } else {  // doesn't exist or no template, merge according to the previous item
-                    add(parts[i], merge_next)
-                    merge_next = true  // next part can merge
-                }
+                let value = macros[macro_name]
+                add(value)  // don't merge
             } else {  // not a macro - merge according to the previous item
-                add(parts[i], merge_next)
-                merge_next = true  // next part can merge
+                add([{content: parts[i]}])
             }
         }
-
-        // Now all macros that are left will split the system template.
-        // Wrap all non-macro text in system templates.
-        let formatted = adjusted.map((part) => {
-            if (!part) return ""  // some parts are undefined?
-            let check_part = part?.trim()
-            if (check_part.startsWith('{{') && check_part.endsWith('}}')) {
-                return part  // don't format macros
-            }
-            return formatInstructModeChat("", part, false, true, "", "", "", null)
-        })
-
-        return formatted.join('')
+        return messages
     }
-    substitute_macros(text, macros) {
-        // Go through each macro as they occur.
-        // For each macro, check if it will be wrapped in an instruct template. If so, we need to end the system
-        //   template before the macro, and continue it after UNLESS it is the first or last text in the prompt
-        // Does NOT take into account {{#if macro}} ... {{/if}} blocks, that is done in substitute_conditionals()
-        // If the macro is not found in the macros object, it is replaced with an empty string
-
-        let parts = text.split(/(\{\{.*?}})/g);
-        let formatted = parts.map((part) => {
-            if (!part) return ""
-            if (!part.startsWith('{{') || !part.endsWith('}}')) return part
-            part = part.trim()  // clean whitespace
-            let macro_name = part.slice(2, -2)
-            return macros[macro_name] ?? ""
-        })
-        return formatted.join('')
-    }
-
-
-
 }
 
 
@@ -3645,37 +3703,23 @@ async function summarize_message(index) {
         scrollChatToBottom()
     }
 }
-async function summarize_text(prompt) {
+async function summarize_text(messages) {
+    let ctx = getContext()
+
     // get size of text
-    let token_size = count_tokens(prompt);
+    let token_size = messages.reduce((acc, p) => acc + count_tokens(p.content), 0);
 
     let context_size = get_context_size();
     if (token_size > context_size) {
-        error(`Text ${token_size} exceeds context size ${context_size}.`);
+        error(`Text (${token_size}) exceeds context size (${context_size}).`);
     }
 
-    let ctx = getContext()
-
-    // At least one openai-style API required at least two messages to be sent.
-    // We can do this by adding a system prompt, which will get added as another message in generateRaw().
-    // A hack obviously. Is this a standard requirement for openai-style chat completion?
-    // TODO update with a more robust method
-    let system_prompt = false
-    if (main_api === 'openai') {
-        system_prompt = "Complete the requested task."
-    }
-
-    /**
-     * Generates a message using the provided prompt.
-     * @param {string} prompt Prompt to generate a message from
-     * @param {string} api API to use. Main API is used if not specified.
-     * @param {boolean} instructOverride true to override instruct mode, false to use the default value
-     * @param {boolean} quietToLoud true to generate a message in system mode, false to generate a message in character mode
-     * @param {string} [systemPrompt] System prompt to use. Only Instruct mode or OpenAI.
-     * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
-     * @returns {Promise<string>} Generated message
-     */
-    let result = await generateRaw(prompt, '', true, false, system_prompt, null, false);
+    // prompt, api, instructOverride, systemMode, systemPrompt, responseLength, trimNames, prefill
+    let result = await generateRaw({
+        prompt: messages,
+        trimNames: false,
+        prefill: get_settings('prefill')
+    });
 
     // trim incomplete sentences if set in ST settings
     if (ctx.powerUserSettings.trim_sentences) {
@@ -3976,8 +4020,6 @@ function initialize_settings_listeners() {
     bind_setting('#summarization_delay', 'summarization_delay', 'number');
     bind_setting('#summarization_time_delay', 'summarization_time_delay', 'number')
     bind_setting('#summarization_time_delay_skip_first', 'summarization_time_delay_skip_first', 'boolean')
-    bind_setting('#prefill', 'prefill', 'text')
-    bind_setting('#show_prefill', 'show_prefill', 'boolean')
 
     bind_setting('#include_user_messages', 'include_user_messages', 'boolean');
     bind_setting('#include_system_messages', 'include_system_messages', 'boolean');
