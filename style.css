@@ -1,9 +1,11 @@
 :root {
-    --qvink_short: #2E8B57;
-    --qvink_long: #4682B4;
-    --qvink_old: #8B0000;
-    --qvink_excluded: #555;
-    --qvink_redundant_opacity: 50%;
+    --qm-default: grey;
+    --qm-short: #2E8B57;
+    --qm-long: #4682B4;
+    --qm-old: #8B0000;
+    --qm-excluded: #555;
+    --qm-redundant-opacity: 50%;
+    --qm-message-removed: grey;
 }
 
 #drawer_content > hr {
@@ -42,7 +44,7 @@ select.inline_setting {
     line-height: 1em;
 }
 /* text input in a line of text */
-input.inline_setting     {
+input.inline_setting {
     margin: 0;
     padding: 0 0 0 5px;
     width: unset !important;
@@ -63,37 +65,48 @@ By default, text is greyed to indicate that is it not injected.
 .qvink_memory_display {
     margin: 0 0 5px 0;
     font-size: small;
-    font-style: italic;
-    color: grey;
+    color: var(--qm-default);
 }
 
 /* to style short-term memories. */
 .qvink_short_memory {
-    color: var(--qvink_short);
+    color: var(--qm-short);
 }
 .qvink_short_memory.qvink_lagging_memory {
-    color: rgba(from var(--qvink_short) r g b / var(--qvink_redundant_opacity));
+    color: rgba(from var(--qm-short) r g b / var(--qm-redundant-opacity));
     text-shadow: none;
 }
 /* to style long-term memories. */
 .qvink_long_memory {
-    color: var(--qvink_long);
+    color: var(--qm-long);
 }
 .qvink_long_memory.qvink_lagging_memory {
-    color: rgba(from var(--qvink_long) r g b / var(--qvink_redundant_opacity));
+    color: rgba(from var(--qm-long) r g b / var(--qm-redundant-opacity));
     text-shadow: none;
 }
 /* to style memories marked for long-term, but are past the context limit */
 .qvink_old_memory {
-    color: var(--qvink_old)
+    color: var(--qm-old)
 }
 .qvink_old_memory.qvink_lagging_memory {
-    color: rgba(from var(--qvink_old) r g b / var(--qvink_redundant_opacity));
+    color: rgba(from var(--qm-old) r g b / var(--qm-redundant-opacity));
     text-shadow: none;
 }
 /* to style memories that are force-excluded */
 .qvink_exclude_memory {
-    color: var(--qvink_excluded)
+    color: var(--qm-excluded)
+}
+
+/*
+To style messages that have been removed from context.
+We need the specificity to override some theme styles.
+*/
+.mes_text.qvink_removed_message,
+.mes_text.qvink_removed_message p,
+.mes_text.qvink_removed_message q,
+.mes_text.qvink_removed_message code,
+.mes_text.qvink_removed_message em {
+    color: var(--qm-message-removed);
 }
 
 /* Style the message buttons, separating them from the rest */
@@ -155,9 +168,50 @@ By default, text is greyed to indicate that is it not injected.
     filter: drop-shadow(0px 0px 5px rgb(65, 210, 243));
 }
 
+/* this is used in some interfaces just for some card styling */
+.qvink_interface_card {
+    margin: 0 0.5em;
+    padding: 0.2em 0.5em;
+    border: 1px black solid;
+    border-radius: 5px;
+    box-shadow: -1px 1px 5px black;
+}
+
+
+
+
+/* Summary Prompt Interface */
+dialog:has(#qvink_summary_prompt_interface) {
+    height: 90vh;  /* always full height */
+    max-height: 90vh;
+}
+#qvink_summary_prompt_interface .qvink_interface_card {
+    margin: 1em;
+}
+#qvink_summary_prompt_interface .qvink_interface_card .inline-drawer-toggle {
+    padding: 10px;
+    padding-right: 0;  /* account for the padding of the card to keep the icon visually centered */
+}
+
+/* remove the background and styling form the dropdown drawers inside the summry prompt interface */
+#qvink_summary_prompt_interface .inline-drawer-header {
+    background: unset;
+    border: unset;
+    margin: unset;
+    padding: unset;
+}
+#qvink_summary_prompt_interface .select2-container {
+    flex: 1;  /* ensures the select2 respects the surrounding flex container */
+}
+
+
+
+
+
 /* Memory state interface */
 dialog:has(#qvink_memory_state_interface) {
     height: 90vh;  /* make the memory edit dialog always full height */
+    max-height: 90vh;
 }
 #qvink_memory_state_interface {
     height: 100%;
@@ -167,17 +221,10 @@ dialog:has(#qvink_memory_state_interface) {
 #qvink_memory_state_interface #filter_bar {
     margin: 1em 0;  /* Filter bar vertical margins */
 }
-#qvink_memory_state_interface #filter_bar .filter_box {
-    margin: 0 0.5em;
-    padding: 0.2em 0.5em;
-    border: 1px black solid;
-    border-radius: 5px;
-    box-shadow: 1px 1px 5px black;
-}
-#qvink_memory_state_interface #filter_bar .filter_box button {
+#qvink_memory_state_interface #filter_bar .qvink_interface_card button {
     width: 100%;
 }
-#qvink_memory_state_interface #filter_bar .filter_box label {
+#qvink_memory_state_interface #filter_bar .qvink_interface_card label {
     width: fit-content;
     margin: auto;
 }

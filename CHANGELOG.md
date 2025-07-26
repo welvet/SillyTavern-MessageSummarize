@@ -1,5 +1,43 @@
 # Changelog
 
+#### v1.1.0
+**ST Version Requirement**: You must be on ST v1.13.2
+- **New Feature**: You can now specify the role of the summary prompt
+- **New Feature**: When using chat completion, the prompt preview will show in chat message format
+- **New Feature**: Prefill now works with chat completion (and moved to the prompt editing interface)
+
+#### v1.0.8
+**IMPORTANT 1**: All slash commands, CSS variables, and macros have been renamed for consistency. You will need to update any QRs, custom CSS, or prompts that use these.
+
+**IMPORTANT 2**: Your current `{{history}}` macro may no longer work as it did before. You will need to reconfigure it in the new interface by clicking "Edit" under "Summarization"
+
+- **New Feature**: Reworked "Edit" interface for the summary prompt. This is now where the `{{history}}`, `{{message}}`, and `{{words}}` macro are defined and modified. You can also create custom macros for the summary prompt using either a message range or STScript.
+- **New Feature**: A new setting called `Static Memory Mode` can be enabled in the general injection settings. This mode makes long-term memories always be injected separately from short-term memories, regardless of context. Disabled by default.
+- **New Feature**: New setting next to `Summarization Time Delay` called `Skip First` determines whether the first summary right after a character message will be delayed or not when auto-summarizing (default false). Turning this on will be the same as the old behavior.
+- **New Feature**: Now supports i18n translations. First translation into Traditional Chinese provided by Rivelle <3
+- **New Feature**: Summaries displayed below messages now parse markdown
+- **New Feature**: Option to re-summarize on continue
+- **New Slash Command**: `/qm-max-summary-tokens` returns the max tokens allowed for summarization given the current completion preset.
+- **New Slash Command**: `/qm-set` allows you to set the memory for a message.
+- **New Slash Command**: `/qm-toggle-auto-summarize` toggles whether auto-summarize is enabled. Does not save the profile.
+- **Changed**: All slash commands now use "-" instead of "_" and start with "qm-" (with "qvink-memory-" as an alias) to avoid overlapping with other commands. See the README for the updated list of all commands.
+- **Changed**: All CSS variables now use "-" instead of "_", and are prefixed with "--qm-"
+- **Changed**: The memory macros have been renamed to `{{qm-short-term-memory}}` and `{{qm-long-term-memory}}`.
+- **Changed**: Messages that have been removed from context are now turned grey in the chat. This can be modified by using the `--qm-message-removed` CSS variable.
+- **Changed**: Summaries that aren't included in memory can now be changed style with the `--qm-default` CSS variable.
+- **Changed**: The slash command `/qm-get` (previously `/get_memory`) can now accept a range of indexes and a custom separator.
+- **Changed**: Modified how profile changes are detected under the hood. Shouldn't affect anything.
+- **Changed**: You won't believe it I moved settings around again. Auto-Summarization settings now get their own section.
+- **Fixed**: The config popout now works with MovingUI
+- **Fixed**: You can now properly save config profile for a group and their chats as if it were a character.
+- **Fixed**: Fixed `auto-summarization before generation` config not working for chat completion. 
+- **Fixed**: The `Edit Memory` interface now saves your selection for the number of messages per page.
+- **Fixed**: The displayed number of tokens in the config now visually updates when the completion preset updates (this was only a visual issue).
+- **Removed**: The old "Message History" config section has been removed.
+- **Removed**: The "Nest messages in summary prompt" config option has been removed.
+- **Removed**: The "Include All Context Content" config option has been removed.
+
+
 #### v0.9.5
 **ST Version Requirement:** You must be on ST version 1.12.14 or greater as it relies on this PR https://github.com/SillyTavern/SillyTavern/pull/3763#issue-2948421833
 

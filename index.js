@@ -1,5 +1,12 @@
-import { getStringHash, debounce, copyText, trimToEndSentence, download, parseJsonFile, waitUntilCondition } from '../../../utils.js';
-import { getContext, getApiUrl, extension_settings } from '../../../extensions.js';
+import {
+    getStringHash,
+    debounce,
+    copyText,
+    trimToEndSentence,
+    download,
+    parseJsonFile,
+    stringToRange,
+} from '../../../utils.js';
 import {
     animation_duration,
     scrollChatToBottom,
@@ -8,6 +15,7 @@ import {
     is_send_press,
     saveSettingsDebounced,
     generateRaw,
+    createRawPrompt,
     getMaxContextSize,
     streamingProcessor,
     amount_gen,
@@ -15,9 +23,11 @@ import {
     CONNECT_API_MAP,
     main_api,
     chat_metadata,
+    messageFormatting
 } from '../../../../script.js';
+import { getContext, getApiUrl, extension_settings } from '../../../extensions.js';
 import { getPresetManager } from '../../../preset-manager.js'
-import { formatInstructModeChat } from '../../../instruct-mode.js';
+import { formatInstructModeChat, formatInstructModePrompt } from '../../../instruct-mode.js';
 import { is_group_generating, selected_group, openGroupId } from '../../../group-chats.js';
 import { loadMovingUIState, renderStoryString, power_user } from '../../../power-user.js';
 import { dragElement } from '../../../RossAscends-mods.js';
@@ -26,6 +36,7 @@ import { MacrosParser } from '../../../macros.js';
 import { commonEnumProviders } from '../../../slash-commands/SlashCommandCommonEnumsProvider.js';
 import { getRegexScripts } from '../../../../scripts/extensions/regex/index.js'
 import { runRegexScript } from '../../../../scripts/extensions/regex/engine.js'
+import { t, translate } from '../../../i18n.js';
 
 export { MODULE_NAME };
 
@@ -35,12 +46,13 @@ const MODULE_NAME_FANCY = 'Qvink Memory';
 const PROGRESS_BAR_ID = `${MODULE_NAME}_progress_bar`;
 
 // CSS classes (must match the CSS file because I'm too stupid to figure out how to do this properly)
-const css_message_div = "qvink_memory_display"
-const css_short_memory = "qvink_short_memory"
-const css_long_memory = "qvink_long_memory"
+const css_message_div = `qvink_memory_display`
+const css_short_memory = `qvink_short_memory`
+const css_long_memory = `qvink_long_memory`
 const css_remember_memory = `qvink_old_memory`
 const css_exclude_memory = `qvink_exclude_memory`
 const css_lagging_memory = `qvink_lagging_memory`
+const css_removed_message = `qvink_removed_message`
 const summary_div_class = `qvink_memory_text`  // class put on all added summary divs to identify them
 const summary_reasoning_class = 'qvink_memory_reasoning'
 const css_button_separator = `qvink_memory_button_separator`
@@ -51,8 +63,8 @@ const group_member_enable_button = `qvink_memory_group_member_enable`
 const group_member_enable_button_highlight = `qvink_memory_group_member_enabled`
 
 // Macros for long-term and short-term memory injection
-const long_memory_macro = `long_term_memory`;
-const short_memory_macro = `short_term_memory`;
+const long_memory_macro = `qm-long-term-memory`;
+const short_memory_macro = `qm-short-term-memory`;
 const generic_memories_macro = `memories`;
 
 // message button classes
@@ -60,7 +72,6 @@ const remember_button_class = `${MODULE_NAME}_remember_button`
 const summarize_button_class = `${MODULE_NAME}_summarize_button`
 const edit_button_class = `${MODULE_NAME}_edit_button`
 const forget_button_class = `${MODULE_NAME}_forget_button`
-const delete_button_class = `${MODULE_NAME}_delete_button`
 
 // global flags and whatnot
 var STOP_SUMMARIZATION = false  // flag toggled when stopping summarization
@@ -84,6 +95,11 @@ Following is the message to summarize:
 `
 const default_long_template = `[Following is a list of events that occurred in the past]:\n{{${generic_memories_macro}}}\n`
 const default_short_template = `[Following is a list of recent events]:\n{{${generic_memories_macro}}}\n`
+const default_summary_macros = {  // default set of macros for the summary prompt.
+    "message": {name: "message", default: true, enabled: true,  type: "special", instruct_template: true, apply_regex: true, description: "The message being summarized"},
+    "words":   {name: "words",   default: true, enabled: true,  type: "custom",  instruct_template: false, apply_regex: false, command: "/qm-max-summary-tokens", description: "Max response tokens defined by the chosen completion preset"},
+    "history": {name: "history", default: true, enabled: false, type: "preset",  instruct_template: true, apply_regex: true, start: 1, end: 6, bot_messages: true, user_messages: true, bot_summaries: false, user_summaries: false},
+}
 const default_settings = {
     // inclusion criteria
     message_length_threshold: 10,  // minimum message token length for summarization
@@ -94,31 +110,28 @@ const default_settings = {
 
     // summarization settings
     prompt: default_prompt,
+    summary_prompt_macros: default_summary_macros,  // macros for the summary prompt interface
+    prompt_role: extension_prompt_roles.SYSTEM,
     prefill: "",   // summary prompt prefill
     show_prefill: false, // whether to show the prefill when memories are displayed
     completion_preset: "",  // completion preset to use for summarization. Empty ("") indicates the same as currently selected.
     connection_profile: "",
+
     auto_summarize: true,   // whether to automatically summarize new chat messages
     summarization_delay: 0,  // delay auto-summarization by this many messages (0 summarizes immediately after sending, 1 waits for one message, etc)
     summarization_time_delay: 0, // time in seconds to delay between summarizations
+    summarization_time_delay_skip_first: false,  // skip the first delay after a character message
     auto_summarize_batch_size: 1,  // number of messages to summarize at once when auto-summarizing
     auto_summarize_message_limit: 10,  // maximum number of messages to go back for auto-summarization.
-    auto_summarize_on_edit: true,  // whether to automatically re-summarize edited chat messages
+    auto_summarize_on_edit: false,  // whether to automatically re-summarize edited chat messages
     auto_summarize_on_swipe: true,  // whether to automatically summarize new message swipes
+    auto_summarize_on_continue: false, // whether automatically re-summarize after a continue
     auto_summarize_progress: true,  // display a progress bar for auto-summarization
     auto_summarize_on_send: false,  // trigger auto-summarization right before a new message is sent
-
-    include_world_info: false,  // include world info in context when summarizing
     block_chat: true,  // block input when summarizing
-    nest_messages_in_prompt: false,  // nest messages to summarize in the prompt for summarization
-
-    include_message_history: 3,  // include a number of previous messages in the prompt for summarization
-    include_message_history_mode: 'none',  // mode for including message history in the prompt
-    include_user_messages_in_history: false,  // include previous user message in the summarization prompt when including message history
-    include_system_messages_in_history: false,  // include previous system messages in the summarization prompt when including message history
-    include_thought_messages_in_history: false,  // include previous thought messages in the summarization prompt when including message history
 
     // injection settings
+    separate_long_term: false,  // whether to keep memories marked for long-term separate from short-term
     summary_injection_separator: "\n* ",  // separator when concatenating summaries
     summary_injection_threshold: 0,            // start injecting summaries after this many messages
     exclude_messages_after_threshold: false,   // remove messages from context after the summary injection threshold
@@ -155,7 +168,7 @@ const global_settings = {
     chats_enabled: {},  // dict of chat IDs to whether memory is enabled
     global_toggle_state: true,  // global state of memory (used when a profile uses the global state)
     disabled_group_characters: {},  // group chat IDs mapped to a list of disabled character keys
-    memory_edit_interface_settings: {}  // settings last used in the memory edit interface
+    memory_edit_interface_settings: {},  // settings last used in the memory edit interface
 }
 const settings_ui_map = {}  // map of settings to UI elements
 
@@ -216,11 +229,13 @@ function get_current_character_identifier() {
     // uniquely identify the current character
     // You have to use the character's avatar image path to uniquely identify them
     let context = getContext();
+
+    // If a group, we can use the group ID to uniquely identify it
     if (context.groupId) {
-        return  // if a group is selected, return
+        return context.groupId
     }
 
-    // otherwise get the avatar image path of the current character
+    // Otherwise get the avatar image path of the current character
     let index = context.characterId;
     if (!index) {  // not a character
         return null;
@@ -231,9 +246,6 @@ function get_current_character_identifier() {
 function get_current_chat_identifier() {
     // uniquely identify the current chat
     let context = getContext();
-    if (context.groupId) {
-        return context.groupId;
-    }
     return context.chatId
 
 }
@@ -242,7 +254,7 @@ function get_extension_directory() {
     let index_path = new URL(import.meta.url).pathname
     return index_path.substring(0, index_path.lastIndexOf('/'))  // remove the /index.js from the path
 }
-function clean_string_for_title(text) {
+function clean_string_for_html(text) {
     // clean a given string for use in a div title.
     return text.replace(/["&'<>]/g, function(match) {
         switch (match) {
@@ -253,6 +265,7 @@ function clean_string_for_title(text) {
             case ">": return "&gt;";
         }
     })
+    // return $('<div/>').text(text).html();
 }
 function escape_string(text) {
     // escape control characters in the text
@@ -290,6 +303,44 @@ function unescape_string(text) {
         }
     });
 }
+function assign_and_prune(target, source) {
+    // Modifies target in-place while also deleting any keys not in source
+    let keys = Object.keys(target).concat(Object.keys(source))
+    for (let key of keys) {
+        if (!(key in source)) delete target[key];
+        else target[key] = source[key];
+    }
+}
+function check_objects_different(obj_1, obj_2) {
+    // check whether two objects are different by checking each key, recursively
+    // if both are objects, recurse on each element of obj_1
+    // The "instanceof" method is true for Objects, Arrays, and Sets.
+    if (obj_1 instanceof Object && obj_2 instanceof Object) {
+        let keys = Object.keys(obj_1).concat(Object.keys(obj_2))
+        for (let key of keys) {
+            if (check_objects_different(obj_1[key], obj_2[key])) {
+                return true  // different
+            }
+        }
+        return false  // not different
+    } else {  // not both objects - check equality directly
+        return obj_1 !== obj_2  // return if different
+    }
+}
+function regex(string, re) {
+    // Returns an array of all matches in capturing groups
+    let matches = [...string.matchAll(re)];
+    return matches.flatMap(m => m.slice(1).filter(Boolean));
+}
+function get_regex_script(name) {
+    const scripts = getRegexScripts();
+    for (let script of scripts) {
+        if (script.scriptName === name) {
+            return script
+        }
+    }
+    error(`No regex script found: "${name}"`)
+}
 function check_st_version() {
     // Check to see if the current version of ST is acceptable.
     // Currently checks for the "symbols" property of the global context,
@@ -301,6 +352,38 @@ function check_st_version() {
         log(`Symbols not found in context: [${getContext().symbols}]`)
         toast("Incompatible ST version - please update.", "error")
     }
+}
+function add_i18n($element=null) {
+    // dynamically translate config settings
+    log("Translating with i18n...")
+    if ($element === null) {
+        $element = $(`.${settings_content_class}`)
+    }
+
+    $element.each(function () {
+        let $this = $(this);
+        // Find all elements with either text or a title
+        $this.find('*').each(function () {
+            let $el = $(this);
+
+            // translate title attribute if present
+            if ($el.attr('title')) {
+                $el.attr('title', translate($el.attr('title')));
+            }
+
+            if ($el.attr('placeholder')) {
+                $el.attr('placeholder', translate($el.attr('placeholder')));
+            }
+
+            // translate the inner text, if present
+            if (!this.childNodes) return
+            for (let child of this.childNodes) {  // each child node (including text nodes)
+                let text = child.nodeValue
+                if (!text?.trim()) continue  // null or just whitespace
+                child.nodeValue = text?.replace(text?.trim(), translate(text?.trim()))  // replace text with translated text
+            }
+        });
+    })
 }
 
 // Completion presets
@@ -534,14 +617,23 @@ function reset_settings() {
     Object.assign(extension_settings[MODULE_NAME], structuredClone(default_settings))
     refresh_settings();   // refresh the UI
 }
-function set_settings(key, value) {
+function set_settings(key, value, copy=false) {
     // Set a setting for the extension and save it
+    if (copy) {
+        value = structuredClone(value)
+    }
     extension_settings[MODULE_NAME][key] = value;
     saveSettingsDebounced();
 }
-function get_settings(key) {
+function get_settings(key, copy=false) {
     // Get a setting for the extension, or the default value if not set
-    return extension_settings[MODULE_NAME]?.[key] ?? default_settings[key];
+    let value = extension_settings[MODULE_NAME]?.[key] ?? default_settings[key];
+    if (copy) {  // needed when retrieving objects
+        return structuredClone(value)
+    } else {
+        return value
+    }
+
 }
 function get_settings_element(key) {
     return settings_ui_map[key]?.[0]
@@ -564,7 +656,7 @@ async function load_settings_html() {
     let path = `${module_dir}/settings.html`
     let found = await $.get(path).then(async response => {
         log(`Loaded settings.html at "${path}"`)
-        $("#extensions_settings2").append(response);  // load html into the settings div\
+        $("#extensions_settings2").append(response);  // load html into the settings div
         return true
     }).catch((response) => {
         error(`Error getting settings.json from "${path}": status: ${response.status}`);
@@ -614,7 +706,7 @@ function toggle_chat_enabled(value=null) {
     refresh_memory()
 
     // update the message visuals
-    update_all_message_visuals()  //not needed? happens in update_message_influsion_flags
+    update_all_message_visuals()  // not needed? happens in update_message_inclusion_flags
 
     // refresh settings UI
     refresh_settings()
@@ -800,9 +892,9 @@ function update_profile_section() {
         // if the current character/chat has a default profile, indicate as such
         let text = profile
         if (profile === current_character_profile) {
-            text = `${profile} (character)`
+            text = `${profile} (${t`Character`})`
         } else if (profile === current_chat_profile) {
-            text = `${profile} (chat)`
+            text = `${profile} (${t`Chat`})`
         }
         $choose_profile_dropdown.append(`<option value="${profile}">${text}</option>`);
     }
@@ -849,7 +941,7 @@ async function update_preset_dropdown() {
     let summary_preset = get_settings('completion_preset')
     let preset_options = await get_presets()
     $preset_select.empty();
-    $preset_select.append(`<option value="">Same as Current</option>`)
+    $preset_select.append(`<option value="">${t`Same as Current`}</option>`)
     for (let option of preset_options) {  // construct the dropdown options
         $preset_select.append(`<option value="${option}">${option}</option>`)
     }
@@ -865,7 +957,7 @@ async function update_connection_profile_dropdown() {
     let summary_connection = get_settings('connection_profile')
     let connection_options = await get_connection_profiles()
     $connection_select.empty();
-    $connection_select.append(`<option value="">Same as Current</option>`)
+    $connection_select.append(`<option value="">${t`Same as Current`}</option>`)
     for (let option of connection_options) {  // construct the dropdown options
         $connection_select.append(`<option value="${option}">${option}</option>`)
     }
@@ -891,12 +983,6 @@ function refresh_settings() {
     update_preset_dropdown()
     check_preset_valid()
 
-    // if prompt doesn't have {{message}}, insert it
-    if (!get_settings('prompt').includes("{{message}}")) {
-        set_settings('prompt', get_settings('prompt') + "\n{{message}}")
-        debug("{{message}} macro not found in summary prompt. It has been added automatically.")
-    }
-
     // auto_summarize_message_limit must be >= auto_summarize_batch_size (unless the limit is disabled, i.e. -1)
     let auto_limit = get_settings('auto_summarize_message_limit')
     let batch_size = get_settings('auto_summarize_batch_size')
@@ -910,6 +996,10 @@ function refresh_settings() {
 
     // update the profile section
     update_profile_section()
+
+    // Update the context limit token displays
+    $(`.${settings_content_class} #short_term_context_limit_display`).text(get_short_token_limit());
+    $(`.${settings_content_class} #long_term_context_limit_display`).text(get_long_token_limit());
 
     // iterate through the settings map and set each element to the current setting value
     for (let [key, [element, type]] of Object.entries(settings_ui_map)) {
@@ -927,17 +1017,6 @@ function refresh_settings() {
         get_settings_element('auto_summarize_batch_size')?.prop('disabled', !auto_summarize);
         get_settings_element('auto_summarize_progress')?.prop('disabled', !auto_summarize);
         get_settings_element('summarization_delay')?.prop('disabled', !auto_summarize);
-
-
-        // If message history is disabled, disable the relevant settings
-        let history_disabled = get_settings('include_message_history_mode') === "none";
-        get_settings_element('include_message_history')?.prop('disabled', history_disabled)
-        get_settings_element('include_user_messages_in_history')?.prop('disabled', history_disabled)
-        get_settings_element('preview_message_history')?.prop('disabled', history_disabled)
-
-        if (!history_disabled && !get_settings('prompt').includes("{{history}}")) {
-            toastr.warning("To include message history, you must use the {{history}} macro in the prompt.")
-        }
 
         // If not excluding message, then disable the option to preserve the last user message
         let excluding_messages = get_settings('exclude_messages_after_threshold')
@@ -994,12 +1073,20 @@ Use like this:
 <div class="flex-container justifySpaceBetween alignItemsCenter">
     <label title="description here">
         <span>label here</span>
-        <select id="id_here" multiple="multiple" class="select2_multi_sameline"></select>
+        <select id="id_here" multiple="multiple"></select>
     </label>
 </div>
  */
-function refresh_select2_element(id, selected, options, placeholder="") {
-    // Refresh a select2 element with the given ID (a select element) and set the options
+function refresh_select2_element(element, selected, options, placeholder="", callback) {
+    // Refresh a select2 element with the given select element (or ID) and set the options
+    let $select = element
+    let id;
+    if (typeof(element) === "string") {
+        $select = $(`#${element}`)
+        id = element
+    } else {
+        id = element.attr('id')
+    }
 
     // check whether the dropdown is open. If so, don't update the options (it messes with the widget)
     let $dropdown = $(`#select2-${id}-results`)
@@ -1007,11 +1094,11 @@ function refresh_select2_element(id, selected, options, placeholder="") {
         return
     }
 
-    let $select = $(`#${id}`)
     $select.empty()  // clear current options
 
     // add the options to the dropdown
     for (let {id, name} of options) {
+        name = clean_string_for_html(name)
         let option = $(`<option value="${id}">${name}</option>`)
         $select.append(option);
     }
@@ -1024,7 +1111,16 @@ function refresh_select2_element(id, selected, options, placeholder="") {
             placeholder: placeholder,
             allowClear: true,
             closeOnSelect: false,
+            dropdownParent: $select.parent()
         });
+
+        $select.on('change', () => {
+            let values = []
+            for (let value of $select.select2('data')) {
+                values.push(value.text)
+            }
+            callback(values)
+        })
 
         // select2ChoiceClickSubscribe($select, () => {
         //     log("CLICKED")
@@ -1073,15 +1169,7 @@ function detect_settings_difference(profile=null) {
     }
     let current_settings = copy_settings();
     let profile_settings = copy_settings(profile);
-
-    let different = false;
-    for (let key of Object.keys(profile_settings)) {
-        if (profile_settings[key] !== current_settings[key]) {
-            different = true;
-            break;
-        }
-    }
-    return different;
+    return check_objects_different(current_settings, profile_settings)
 }
 function save_profile(profile=null) {
     // Save the current settings to the given profile
@@ -1205,7 +1293,7 @@ function new_profile() {
     save_profile(profile);
     load_profile(profile);
 }
-function delete_profile() {
+async function delete_profile() {
     // Delete the current profile
     if (get_settings('profiles').length === 1) {
         error("Cannot delete your last profile");
@@ -1213,6 +1301,11 @@ function delete_profile() {
     }
     let profile = get_settings('profile');
     let profiles = get_settings('profiles');
+
+    let result = await getContext().Popup.show.confirm(`Permanently delete profile: "${profile}"`, "", {okButton: 'Delete', cancelButton: 'Cancel'});
+    if (!result) {
+        return
+    }
 
     // delete the profile
     delete profiles[profile];
@@ -1376,30 +1469,45 @@ function update_message_visuals(i, style=true, text=null) {
 
     let chat = getContext().chat;
     let message = chat[i];
-    let error_message = get_data(message, 'error');
+    let error_message = translate(get_data(message, 'error'));
     let reasoning = get_data(message, 'reasoning')
     let memory = get_memory(message)
+    let lagging = get_data(message, 'lagging')  // lagging behind injection threshold
+    let exclude_messages = get_settings('exclude_messages_after_threshold')  // are we excluding messages after the threshold?
 
     // get the div holding the main message text
     let message_element = div_element.find('div.mes_text');
+
+    // If we are excluding messages and the message isn't lagging (i.e. the message is removed and the summary injected)
+    if (exclude_messages && !lagging) {
+        message_element.addClass(css_removed_message);
+    } else {
+        message_element.removeClass(css_removed_message);
+    }
+
+    // get the style class, either passed in or based on inclusion flags
     let style_class = style ? get_summary_style_class(message) : ""
 
     // if no text is provided, use the memory text
     if (!text) {
         text = ""  // default text when no memory
         if (memory) {
-            text = clean_string_for_title(`Memory: ${memory}`)
+            text = clean_string_for_html(`Memory: ${memory}`)
         } else if (error_message) {
             style_class = ''  // clear the style class if there's an error
             text = `Error: ${error_message}`
         }
     }
 
+    // parse markdown
+    // text, ch_name, isSystem, isUser, messageId
+    text = messageFormatting(text, null, false, false, -1)
+
     // create the div element for the memory and add it to the message div
     let memory_div = $(`<div class="${summary_div_class} ${css_message_div}"><span class="${style_class}">${text}</span></div>`)
     if (reasoning) {
-        reasoning = clean_string_for_title(reasoning)
-        memory_div.prepend($(`<span class="${summary_reasoning_class}" title="${reasoning}">[Reasoning] </span>`))
+        reasoning = clean_string_for_html(reasoning)
+        memory_div.prepend($(`<span class="${summary_reasoning_class}" title="${reasoning}">[${t`Reasoning`}] </span>`))
     }
     message_element.after(memory_div);
 
@@ -1474,9 +1582,8 @@ async function display_text_modal(title, text="") {
     // replace newlines in text with <br> for HTML
     let ctx = getContext();
     text = text.replace(/\n/g, '<br>');
-    let html = `<h2>${title}</h2><div style="text-align: left; overflow: auto;">${text}</div>`
-    //const popupResult = await ctx.callPopup(html, 'text', undefined, { okButton: `Close` });
-    let popup = new ctx.Popup(html, ctx.POPUP_TYPE.TEXT, undefined, {okButton: 'Close', allowVerticalScrolling: true});
+    let html = `<h3>${title}</h3><div style="text-align: left; overflow: auto;">${text}</div>`
+    let popup = new ctx.Popup(html, ctx.POPUP_TYPE.TEXT, undefined, {okButton: 'Close', allowVerticalScrolling: true, wider: true});
     await popup.show()
 }
 async function get_user_setting_text_input(key, title, description="") {
@@ -1496,7 +1603,9 @@ async function get_user_setting_text_input(key, title, description="") {
         }
     }
     let ctx = getContext();
-    let popup = new ctx.Popup(title, ctx.POPUP_TYPE.INPUT, value, {rows: 20, customButtons: [restore_button]});
+    let popup = new ctx.Popup(title, ctx.POPUP_TYPE.INPUT, value, {rows: 20, customButtons: [restore_button], wider: true});
+
+    add_i18n($(popup.content))  // translate any content
 
     // Now remove the ".result-control" class to prevent it from submitting when you hit enter.
     popup.mainInput.classList.remove('result-control');
@@ -1531,7 +1640,7 @@ function progress_bar(id, progress, total, title) {
     <div class="title">${title}</div>
     <div>(<span class="progress">${progress}</span> / <span class="total">${total}</span>)</div>
     <progress value="${progress}" max="${total}" class="flex1"></progress>
-    <button class="menu_button fa-solid fa-stop" title="Abort summarization"></button>
+    <button class="menu_button fa-solid fa-stop" title="${t`Abort summarization`}"></button>
 </div>`)
 
     // add a click event to abort the summarization
@@ -1557,7 +1666,7 @@ function remove_progress_bar(id) {
 }
 
 
-// Memory State Interface
+// Interfaces
 class MemoryEditInterface {
 
     // Array with each message index to show in the interface.
@@ -1631,7 +1740,7 @@ class MemoryEditInterface {
     html_template = `
 <div id="qvink_memory_state_interface">
 <div class="flex-container justifyspacebetween alignitemscenter">
-    <h4>Memory State</h4>
+    <h3>Memory State</h3>
     <button id="preview_memory_state" class="menu_button fa-solid fa-eye margin0" title="Preview current memory state (the exact text that will be injected into your context)."></button>
     <button id="expand_filter_bar" class="menu_button fa-solid fa-list-check margin0" title="Toggle chat filters"></button>
     <label class="checkbox_label" title="Selecting message subsets applies to the entire chat history. When unchecked, it only applies to the current page.">
@@ -1681,12 +1790,12 @@ class MemoryEditInterface {
     <div class="interface_actions">
         <div title="Remember (toggle inclusion of summary in long-term memory)"     class="mes_button fa-solid fa-brain ${remember_button_class}"></div>
         <div title="Force Exclude (toggle inclusion of summary from all memory)"    class="mes_button fa-solid fa-ban ${forget_button_class}"></div>
-        <div title="Re-Summarize (AI)"                                              class="mes_button fa-solid fa-quote-left ${summarize_button_class}"></div>
+        <div title="Summarize (AI)"                                                 class="mes_button fa-solid fa-quote-left ${summarize_button_class}"></div>
     </div>
     `
     ctx = getContext();
 
-    // If you define the popup in the constructor so you don't have to recreate it every time, then clicking the "ok" button has like a .5-second lang before closing the popup.
+    // If you define the popup in the constructor so you don't have to recreate it every time, then clicking the "ok" button has like a .5-second lag before closing the popup.
     // If you instead re-create it every time in show(), there is no lag.
     constructor() {
         this.settings = get_settings('memory_edit_interface_settings')
@@ -1734,7 +1843,7 @@ class MemoryEditInterface {
             let checked = this.settings[id] ?? data.default
 
             let $el = $(`
-<div class="filter_box flex1">
+<div class="flex1 qvink_interface_card">
     <label class="checkbox_label" title="${data.title}">
         <input id="${filter_checkbox_id}" type="checkbox" ${checked ? "checked" : ""}/>
         <span>${data.display}</span>
@@ -1831,6 +1940,8 @@ class MemoryEditInterface {
             let message_id = Number($(this).closest('tr').attr('message_id'));  // get the message ID from the row's "message_id" attribute
             await summarize_messages(message_id);
         });
+
+        add_i18n(this.$content)
     }
 
     async show() {
@@ -1897,6 +2008,7 @@ class MemoryEditInterface {
 
         this.update_selected()
         this.update_context_line()
+        add_i18n(this.$content)  // need to translate any text in the table after being populated
     }
     update_filters(preserve_page=false) {
         // update list of indexes to include based on current filters
@@ -1938,7 +2050,7 @@ class MemoryEditInterface {
         // re-initialize paginator with new data
         this.$pagination.pagination({
             dataSource: this.filtered,
-            pageSize: 100,
+            pageSize: this.settings.page_size ?? 100,
             pageNumber: preserve_page ? this.pagination?.pageNumber : 1,
             sizeChangerOptions: [10, 50, 100, 500, 1000],
             showSizeChanger: true,
@@ -1947,6 +2059,8 @@ class MemoryEditInterface {
                 if (this.settings.reverse_page_sort) {
                     data.reverse()
                 }
+                this.settings.page_size = pagination.pageSize
+                this.save_settings()
                 this.displayed = data
                 this.clear()
                 this.update_table()
@@ -2005,7 +2119,7 @@ class MemoryEditInterface {
         });
 
         this.$regex_selector.empty();
-        this.$regex_selector.append(`<option value="">Select Script</option>`)
+        this.$regex_selector.append(`<option value="">None</option>`)
         for (let name of Object.keys(scripts)) {  // construct the dropdown options
             this.$regex_selector.append(`<option value="${name}">${name}</option>`)
         }
@@ -2182,6 +2296,836 @@ class MemoryEditInterface {
     }
 }
 
+class SummaryPromptEditInterface {
+
+    html_template = `
+<div id="qvink_summary_prompt_interface" style="height: 100%">
+<div class="flex-container justifyspacebetween">
+    <div class="flex2">
+        <div class="flex-container justifyspacebetween alignitemscenter">
+            <h3>Summary Prompt</h3>
+            <i class="fa-solid fa-info-circle" style="margin-right: 1em" title="Customize the prompt used for summarizing messages."></i>
+            <button id="preview_summary_prompt" class="menu_button fa-solid fa-eye margin0" title="Preview current summary prompt (the exact text that will be sent to the model)"></button>
+            <button id="restore_default_prompt" class="menu_button fa-solid fa-recycle margin0 red_button" title="Restore the default prompt"></button>
+
+            <label class="flex-container alignItemsCenter" title="Role used for the summary prompt" style="margin-left: auto;">
+                <span>Role: </span>
+                <select id="prompt_role" class="text_pole inline_setting">
+                    <option value="0">System</option>
+                    <option value="1">User</option>
+                    <option value="2">Assistant</option>
+                </select>
+            </label>
+        </div>
+    </div>
+    <div class="flex1" style="height: 100%">
+        <div class="flex-container justifyspacebetween alignitemscenter">
+            <h3 class="flex2">Macros <i class="fa-solid fa-info-circle" title="Dynamic macros only available for the summary prompt."></i></h3>
+            <button id="add_macro" class="flex1 menu_button" title="Add a new macro">New</button>
+        </div>
+    </div>
+</div>
+
+<div class="flex-container justifyspacebetween" style="height: calc(100% - 120px);">
+    <div class="flex2">
+        <textarea id="prompt" class="" style="height: 100%; overflow-y: auto"></textarea>
+    </div>
+    <div class="flex1" style="height: 100%">
+        <div id="macro_definitions" style="height: 100%; overflow-y: auto"></div>
+    </div>
+</div>
+
+<div class="flex-container justifyspacebetween alignitemscenter">
+    <label title="Start the summarization with this prefilled text." class="checkbox_label">
+        <span>Prefill</span>
+        <input id="prefill" class="text_pole" type="text" placeholder="Start reply with...">
+    </label>
+
+    <label title="Include the prefill in displayed memories and injections (no effect with reasoning models)" class="checkbox_label">
+        <input id="show_prefill" type="checkbox" />
+        <span>Include in Memories</span>
+    </label>
+</div>
+
+</div>
+`
+    // remember to set the name of the radio group for each separate instance
+    macro_definition_template = `
+
+<div class="macro_definition qvink_interface_card">
+<div class="inline-drawer">
+    <div class="inline-drawer-header">
+        <div class="flex-container alignitemscenter margin0 flex1">
+            <button class="macro_enable menu_button fa-solid margin0"></button>
+            <button class="macro_preview menu_button fa-solid fa-eye margin0" title="Preview the result of this macro"></button>
+            <input class="macro_name flex1 text_pole" type="text" placeholder="name">
+        </div>
+        <div class="inline-drawer-toggle">
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+    </div>
+
+    <div class="inline-drawer-content">
+        <div class="flex-container alignitemscenter justifyCenter">
+            <div class="macro_type flex2">
+                <label>
+                    <input type="radio" value="preset" />
+                    <span>Range</span>
+                </label>
+                <label>
+                    <input type="radio" value="custom" />
+                    <span>STScript</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="macro_type_range">
+            <div title="The range of messages to replace this macro, relative to the message being summarized (which is at 0). For example, setting this to (3, 10) will include from the 3rd to the 10th message back in the chat.">
+                <input class="macro_preset_start text_pole widthUnset" type="number" min="0" max="99" />
+                <span> - </span>
+                <input class="macro_preset_end text_pole widthUnset" type="number" min="0" max="99" />
+            </div>
+
+            <label title="Bot messages within the range above will be included" class="checkbox_label">
+                <input class="macro_preset_bot_messages" type="checkbox" />
+                <span>Bot Messages</span>
+            </label>
+            <label title="Summaries on bot messages within the range above will be included" class="checkbox_label">
+                <input class="macro_preset_bot_summaries" type="checkbox" />
+                <span>Bot Summaries</span>
+            </label>
+            <label title="User messages within the range above will be included" class="checkbox_label">
+                <input class="macro_preset_user_messages" type="checkbox" />
+                <span>User Messages</span>
+            </label>
+            <label title="Summaries on user messages within the range above will be included" class="checkbox_label">
+                <input class="macro_preset_user_summaries" type="checkbox" />
+                <span>User Summaries</span>
+            </label>
+        </div>
+
+        <div class="macro_type_message">
+            <table style="width: 100%;">
+                <tr title="Each message will be replaced by the return value of the script when run. Use {{message}} for the text of the message and {{id}} for the ID of the message.">
+                    <td><span>STScript</span></td>
+                    <td><input class="macro_command text_pole" type="text" placeholder="STScript"></td>
+                </tr>
+                <tr title="Select regex scripts to run on each message. This will occur before the messages are passed to the above script.">
+                    <td><span>Regex</span></td>
+                    <td><select multiple="multiple" class="regex_select"></select></td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="macro_type_script">
+            <label title="The macro will be replaced by the return value of the script when run. Use {{message}} for the text of the message and {{id}} for the ID of the message." class="checkbox_label">
+                <input class="macro_command text_pole" type="text" placeholder="STScript">
+            </label>
+        </div>
+
+        <div class="macro_type_any flex-container alignitemscenter">
+            <label title="[Text Completion]: The result of this macro will be wrapped in your instruct template. [Chat Completion]: The result of this macro will be added as a separate message." class="checkbox_label">
+                <input class="macro_instruct_template" type="checkbox">
+                <span>Separate Block</span>
+            </label>
+
+            <button class="macro_delete menu_button red_button fa-solid fa-trash" title="Delete custom macro" style="margin-left: auto;"></button>
+            <button class="macro_restore menu_button red_button fa-solid fa-recycle" title="Restore default macro" style="margin-left: auto;"></button>
+        </div>
+
+    </div>
+</div>
+</div>
+
+    `
+    ctx = getContext();
+
+    // enable/disable icons
+    static fa_enabled = "fa-check"
+    static fa_disabled = "fa-xmark"
+
+    default_macro_settings = {
+        "name": "new_macro",
+        "enabled": true,
+        "type": "preset",
+        "start": 1, "end": 1,
+        "bot_messages": true,
+        "bot_summaries": true,
+        "user_messages": true,
+        "user_summaries": true,
+        "instruct_template": true,
+        "command": "",
+        "regex_scripts": [],
+    }
+
+    // If you define the popup in the constructor so you don't have to recreate it every time, then clicking the "ok" button has like a .5-second lag before closing the popup.
+    // If you instead re-create it every time in show(), there is no lag.
+    constructor() {
+        this.from_settings()
+    }
+    async init() {
+        this.popup = new this.ctx.Popup(this.html_template, this.ctx.POPUP_TYPE.TEXT, undefined, {wider: true, okButton: 'Save', cancelButton: 'Cancel'});
+        this.$content = $(this.popup.content)
+        this.$buttons = this.$content.find('.popup-controls')
+        this.$preview = this.$content.find('#preview_summary_prompt')
+        this.$restore = this.$content.find('#restore_default_prompt')
+        this.$definitions = this.$content.find('#macro_definitions')
+        this.$add_macro = this.$content.find('#add_macro')
+
+        // settings
+        this.$prompt = this.$content.find('#prompt')
+        this.$prompt_role = this.$content.find('#prompt_role')
+        this.$prefill = this.$content.find('#prefill')
+        this.$show_prefill = this.$content.find('#show_prefill')
+
+
+        // manually set a larger width
+        this.$content.closest('dialog').css('min-width', '80%')
+
+        // buttons
+        this.$preview.on('click', () => this.preview_prompt())
+        this.$add_macro.on('click', () => this.new_macro())
+        this.$restore.on('click', () => this.$prompt.val(default_settings["prompt"]))
+
+        // manually add tooltips to the popout buttons because you can't do that when defining them
+        this.$buttons.find('.popup-button-ok').attr('title', 'Save changes to the prompt and macros')
+        this.$buttons.find('.popup-button-cancel').attr('title', 'Discard changes to the prompt and macros')
+
+        // set the prompt text and the macro settings
+        this.from_settings()
+
+        let summary_profile = await get_summary_connection_profile()
+        this.api = await get_connection_profile_api(summary_profile)
+
+        // translate
+        add_i18n(this.$content)
+    }
+
+    async show() {
+        this.init()
+        this.update_macros()
+
+        let result = await this.popup.show();  // wait for result
+        if (result) {  // clicked save
+            this.save_settings()
+        }
+        refresh_settings()
+    }
+
+    // building interface
+    update_macros(macro=null) {
+        // Update the interface from settings (all macros or just the specified macro)
+        if (macro === null) {
+            for (let name of this.list_macros()) {
+                let macro = this.get_macro(name)
+                this.create_macro_interface(macro)
+            }
+        } else {
+            this.create_macro_interface(macro)
+        }
+        add_i18n(this.$content)
+    }
+    create_macro_interface(macro) {
+        // Create or update a macro interface item with the given settings
+        let id = this.get_id(macro.name)
+
+        // first check if it already exists
+        let $macro = this.$definitions.find(`#${id}`)
+        if ($macro.length > 0) {  // if it exists, remove it and replace with the template
+            // Need to only replace the items inside the drawer so it says open if it's already open
+            let $template = $(this.macro_definition_template)
+
+            let $drawer_content = $macro.find('.inline-drawer-content')
+            $drawer_content.empty()
+            $drawer_content.append($template.find('.inline-drawer-content').children())
+
+            let $header_content = $macro.find('.inline-drawer-header')
+            $header_content.children().first().remove()  // remove the first div in the header (not the toggle)
+            $header_content.prepend($template.find('.inline-drawer-header').children().first())
+
+        } else { // doesn't exist - add it
+            $macro = $(this.macro_definition_template).prependTo(this.$definitions)
+            $macro.attr('id', id)
+        }
+
+        // handling the macro type radio group
+        let radio_group_name = `macro_type_radio_${macro.name}`
+        $macro.find(`.macro_type input`).attr('name', radio_group_name)  // set the radio group name
+
+        let $range_div = $macro.find(".macro_type_range")
+        let $message_div = $macro.find(".macro_type_message")
+        let $script_div = $macro.find(".macro_type_script")
+        let $any_div = $macro.find(".macro_type_any")
+
+        function set_enabled() {
+            if (macro.enabled) {
+                $enable.removeClass(SummaryPromptEditInterface.fa_disabled)
+                $enable.addClass(SummaryPromptEditInterface.fa_enabled)
+                $enable.removeClass("red_button")
+                $enable.addClass("button_highlight")
+                $enable.prop('title', "Enabled")
+            } else {
+                $enable.removeClass(SummaryPromptEditInterface.fa_enabled)
+                $enable.addClass(SummaryPromptEditInterface.fa_disabled)
+                $enable.removeClass("button_highlight")
+                $enable.addClass("red_button")
+                $enable.prop('title', "Disabled")
+            }
+        }
+
+        // set settings
+        let $name = $macro.find("input.macro_name")
+        let $enable = $macro.find("button.macro_enable")
+        let $preview = $macro.find("button.macro_preview")
+        let $delete = $macro.find("button.macro_delete")
+        let $restore = $macro.find("button.macro_restore")
+        let $macro_type_div = $macro.find('.macro_type')
+        let $macro_type_radios = $macro.find(`input[name=${radio_group_name}]`)
+        let $macro_preset_start = $macro.find(".macro_preset_start")
+        let $macro_preset_end = $macro.find(".macro_preset_end")
+        let $macro_preset_bot_messages = $macro.find(".macro_preset_bot_messages")
+        let $macro_preset_bot_summaries = $macro.find(".macro_preset_bot_summaries")
+        let $macro_preset_user_messages = $macro.find(".macro_preset_user_messages")
+        let $macro_preset_user_summaries = $macro.find(".macro_preset_user_summaries")
+        let $macro_command_message = $macro.find(".macro_type_message input.macro_command")
+        let $macro_command_script  = $macro.find(".macro_type_script input.macro_command")
+        let $macro_instruct = $macro.find(".macro_instruct_template")
+        let $regex_select = $macro.find(".regex_select")
+
+        function show_settings_div() {
+            // hide/show the appropriate settings divs.
+            // .show() fails if the object isn't in the DOM yet, so we have to try/catch since the popup isn't inserted yet.
+            if (macro.type === "preset") {
+                try {
+                    $range_div.show()
+                    $message_div.show()
+                    $macro_command_message.change()  // trigger a change event on the command input so the macro's script actually changes
+                } catch {}
+                $script_div.hide()
+
+            } else if (macro.type === "custom") {
+                $range_div.hide()
+                $message_div.hide()
+                try {
+                    $script_div.show()
+                    $macro_command_script.change()
+                } catch {}
+            }
+        }
+        show_settings_div()
+
+        // preview
+        $preview.on('click', async () => await this.preview_macro(macro))
+
+        // enable
+        set_enabled()
+        $enable.on('click', async () => {
+            macro.enabled = !macro.enabled
+            set_enabled()
+        })
+
+        // if it has a description, add it as the title for the name
+        if (macro.description) {
+            $name.attr('title', macro.description)
+        }
+
+        // special case for the {{message}} macro
+        if (macro.name === "message") {
+            $macro_type_div.remove()
+            $range_div.remove()
+            $script_div.remove()
+        }
+
+        // delete / restore
+        if (macro.default) {
+            $name.prop('disabled', true)  // prevent name change (or else we couldn't restore default)
+            $delete.remove()
+            $restore.on('click', () => this.restore_macro_default(macro.name))
+        } else {
+            $restore.remove()
+            $delete.on('click', () => {
+                delete this.macros[macro.name]
+                $macro.remove()
+            })
+        }
+
+        // name
+        $name.val(macro.name)
+        $name.on('change', () => {
+            let old_name = macro.name
+            let new_name = $name.val()
+            if (old_name === new_name) return  // no change
+
+            // can't change the name of a default or special macro
+            if (macro.default || macro.type === "special") {
+                $name.val(old_name)  // set the field to the old value
+                return
+            }
+
+            new_name = this.get_unique_name(new_name)  // ensure unique name
+            macro.name = new_name
+            this.macros[new_name] = macro
+            delete this.macros[old_name]
+
+            // change the ID of the card
+            $macro.attr('id', this.get_id(new_name))
+            $name.val(new_name)  // set the field
+        })
+
+        // type
+        $macro_type_radios.filter(`[value=${macro.type}]`).prop('checked', true)
+        $macro_type_radios.on('change', () => {
+            macro.type = $macro_type_radios.filter(':checked').val()
+            show_settings_div()
+        })
+
+        // start, end
+        $macro_preset_start.val(macro.start ?? this.default_macro_settings.start)
+        $macro_preset_start.on('change', () => {
+            macro.start = Number($macro_preset_start.val())
+        })
+        $macro_preset_end.val(macro.end ?? this.default_macro_settings.end)
+        $macro_preset_end.on('change', () => {
+            macro.end = Number($macro_preset_end.val())
+        })
+
+        // checkboxes
+        $macro_preset_bot_messages.prop('checked', macro.bot_messages)
+        $macro_preset_bot_messages.on('change', () => {
+            macro.bot_messages = $macro_preset_bot_messages.is(':checked')
+        })
+        $macro_preset_bot_summaries.prop('checked', macro.bot_summaries)
+        $macro_preset_bot_summaries.on('change', () => {
+            macro.bot_summaries = $macro_preset_bot_summaries.is(':checked')
+        })
+        $macro_preset_user_messages.prop('checked', macro.user_messages)
+        $macro_preset_user_messages.on('change', () => {
+            macro.user_messages = $macro_preset_user_messages.is(':checked')
+        })
+        $macro_preset_user_summaries.prop('checked', macro.user_summaries)
+        $macro_preset_user_summaries.on('change', () => {
+            macro.user_summaries = $macro_preset_user_summaries.is(':checked')
+        })
+        $macro_instruct.prop('checked', macro.instruct_template)
+        $macro_instruct.on('change', () => {
+            macro.instruct_template = $macro_instruct.is(':checked')
+        })
+
+        // update the regex Select2 (gotta add an ID to the template too)
+        let options = []
+        let selected = []
+        let regex_scripts = getRegexScripts()
+        for (let i in regex_scripts) {
+            let name = regex_scripts[i].scriptName
+            options.push({id: i, name: name})
+            if (macro.regex_scripts.includes(name)) selected.push(i)
+        }
+        refresh_select2_element($regex_select, selected, options, t`Select regex scripts`, (values) => {
+            macro.regex_scripts = values
+        })
+
+        // commands
+        $macro_command_message.val(macro.command)
+        $macro_command_message.on('change', () => {
+            macro.command = $macro_command_message.val()
+        })
+
+        $macro_command_script.val(macro.command)
+        $macro_command_script.on('change', () => {
+            macro.command = $macro_command_script.val()
+        })
+    }
+
+    // special macros
+    async special_macro_message(index) {
+        let macro = this.get_macro("message")
+        let message = this.ctx.chat[index]
+        let role = message.is_user ? 'user' : message.is_system ? 'system' : 'assistant'
+
+        // apply script and regex
+        let text = await this.evaluate_script(macro, index)
+
+        if (macro.instruct_template) {  // apply template
+            return [{role: role, name: message.name, content: text}]
+        } else {
+            return [{content: text}]
+        }
+
+    }
+
+    // utilities
+    is_open() {
+        if (!this.popup) return false
+        return this.$content.closest('dialog').attr('open');
+    }
+    from_settings() {
+        // set the interface from settings
+        this.$prompt?.val(get_settings('prompt'))
+        this.$prompt_role?.val(get_settings('prompt_role'))
+        this.$prefill?.val(get_settings('prefill'))
+        this.$show_prefill?.prop('checked', get_settings('show_prefill', true))
+        this.macros = get_settings('summary_prompt_macros', true)
+
+        // for each macro, ensure default settings if not specified
+        for (let name of Object.keys(this.macros)) {
+            this.macros[name] = Object.assign({}, this.default_macro_settings, this.macros[name])
+        }
+    }
+    save_settings() {
+        // save settings in the interface
+        set_settings('prompt', this.$prompt.val())  // save the prompt
+        set_settings('prompt_role', Number(this.$prompt_role.val()))
+        set_settings('prefill', this.$prefill.val())
+        set_settings('show_prefill', this.$show_prefill.is(':checked'))
+        set_settings('summary_prompt_macros', this.macros, true)
+    }
+    get_prompt_role(name=false) {
+        let role = this.is_open() ? Number(this.$prompt_role.val()) : get_settings('prompt_role')
+        if (name) {
+            switch (role) {
+                case extension_prompt_roles.USER:
+                    role = 'user'
+                    break
+                case extension_prompt_roles.ASSISTANT:
+                    role = 'assistant'
+                    break
+                default:
+                    role = 'system'
+                    break
+            }
+        }
+        return role
+    }
+    get_prefill() {
+        return this.is_open() ? this.$prefill.val() : get_settings('prefill')
+    }
+    get_unique_name(name) {
+        // if the given name isn't unique, make it unique
+
+        // replace the last "_n" with "_(n+1)"
+        while (this.get_macro(name)) {
+            let match = name.match(/_(\d+)$/)
+            if (match) {
+                name = name.slice(0, match.index) + "_" + (Number(match[1]) + 1)
+            } else {
+                name += "_2"
+            }
+        }
+        return name
+    }
+    get_id(name) {
+        // get the HTML ID for the given macro name
+        return `summary_macro_definition_${name}`
+    }
+    list_macros() {
+        return Object.keys(this.macros)
+    }
+    get_macro(name) {
+        // get the macro by name.
+        let macro = this.macros[name]
+        if (macro) return macro
+    }
+    new_macro(name=null) {
+        // Create a new macro with the given name or the default
+        let macro = structuredClone(this.default_macro_settings)
+        if (name) macro.name = name
+        macro.name = this.get_unique_name(macro.name)  // ensure unique name from existing macros
+        this.macros[macro.name] = macro
+        this.create_macro_interface(macro)
+    }
+    restore_macro_default(name) {
+        // Restore the macro to default (does nothing for non-default macros).
+        // Edit the macro settings object in-place so all the callbacks with a reference to it still work.
+        let macro = this.get_macro(name)
+        if (!macro.default) return
+        let default_macro = default_summary_macros[name]
+        if (!default_macro) error(`Attempted to restore default summary macro, but no default was found: "${name}"`)
+        assign_and_prune(macro, default_macro)
+        this.update_macros(macro)
+    }
+
+    async preview_prompt() {
+        // show the summary prompt preview popup using the current interface settings
+        let index = this.ctx.chat.length-1
+        let text = this.$prompt.val()
+        let messages = await this.create_summary_prompt(index, text)
+        let prompt = createRawPrompt(messages, this.api, false, false, '', this.get_prefill())  // build prompt
+        if (typeof prompt === 'string') {
+            prompt = clean_string_for_html(prompt)
+        } else {  // array
+            prompt = JSON.stringify(prompt, null, "&emsp;")
+        }
+        await display_text_modal(t`Summary Prompt Preview (Last Message)`, prompt);
+    }
+    async preview_macro(macro) {
+        // show the result of the given macro
+        let messages = await this.compute_macro(this.ctx.chat.length-1, macro.name, true)
+        let result;
+        if (macro.instruct_template) {
+            result = createRawPrompt(messages, this.api, false, false, '', '')  // build prompt with instruct template
+            if (typeof result === 'string') {
+                // remove the end line (which for TC include the assistant start sequence)
+                let end_line = formatInstructModePrompt(this.ctx.name2, false, '', this.ctx.name1, this.ctx.name2, true, false)
+                if (result.slice(result.length-end_line.length, result.length) === end_line) {  // end line present
+                    result = result.slice(0, result.length-end_line.length)
+                }
+
+                result = clean_string_for_html(result)  // if string, clean it
+            } else {  // list of message objects
+                result = result.map(m => {  // need to clean text before we stringify because of the &emsp;
+                    m.content = clean_string_for_html(m.content)
+                    return m
+                })
+                result = JSON.stringify(result, null, "&emsp;")
+            }
+        } else {
+            result = createRawPrompt(messages, this.api, true, false, '', '')  // build prompt ignoring instruct
+            result = result?.[0]?.content ?? result
+            result = clean_string_for_html(result)
+        }
+
+        await display_text_modal(t`Macro Preview:`+` {{${macro.name}}}`, result)
+    }
+
+
+    // creating the prompt
+    async evaluate_script(macro, id, text=null) {
+        // Evaluate any regex and scripts on the macro for the given message index
+        if (text === null) {
+            text = this.ctx.chat[id].mes
+        }
+
+        // evaluate regex if present
+        for (let regex of macro.regex_scripts ?? []) {
+            text = runRegexScript(get_regex_script(regex), text)
+        }
+
+        // evaluate script if present
+        let command = macro.command
+        if (command?.trim()) {
+            // replace {{id}} in the command with the message index
+            command = command.replace(/\{\{id}}/g, id.toString())
+
+            // replace {{message}} with the text of the message
+            command = command.replace(/\{\{message}}/g, text)
+
+            try {
+                let result = await this.ctx.executeSlashCommandsWithOptions(command)
+                text = result?.pipe ?? ""
+            } catch (e) {
+                error(e)
+                return ""
+            }
+        }
+
+        return text
+    }
+    async compute_macro(index, name, ignore_enabled=false) {
+        // get the result from the given custom macro for the given message index
+        // Returns a list of message objects, i.e.: [{role: '', content: ''}, ...]
+        let macro = this.get_macro(name)
+        if (!macro) return  // macro doesn't exist
+        if (!macro.enabled && !ignore_enabled) return
+
+        console.log("COMPUTING: ", name)
+
+        // special macro?
+        if (name === "message") {
+            return this.special_macro_message(index)
+        }
+
+        if (macro.type === "preset") {  // range presets
+           return this.compute_range_macro(index, macro)
+        } else if (macro.type === "custom") {  // STScript
+            let text = await this.evaluate_script(macro, index, "")
+            if (text && macro.instruct_template) {
+                return [{role: this.get_prompt_role(true), content: text}]
+            } else {
+                return [{content: text}]
+            }
+
+        } else {
+            error(`Unknown summary prompt macro type: "${macro.type}"`)
+        }
+    }
+    async compute_range_macro(index, macro) {
+        // Get a history of messages from index-end to index-start
+        // Returns a list of message objects
+        let chat = this.ctx.chat
+        let history = []
+
+        // calculate starting and ending indexes, bounded by the start of the chat
+        let start_index = Math.max(index-macro.end, 0)
+        let end_index = Math.max(index-macro.start, 0)
+        debug(`Getting Message History. Index: ${index}, Start: ${macro.start}, End: ${macro.end} (${start_index} to ${end_index})`)
+
+        for (let i = start_index; i <= end_index && i < chat.length; i++) {
+            let m = chat[i];
+            let include_message = true
+            let include_summary = true
+
+            // whether we include the message itself is determined only by these settings.
+            // Even if the message wouldn't be *summarized* we still want to include it in the history for context.
+            if (m.is_user) {
+                include_message = macro.user_messages
+                include_summary = macro.user_summaries
+            } else if (m.is_system || m.is_thoughts) {
+                include_message = false;
+                include_summary = false
+            } else {  // otherwise it's a bot message
+                include_message = macro.bot_messages
+                include_summary = macro.bot_summaries
+            }
+
+            if (include_message) {
+                // apply script and regex
+                let text = await this.evaluate_script(macro, i)
+                let role = m.is_user ? 'user' : m.is_system ? 'system' : 'assistant'
+
+                // apply template
+                if (macro.instruct_template) {
+                    history.push({role: role, name: m.name, content: text})
+                } else {
+                    history.push(text)
+                }
+            }
+
+            if (include_summary) {
+                // Whether we include the *summary* is also determined by the regular summary inclusion criteria.
+                // This is so the inclusion matches the summary injection.
+                include_summary = check_message_exclusion(m)
+                let memory = get_memory(m)
+                if (include_summary && memory) {  // if there is a memory to include
+                    memory = `Summary: ${memory}`
+                    if (macro.instruct_template) {
+                        history.push({role: 'system', content: memory})
+                    } else {
+                        history.push(memory)
+                    }
+                }
+            }
+        }
+
+        // join with newlines
+        if (macro.instruct_template) {
+            return history
+        } else {
+            return [{content: history.join('\n')}]
+        }
+    }
+
+    async create_summary_prompt(index, prompt=null) {
+        // Create the full summary prompt for the message at the given index.
+        // The instruct template will automatically add an input sequence to the beginning and an output sequence to the end.
+        // Therefore, if we are NOT using instructOverride, we have to remove the first system sequence at the very beginning which gets added by format_system_prompt.
+        // If we ARE using instructOverride, we have to add a final trailing output sequence
+
+        // If no prompt given, use the current settings prompt.
+        if (prompt === null) {
+            prompt = get_settings('prompt')
+        }
+
+        // map of macros used in the prompt to their values
+        let macros = await this.compute_used_macros(index, prompt)
+
+        // Substitute any {{#if macro}} ... {{/if}} blocks.
+        // These conditional substitutions have to be done before splitting and making each section a system prompt,
+        //   because the conditional content may contain regular text that should be included in the system prompt.
+        prompt = this.substitute_conditionals(prompt, macros)
+
+        // now split the prompt into messages and substitute macros
+        let messages = this.evaluate_prompt(prompt, macros)
+
+        // substitute any global macros like {{persona}}, {{char}}, etc...
+        for (let message of messages) {
+            message.content = this.ctx.substituteParamsExtended(message.content)
+        }
+        return messages
+    }
+    async compute_used_macros(index, text) {
+        // return a mapping of the macros used in this text and their return value
+
+        // Matches {{macro}} or {{#if macro}}, captures the macro name
+        let matches = regex(text, /\{\{#if (.*?)}}|\{\{(?!\/if)(.*?)}}/gs)
+
+        // trim whitespace and remove duplicates
+        let names = new Set()
+        for (let match of matches) {  // iterate over all match objects
+            names.add(match.trim())
+        }
+
+        // compute value for each
+        let values = {}
+        for (let name of names) {
+            let value = await this.compute_macro(index, name)
+            if (!value) continue
+            values[name] = value
+        }
+        return values
+    }
+    substitute_conditionals(text, macros) {
+        // substitute any {{#if macro}} ... {{/if}} blocks in the text with the corresponding content if the macro is in the passed map
+        // Does NOT replace the actual macros, that is done in substitute_macros()
+        // We use Handlebars.js to parse out the {{#if}} ... {{/if}} blocks
+        // ignoreStandalone=true: blocks and partials that are on their own line will not remove the whitespace on that line.
+
+        let template_data = {};
+        for (let name of Object.keys(macros)) {
+            template_data[name] = `{{${name}}}`  // replace any instance of the macro with itself
+        }
+        try {
+            return Handlebars.compile(text, {ignoreStandalone: true})(template_data)
+        } catch (e) {
+            error(`ERROR: ${e}`)
+            return text
+        }
+    }
+    evaluate_prompt(text, macros) {
+        // Convert the prompt into chat-style messages, i.e. [{role: '', content: ''}, ...]
+        // Any {{macro}} items present will become a separate message if they need to be wrapped in an instruct template.
+        // It is assumed that the macros will be later replaced with appropriate text
+
+        // split on {{...}}
+        // /g flag is for global, /s flag makes . match newlines so the {{#if ... /if}} can span multiple lines
+        // You need the capturing groups for the matches to be included in the parts.
+        // However this results in some parts being undefined for some reason, I think because only one capturing group is used for each match
+        let parts = text.split(/(\{\{.*?}})/g);
+        let messages = []
+        let merge_next = false
+
+        let add = (content) => {
+            // add content to the message list
+            for (let message of content) {
+                if (message.role) {  // if a role is present, don't merge it.
+                    messages.push(message)
+                    merge_next = false  // don't merge the next one
+                } else {  // no role - merge with last message if possible
+                    if (merge_next && messages.length > 0) {
+                        messages[messages.length - 1].content += message.content
+                    } else {  // can't merge or first item
+                        messages.push({role: this.get_prompt_role(true), content: message.content})  // use default role
+                    }
+                    merge_next = true  // can merge next one with this
+                }
+            }
+        }
+
+        for (let i in parts) {
+            let part = parts[i]?.trim()
+            if (!part) continue  // some parts are undefined
+            if (part.startsWith('{{') && part.endsWith('}}')) {  // this is a macro
+                let macro_name = part.slice(2, -2)  // get the macro name
+                let value = macros[macro_name]
+                add(value)  // don't merge
+            } else {  // not a macro - merge according to the previous item
+                add([{content: parts[i]}])
+            }
+        }
+        return messages
+    }
+}
+
+
 
 // Message functions
 function set_data(message, key, value) {
@@ -2211,7 +3155,7 @@ function get_data(message, key) {
     return message?.extra?.[MODULE_NAME]?.[key];
 }
 function get_memory(message) {
-    // returns the memory (and reasoning, if present) properly prepended with the prefill (if present)
+    // returns the memory properly prepended with the prefill (if present)
     let memory = get_data(message, 'memory') ?? ""
     let prefill = get_data(message, 'prefill') ?? ""
 
@@ -2412,6 +3356,7 @@ function update_message_inclusion_flags() {
 
     debug("Updating message inclusion flags")
 
+    let separate_long_term = get_settings('separate_long_term')
     let injection_threshold = get_settings('summary_injection_threshold')
     let exclude_messages = get_settings('exclude_messages_after_threshold')
     let keep_last_user_message = get_settings('keep_last_user_message')
@@ -2421,10 +3366,13 @@ function update_message_inclusion_flags() {
     // iterate through the chat in reverse order and mark the messages that should be included in short-term and long-term memory
     let short_limit_reached = false;
     let long_limit_reached = false;
-    let long_term_end_index = null;  // index of the most recent message that doesn't fit in short-term memory
     let end = chat.length - 1;
-    let summary = ""  // total concatenated summary so far
-    let new_summary = ""  // temp summary storage to check token length
+
+    let short_summary = ""  // total concatenated summary so far
+    let long_summary = ""  // temp summary storage to check token length
+    let new_short_summary = ""
+    let new_long_summary = ""
+
     for (let i = end; i >= 0; i--) {
         let message = chat[i];
 
@@ -2453,29 +3401,30 @@ function update_message_inclusion_flags() {
                 continue
             }
 
-            new_summary = concatenate_summary(summary, message)  // concatenate this summary
-            let short_token_size = count_tokens(new_summary);
-            if (short_token_size > get_short_token_limit()) {  // over context limit
-                short_limit_reached = true;
-                long_term_end_index = i;  // this is where long-term memory ends and short-term begins
-                summary = ""  // reset summary
-            } else {  // under context limit
-                set_data(message, 'include', 'short');
-                summary = new_summary
-                continue
+            // consider this for short term memories as long as we aren't separating long-term or (if we are), this isn't a long-term
+            if (!separate_long_term || !get_data(message, 'remember')) {
+                new_short_summary = concatenate_summary(short_summary, message)  // concatenate this summary
+                let short_token_size = count_tokens(new_short_summary);
+                if (short_token_size > get_short_token_limit()) {  // over context limit
+                    short_limit_reached = true;
+                } else {  // under context limit
+                    set_data(message, 'include', 'short');
+                    short_summary = new_short_summary
+                    continue
+                }
             }
         }
 
-        // if the short-term limit has been reached, check the long-term limit
+        // if the short-term limit has been reached (or we are separating), check the long-term limit.
         let remember = get_data(message, 'remember');
         if (!long_limit_reached && remember) {  // long-term limit hasn't been reached yet and the message was marked to be remembered
-            new_summary = concatenate_summary(summary, message)  // concatenate this summary
-            let long_token_size = count_tokens(new_summary);
+            new_long_summary = concatenate_summary(long_summary, message)  // concatenate this summary
+            let long_token_size = count_tokens(new_long_summary);
             if (long_token_size > get_long_token_limit()) {  // over context limit
                 long_limit_reached = true;
             } else {
                 set_data(message, 'include', 'long');  // mark the message as long-term
-                summary = new_summary
+                long_summary = new_long_summary
                 continue
             }
         }
@@ -2486,16 +3435,16 @@ function update_message_inclusion_flags() {
 
     update_all_message_visuals()
 }
-function concatenate_summary(existing_text, message) {
+function concatenate_summary(existing_text, message, separator=null) {
     // given an existing text of concatenated summaries, concatenate the next one onto it
     let memory = get_memory(message)
     if (!memory) {  // if there's no summary, do nothing
         return existing_text
     }
-    let separator = get_settings('summary_injection_separator')
+    separator = separator ?? get_settings('summary_injection_separator')
     return existing_text + separator + memory
 }
-function concatenate_summaries(indexes) {
+function concatenate_summaries(indexes, separator=null) {
     // concatenate the summaries of the messages with the given indexes
     // Excludes messages that don't meet the inclusion criteria
 
@@ -2506,7 +3455,7 @@ function concatenate_summaries(indexes) {
     // iterate through given indexes
     for (let i of indexes) {
         let message = chat[i];
-        summary = concatenate_summary(summary, message)
+        summary = concatenate_summary(summary, message, separator)
     }
 
     return summary
@@ -2580,7 +3529,7 @@ globalThis.memory_intercept_messages = function (chat, _contextSize, _abort, typ
 
 
 // Summarization
-async function summarize_messages(indexes=null, show_progress=true) {
+async function summarize_messages(indexes=null, show_progress=true, skip_initial_delay=true) {
     // Summarize the given list of message indexes (or a single index)
     let ctx = getContext();
 
@@ -2625,26 +3574,24 @@ async function summarize_messages(indexes=null, show_progress=true) {
             break;
         }
 
-        await summarize_message(i);
-
-        // wait for time delay if set
+        // Wait for time delay if set (only delay first if initial delay set)
         let time_delay = get_settings('summarization_time_delay')
-        if (time_delay > 0 && n < indexes.length-1) {  // delay all except the last
-
-            // check if summarization was stopped by the user during summarization
-            if (STOP_SUMMARIZATION) {
-                log('Summarization stopped');
-                break;
-            }
-
+        if (time_delay > 0 && (n > 0 || (n === 0 && !skip_initial_delay))) {
             debug(`Delaying generation by ${time_delay} seconds`)
             if (show_progress) progress_bar('summarize', null, null, "Delaying")
             await new Promise((resolve) => {
                 SUMMARIZATION_DELAY_TIMEOUT = setTimeout(resolve, time_delay * 1000)
                 SUMMARIZATION_DELAY_RESOLVE = resolve  // store the resolve function to call when cleared
             });
+
+            // check if summarization was stopped by the user during the delay
+            if (STOP_SUMMARIZATION) {
+                log('Summarization stopped');
+                break;
+            }
         }
 
+        await summarize_message(i);
         n += 1;
     }
 
@@ -2687,13 +3634,13 @@ async function summarize_message(index) {
     update_message_visuals(index, false, "Summarizing...")
     memoryEditInterface.update_message_visuals(index, null, false, "Summarizing...")
 
-    // If the most recent message, scroll to the bottom to get the summary in view.
+    // If the most recent message, scroll to the bottom to get the summary in view (affected by ST settings)
     if (index === chat.length - 1) {
         scrollChatToBottom();
     }
 
     // construct the full summary prompt for the message
-    let prompt = await create_summary_prompt(index)
+    let prompt = await summaryPromptEditInterface.create_summary_prompt(index)
 
     // summarize it
     let summary;
@@ -2756,54 +3703,23 @@ async function summarize_message(index) {
         scrollChatToBottom()
     }
 }
-async function summarize_text(prompt) {
+async function summarize_text(messages) {
+    let ctx = getContext()
+
     // get size of text
-    let token_size = count_tokens(prompt);
+    let token_size = messages.reduce((acc, p) => acc + count_tokens(p.content), 0);
 
     let context_size = get_context_size();
     if (token_size > context_size) {
-        error(`Text ${token_size} exceeds context size ${context_size}.`);
+        error(`Text (${token_size}) exceeds context size (${context_size}).`);
     }
 
-    let ctx = getContext()
-
-    // At least one openai-style API required at least two messages to be sent.
-    // We can do this by adding a system prompt, which will get added as another message in generateRaw().
-    // A hack obviously. Is this a standard requirement for openai-style chat completion?
-    // TODO update with a more robust method
-    let system_prompt = false
-    if (main_api === 'openai') {
-        system_prompt = "Complete the requested task."
-    }
-
-    // TODO do the world info injection manually instead
-    let include_world_info = get_settings('include_world_info');
-    let result;
-    if (include_world_info) {
-        /**
-         * Background generation based on the provided prompt.
-         * @param {string} quiet_prompt Instruction prompt for the AI
-         * @param {boolean} quietToLoud Whether the message should be sent in a foreground (loud) or background (quiet) mode
-         * @param {boolean} skipWIAN whether to skip addition of World Info and Author's Note into the prompt
-         * @param {string} quietImage Image to use for the quiet prompt
-         * @param {string} quietName Name to use for the quiet prompt (defaults to "System:")
-         * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
-         * @returns
-         */
-        result = await ctx.generateQuietPrompt(prompt, true, false, system_prompt, "assistant");
-    } else {
-        /**
-         * Generates a message using the provided prompt.
-         * @param {string} prompt Prompt to generate a message from
-         * @param {string} api API to use. Main API is used if not specified.
-         * @param {boolean} instructOverride true to override instruct mode, false to use the default value
-         * @param {boolean} quietToLoud true to generate a message in system mode, false to generate a message in character mode
-         * @param {string} [systemPrompt] System prompt to use. Only Instruct mode or OpenAI.
-         * @param {number} [responseLength] Maximum response length. If unset, the global default value is used.
-         * @returns {Promise<string>} Generated message
-         */
-        result = await generateRaw(prompt, '', true, false, system_prompt, null, false);
-    }
+    // prompt, api, instructOverride, systemMode, systemPrompt, responseLength, trimNames, prefill
+    let result = await generateRaw({
+        prompt: messages,
+        trimNames: false,
+        prefill: get_settings('prefill')
+    });
 
     // trim incomplete sentences if set in ST settings
     if (ctx.powerUserSettings.trim_sentences) {
@@ -2812,170 +3728,6 @@ async function summarize_text(prompt) {
 
     return result;
 }
-function get_message_history(index) {
-    // Get a history of messages leading up to the given index (excluding the message at the index)
-    // If the include_message_history setting is 0, returns null
-    let num_history_messages = get_settings('include_message_history');
-    let mode = get_settings('include_message_history_mode');
-    if (num_history_messages === 0 || mode === "none") {
-        return;
-    }
-
-    let ctx = getContext()
-    let chat = ctx.chat
-
-    let num_included = 0;
-    let history = []
-    for (let i = index-1; num_included < num_history_messages && i>=0; i--) {
-        let m = chat[i];
-        let include = true
-
-        // whether we include the message itself is determined only by these settings.
-        // Even if the message wouldn't be *summarized* we still want to include it in the history for context.
-        if (m.is_user && !get_settings('include_user_messages_in_history')) {
-            include = false;
-        } else if (m.is_system && !get_settings('include_system_messages_in_history')) {
-            include = false;
-        } else if (m.is_thoughts && !get_settings('include_thought_messages_in_history')) {
-            include = false;
-        }
-
-        if (!include) continue;
-
-        let included = false
-        if (mode === "summaries_only" || mode === "messages_and_summaries") {
-
-            // Whether we include the *summary* is determined by the regular summary inclusion criteria.
-            // This is so the inclusion matches the summary injection.
-            let include_summary = check_message_exclusion(m)
-            let memory = get_memory(m)
-            if (include_summary && memory) {
-                memory = `Summary: ${memory}`
-                history.push(formatInstructModeChat("assistant", memory, false, false, "", "", "", null))
-                included = true
-            }
-        }
-        if (mode === "messages_only" || mode === "messages_and_summaries") {
-            history.push(formatInstructModeChat(m.name, m.mes, m.is_user, false, "", ctx.name1, ctx.name2, null))
-            included = true
-        }
-
-        if (included) {
-            num_included++
-        }
-    }
-
-    // reverse the history so that the most recent message is first
-    history.reverse()
-
-    // join with newlines
-    return history.join('\n')
-}
-function system_prompt_split(text) {
-    // Given text with some number of {{macro}} items, split the text by these items and format the rest as system messages surrounding the macros
-    // It is assumed that the macros will be later replaced with appropriate text
-
-    // split on either {{...}} or {{#if ... /if}}.
-    // /g flag is for global, /s flag makes . match newlines so the {{#if ... /if}} can span multiple lines
-    let parts = text.split(/(\{\{#if.*?\/if}})|(\{\{.*?}})/gs);
-
-    let formatted = parts.map((part) => {
-        if (!part) return ""  // some parts are undefined
-        part = part.trim()  // trim whitespace
-        if (!part) return ""  // if empty after trimming
-        if (part.startsWith('{{') && part.endsWith('}}')) {
-            return part  // don't format macros
-        }
-        let formatted = formatInstructModeChat("assistant", part, false, true, "", "", "", null)
-        return `${formatted}`
-    })
-    return formatted.join('')
-}
-function substitute_conditionals(text, params) {
-    // substitute any {{#if macro}} ... {{/if}} blocks in the text with the corresponding content if the macro is present in the params object.
-    // Does NOT replace the actual macros, that is done in substitute_params()
-
-    let parts = text.split(/(\{\{#if.*?\/if}})/gs);
-    let formatted = parts.map((part) => {
-        if (!part) return ""
-        if (!part.startsWith('{{#if')) return part
-        part = part.trim()  // clean whitespace
-        let macro_name = part.match(/\{\{#if (.*?)}}/)[1]
-        let macro_present = Boolean(params[macro_name]?.trim())
-        let conditional_content = part.match(/\{\{#if.*?}}(.*?)\{\{\/if}}/s)[1] ?? ""
-        return macro_present ? conditional_content : ""
-    })
-    return formatted.join('')
-}
-function substitute_params(text, params) {
-    // custom function to parse macros because I literally cannot find where ST does it in their code.
-    // Does NOT take into account {{#if macro}} ... {{/if}} blocks, that is done in substitute_conditionals()
-    // If the macro is not found in the params object, it is replaced with an empty string
-
-    let parts = text.split(/(\{\{.*?}})/g);
-    let formatted = parts.map((part) => {
-        if (!part) return ""
-        if (!part.startsWith('{{') || !part.endsWith('}}')) return part
-        part = part.trim()  // clean whitespace
-        let macro = part.slice(2, -2)
-        return params[macro] ?? ""
-    })
-    return formatted.join('')
-}
-async function create_summary_prompt(index) {
-    // create the full summary prompt for the message at the given index.
-    // the instruct template will automatically add an input sequence to the beginning and an output sequence to the end.
-    // Therefore, if we are NOT using instructOverride, we have to remove the first system sequence at the very beginning which gets added by format_system_prompt.
-    // If we ARE using instructOverride, we have to add a final trailing output sequence
-
-    let ctx = getContext()
-    let chat = ctx.chat
-    let message = chat[index];
-
-    // get history of messages (formatted as system messages) leading up to the message
-    let history_text = get_message_history(index);
-
-    // format the message itself
-    let message_text = formatInstructModeChat(message.name, message.mes, message.is_user, false, "", ctx.name1, ctx.name2, null)
-
-    // get the full prompt template from settings
-    let prompt = get_settings('prompt');
-
-    // first substitute any global macros like {{persona}}, {{char}}, etc...
-    let words = await get_summary_preset_max_tokens()
-    prompt = ctx.substituteParamsExtended(prompt, {"words": words})
-
-    // then substitute any {{#if macro}} ... {{/if}} blocks
-    prompt = substitute_conditionals(prompt, {"message": message_text, "history": history_text})
-
-    // The conditional substitutions have to be done before splitting and making each section a system prompt, because the conditional content may contain regular text
-    //  that should be included in the system prompt.
-
-    // if nesting
-    if (get_settings('nest_messages_in_prompt')) {
-        // substitute custom macros
-        prompt = substitute_params(prompt, {"message": message_text, "history": history_text});  // substitute "message" and "history" macros
-
-        // then wrap it in the system prompt (if using instructOverride)
-        prompt = formatInstructModeChat("", prompt, false, true, "", "", "", null)
-    } else {  // otherwise
-        // first make each prompt section its own system prompt
-        prompt = system_prompt_split(prompt)
-
-        // now substitute the custom macros
-        prompt = substitute_params(prompt, {"message": message_text, "history": history_text});  // substitute "message" and "history" macros
-    }
-
-    // If using instructOverride, append the assistant starting message template to the text, replacing the name with "assistant" if needed
-    let output_sequence = ctx.substituteParamsExtended(power_user.instruct.output_sequence, {name: "assistant"});
-    prompt = `${prompt}\n${output_sequence}`
-
-    // finally, append the prefill
-    prompt = `${prompt} ${get_settings('prefill')}`
-
-    return prompt
-}
-
 function refresh_memory() {
     let ctx = getContext();
     if (!chat_enabled()) { // if chat not enabled, remove the injections
@@ -3066,7 +3818,7 @@ function collect_messages_to_auto_summarize() {
     debug(`Messages to summarize (${messages_to_summarize.length}): ${messages_to_summarize}`)
     return messages_to_summarize.reverse()  // reverse for chronological order
 }
-async function auto_summarize_chat() {
+async function auto_summarize_chat(skip_initial_delay=true) {
     // Perform automatic summarization on the chat
     log('Auto-Summarizing chat...')
     let messages_to_summarize = collect_messages_to_auto_summarize()
@@ -3079,14 +3831,15 @@ async function auto_summarize_chat() {
     }
 
     let show_progress = get_settings('auto_summarize_progress');
-    await summarize_messages(messages_to_summarize, show_progress);
+    await summarize_messages(messages_to_summarize, show_progress, skip_initial_delay);
 }
 
 // Event handling
 var last_message_swiped = null  // if an index, that was the last message swiped
+var last_message = null // if an index, that was the last message sent
 async function on_chat_event(event=null, data=null) {
     // When the chat is updated, check if the summarization should be triggered
-    debug("Chat updated: " + event)
+    debug("Chat updated: " + event + " " + data)
 
     const context = getContext();
     let index = data
@@ -3118,7 +3871,6 @@ async function on_chat_event(event=null, data=null) {
             await auto_summarize_chat();  // auto-summarize the chat
             break;
 
-        // currently no triggers on user message rendered
         case 'user_message':
             last_message_swiped = null;
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
@@ -3144,15 +3896,23 @@ async function on_chat_event(event=null, data=null) {
                 debug("re-summarizing on swipe")
                 await summarize_messages(index);  // summarize the swiped message
                 refresh_memory()
-                break;
-            } else { // not a swipe
-                last_message_swiped = null;
+            } else if (last_message === index) {  // not a swipe, but the same index as last message - must be a continue
+                last_message_swiped = null
+                let message = context.chat[index];
+                if (!get_settings("auto_summarize_on_continue")) break;  // if auto_summarize_on_continue is disabled, no nothing
+                if (!get_memory(message, 'memory')) break;  // if the message doesn't have a memory, skip.
+                debug("re-summarizing on continue")
+                await summarize_messages(index);  // summarize the swiped message
+                refresh_memory()
+            } else { // not a swipe or continue
+                last_message_swiped = null
                 if (!get_settings('auto_summarize')) break;  // if auto-summarize is disabled, do nothing
                 if (get_settings("auto_summarize_on_send")) break;  // if auto_summarize_on_send is enabled, don't auto-summarize on character message
                 debug("New message detected, summarizing")
-                await auto_summarize_chat();  // auto-summarize the chat (checks for exclusion criteria and whatnot)
-                break;
+                await auto_summarize_chat(get_settings('summarization_time_delay_skip_first'));  // auto-summarize the chat, skipping first delay if needed
             }
+            last_message = index;
+            break;
 
         case 'message_edited':  // Message has been edited
             last_message_swiped = null;
@@ -3169,6 +3929,7 @@ async function on_chat_event(event=null, data=null) {
             break;
 
         case 'message_swiped':  // when this event occurs, don't summarize yet (a new_message event will follow)
+            last_message_swiped = index;
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
             debug("Message swiped, reloading memory")
 
@@ -3181,7 +3942,6 @@ async function on_chat_event(event=null, data=null) {
             }
 
             refresh_memory()
-            last_message_swiped = index;
 
             // make sure the chat is scrolled to the bottom because the memory will change
             scrollChatToBottom();
@@ -3227,44 +3987,24 @@ function initialize_settings_listeners() {
     bind_function('#edit_memory_state', () => memoryEditInterface.show())
     bind_function("#refresh_memory", () => refresh_memory());
 
-    bind_function('#edit_summary_prompt', async () => {
-        let max_tokens = await get_summary_preset_max_tokens()
-        let description = `
-Available Macros:
-<ul style="text-align: left; font-size: smaller;">
-    <li><b>{{message}}:</b> The message text.</li>
-    <li><b>{{history}}:</b> The message history as configured by the "Message History" setting.</li>
-    <li><b>{{words}}:</b> The token limit as defined by the chosen completion preset (Currently: ${max_tokens}).</li>
-</ul>
-`
-        get_user_setting_text_input('prompt', 'Edit Summary Prompt', description)
-    })
+    bind_function('#edit_summary_prompt', () => summaryPromptEditInterface.show())
     bind_function('#edit_long_term_memory_prompt', async () => {
         let description = `
 <ul style="text-align: left; font-size: smaller;">
-    <li>This will be the content of the <b>{{${long_memory_macro}}}</b> macro.</li>
+    <li>This will be the content of <b>{{${long_memory_macro}}}</b></li>
     <li>If there is nothing in long-term memory, the whole macro will be empty.</li>
-    <li>In this input, the <b>{{${generic_memories_macro}}}</b> macro will be replaced by all long-term memories.</li>
+    <li><b>{{${generic_memories_macro}}}</b> will be replaced by all long-term memories.</li>
 </ul>`
-        get_user_setting_text_input('long_template', `Edit Long-Term Memory Injection`, description)
+        get_user_setting_text_input('long_template', t`Edit Long-Term Memory Injection`, description)
     })
     bind_function('#edit_short_term_memory_prompt', async () => {
         let description = `
 <ul style="text-align: left; font-size: smaller;">
-    <li>This will be the content of the <b>{{${short_memory_macro}}}</b> macro.</li>
+    <li>This will be the content of <b>{{${short_memory_macro}}}</b></li>
     <li>If there is nothing in short-term memory, the whole macro will be empty.</li>
-    <li>In this input, the <b>{{${generic_memories_macro}}}</b> macro will be replaced by all short-term memories.</li>
+    <li><b>{{${generic_memories_macro}}}</b> will be replaced by all short-term memories.</li>
 </ul>`
-        get_user_setting_text_input('short_template', `Edit Short-Term Memory Injection`, description)
-    })
-    bind_function('#preview_message_history', async () => {
-        let chat = getContext().chat;
-        let history = get_message_history(chat.length-1);
-        display_text_modal("{{history}} Macro Preview (Last Message)", history);
-    })
-    bind_function('#preview_summary_prompt', async () => {
-        let text = await create_summary_prompt(getContext().chat.length-1)
-        display_text_modal("Summary Prompt Preview (Last Message)", text);
+        get_user_setting_text_input('short_template', t`Edit Short-Term Memory Injection`, description)
     })
 
     bind_setting('#connection_profile', 'connection_profile', 'text')
@@ -3272,53 +4012,41 @@ Available Macros:
     bind_setting('#auto_summarize', 'auto_summarize', 'boolean');
     bind_setting('#auto_summarize_on_edit', 'auto_summarize_on_edit', 'boolean');
     bind_setting('#auto_summarize_on_swipe', 'auto_summarize_on_swipe', 'boolean');
+    bind_setting('#auto_summarize_on_continue', 'auto_summarize_on_continue', 'boolean');
     bind_setting('#auto_summarize_batch_size', 'auto_summarize_batch_size', 'number');
     bind_setting('#auto_summarize_message_limit', 'auto_summarize_message_limit', 'number');
     bind_setting('#auto_summarize_progress', 'auto_summarize_progress', 'boolean');
     bind_setting('#auto_summarize_on_send', 'auto_summarize_on_send', 'boolean');
     bind_setting('#summarization_delay', 'summarization_delay', 'number');
     bind_setting('#summarization_time_delay', 'summarization_time_delay', 'number')
-    bind_setting('#prefill', 'prefill', 'text')
-    bind_setting('#show_prefill', 'show_prefill', 'boolean')
+    bind_setting('#summarization_time_delay_skip_first', 'summarization_time_delay_skip_first', 'boolean')
 
     bind_setting('#include_user_messages', 'include_user_messages', 'boolean');
     bind_setting('#include_system_messages', 'include_system_messages', 'boolean');
     bind_setting('#include_narrator_messages', 'include_narrator_messages', 'boolean')
     bind_setting('#message_length_threshold', 'message_length_threshold', 'number');
 
-    bind_setting('#include_world_info', 'include_world_info', 'boolean');
     bind_setting('#block_chat', 'block_chat', 'boolean');
-    bind_setting('#nest_messages_in_prompt', 'nest_messages_in_prompt', 'boolean')
-    bind_setting('#include_message_history', 'include_message_history', 'number');
-    bind_setting('#include_message_history_mode', 'include_message_history_mode', 'text');
-    bind_setting('#include_user_messages_in_history', 'include_user_messages_in_history', 'boolean');
 
     bind_setting('#summary_injection_separator', 'summary_injection_separator', 'text')
     bind_setting('#summary_injection_threshold', 'summary_injection_threshold', 'number');
     bind_setting('#exclude_messages_after_threshold', 'exclude_messages_after_threshold', 'boolean');
     bind_setting('#keep_last_user_message', 'keep_last_user_message', 'boolean')
+    bind_setting('#separate_long_term', 'separate_long_term', 'boolean');
 
     bind_setting('input[name="short_term_position"]', 'short_term_position', 'number');
     bind_setting('#short_term_depth', 'short_term_depth', 'number');
     bind_setting('#short_term_role', 'short_term_role');
     bind_setting('#short_term_scan', 'short_term_scan', 'boolean');
-    bind_setting('#short_term_context_limit', 'short_term_context_limit', 'number', () => {
-        $('#short_term_context_limit_display').text(get_short_token_limit());
-    });
-    bind_setting('input[name="short_term_context_type"]', 'short_term_context_type', 'text', () => {
-        $('#short_term_context_limit_display').text(get_short_token_limit());
-    })
+    bind_setting('#short_term_context_limit', 'short_term_context_limit', 'number')
+    bind_setting('input[name="short_term_context_type"]', 'short_term_context_type', 'text')
 
     bind_setting('input[name="long_term_position"]', 'long_term_position', 'number');
     bind_setting('#long_term_depth', 'long_term_depth', 'number');
     bind_setting('#long_term_role', 'long_term_role');
     bind_setting('#long_term_scan', 'long_term_scan', 'boolean');
-    bind_setting('#long_term_context_limit', 'long_term_context_limit', 'number', () => {
-        $('#long_term_context_limit_display').text(get_long_token_limit());  // update the displayed token limit
-    });
-    bind_setting('input[name="long_term_context_type"]', 'long_term_context_type', 'text', () => {
-        $('#long_term_context_limit_display').text(get_long_token_limit());  // update the displayed token limit
-    })
+    bind_setting('#long_term_context_limit', 'long_term_context_limit', 'number')
+    bind_setting('input[name="long_term_context_type"]', 'long_term_context_type', 'text')
 
     bind_setting('#debug_mode', 'debug_mode', 'boolean');
     bind_setting('#display_memories', 'display_memories', 'boolean')
@@ -3337,10 +4065,10 @@ function initialize_message_buttons() {
     let ctx = getContext()
 
     let html = `
-<div title="Remember (toggle inclusion of summary in long-term memory)" class="mes_button ${remember_button_class} fa-solid fa-brain" tabindex="0"></div>
-<div title="Force Exclude (toggle inclusion of summary from all memory)" class="mes_button ${forget_button_class} fa-solid fa-ban" tabindex="0"></div>
-<div title="Edit Summary" class="mes_button ${edit_button_class} fa-solid fa-pen-fancy" tabindex="0"></div>
-<div title="Summarize (AI)" class="mes_button ${summarize_button_class} fa-solid fa-quote-left" tabindex="0"></div>
+<div title="${t`Remember (toggle inclusion of summary in long-term memory)`}" class="mes_button ${remember_button_class} fa-solid fa-brain" tabindex="0"></div>
+<div title="${t`Force Exclude (toggle inclusion of summary from all memory)`}" class="mes_button ${forget_button_class} fa-solid fa-ban" tabindex="0"></div>
+<div title="${t`Edit Summary`}" class="mes_button ${edit_button_class} fa-solid fa-pen-fancy" tabindex="0"></div>
+<div title="${t`Summarize (AI)`}" class="mes_button ${summarize_button_class} fa-solid fa-quote-left" tabindex="0"></div>
 <span class="${css_button_separator}"></span>
 `
 
@@ -3385,7 +4113,7 @@ function initialize_group_member_buttons() {
     debug("Initializing group member buttons")
 
     let $template = $('#group_member_template').find('.group_member_icon')
-    let $button = $(`<div title="Toggle summarization for memory" class="right_menu_button fa-solid fa-lg fa-brain ${group_member_enable_button}"></div>`)
+    let $button = $(`<div title="${t`Toggle summarization for memory`}" class="right_menu_button fa-solid fa-lg fa-brain ${group_member_enable_button}"></div>`)
 
     // add listeners
     $(document).on("click", `.${group_member_enable_button}`, (e) => {
@@ -3436,76 +4164,54 @@ function initialize_slash_commands() {
     let ARGUMENT_TYPE = ctx.ARGUMENT_TYPE
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'qvink_log_chat',
+        name: 'qm-debug',
+        aliases: ['qvink-memory-debug'],
+        helpString: 'Logs the ST core context and Qvink Memory extension settings to console.',
         callback: (args) => {
-            log(getContext())
-            log(getContext().chat)
+            log(getContext());
+            log(extension_settings[MODULE_NAME]);
+            return "";
         },
-        helpString: 'log chat',
+
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'qvink_log_settings',
-        callback: async (args) => {
-            log(extension_settings[MODULE_NAME])
-        },
-        helpString: 'Log current settings',
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'hard_reset',
+        name: 'qm-hard-reset',
+        aliases: ['qvink-memory-hard-reset'],
+        helpString: 'WARNING: Hard reset all settings for this extension. All config profiles will be deleted.',
         callback: (args) => {
-            hard_reset_settings()
-            refresh_settings()
-            refresh_memory()
+            hard_reset_settings();
+            refresh_settings();
+            refresh_memory();
+            return "";
         },
-        helpString: 'Hard reset all settings',
+
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'remember',
-        callback: (args, index) => {
-            if (index === "") index = null  // if not provided the index is an empty string, but we need it to be null to get the default behavior
-            remember_message_toggle(index);
+        name: 'qm-enabled',
+        aliases: ['qvink-memory-enabled'],
+        helpString: 'Return whether the extension is enabled in the current chat.',
+        callback: (args) => {
+            return String(chat_enabled());
         },
-        helpString: 'Toggle the remember status of a message (default is the most recent message)',
-        unnamedArgumentList: [
-            SlashCommandArgument.fromProps({
-                description: 'Index of the message to toggle',
-                isRequired: false,
-                typeList: ARGUMENT_TYPE.NUMBER,
-            }),
-        ],
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'force_exclude_memory',
-        callback: (args, index) => {
-            if (index === "") index = null  // if not provided the index is an empty string, but we need it to be null to get the default behavior
-            forget_message_toggle(index);
-        },
-        helpString: 'Toggle the ememory exclusion status of a message (default is the most recent message)',
-        unnamedArgumentList: [
-            SlashCommandArgument.fromProps({
-                description: 'Index of the message to toggle',
-                isRequired: false,
-                typeList: ARGUMENT_TYPE.NUMBER,
-            }),
-        ],
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'toggle_memory',
+        name: 'qm-toggle',
+        aliases: ['qvink-memory-toggle'],
+        helpString: 'Change whether the extension is enabled for the current chat. If no state is provided, it will toggle the current state.',
         callback: (args, state) => {
             if (state === "") {  // if not provided the state is an empty string, but we need it to be null to get the default behavior
-                state = null
+                state = null;
             } else {
-                state = state === "true"  // convert to boolean
+                state = state === "true";  // convert to boolean
             }
 
             toggle_chat_enabled(state);  // toggle the memory for the current chat
+            return "";
         },
-        helpString: 'Change whether memory is enabled for the current chat. If no state is provided, it will toggle the current state.',
+
         unnamedArgumentList: [
             SlashCommandArgument.fromProps({
                 description: 'Boolean value to set the memory state',
@@ -3516,62 +4222,178 @@ function initialize_slash_commands() {
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'get_memory_enabled',
-        callback: (args) => {
-            return chat_enabled()
-        },
-        helpString: 'Return whether memory is currently enabled.'
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'toggle_memory_display',
+        name: 'qm-toggle-display',
+        aliases: ['qvink-memory-toggle-display'],
+        helpString: "Toggle the \"display memories\" setting on the current profile (doesn't save the profile).",
         callback: (args) => {
             $(`.${settings_content_class} #display_memories`).click();  // toggle the memory display
+            return "";
         },
-        helpString: "Toggle the \"display memories\" setting on the current profile (doesn't save the profile).",
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'toggle_memory_popout',
+        name: 'qm-toggle-auto-summarize',
+        aliases: ['qvink-memory-toggle-auto-summarize'],
+        helpString: "Toggle the \"auto-summarize\" setting on the current profile (doesn't save the profile).",
         callback: (args) => {
-            toggle_popout()
+            $(`.${settings_content_class} #auto_summarize`).click();  // toggle the memory display
+            return "";
         },
-        helpString: 'Toggle the extension config popout',
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'toggle_memory_edit_interface',
+        name: 'qm-toggle-config',
+        aliases: ['qvink-memory-toggle-config'],
+        helpString: 'Toggle the extension config popout.',
         callback: (args) => {
-            memoryEditInterface.show()
+            toggle_popout();
+            return "";
         },
-        helpString: 'Toggle the memory editing interface',
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'toggle_memory_injection_preview',
+        name: 'qm-toggle-edit-interface',
+        aliases: ['qvink-memory-toggle-edit-interface'],
+        helpString: 'Toggle the memory editing interface.',
         callback: (args) => {
-            display_injection_preview()
-        },
-        helpString: 'Toggle a preview of the current memory injection',
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'summarize_chat',
-        helpString: 'Summarize the chat using the auto-summarization criteria, even if auto-summarization is off.',
-        callback: async (args, limit) => {
-            let indexes = collect_messages_to_auto_summarize()
-            await summarize_messages(indexes);
+            memoryEditInterface.show();
+            return "";
         },
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'summarize',
+        name: 'qm-toggle-injection-preview',
+        aliases: ['qvink-memory-toggle-injection-preview'],
+        helpString: 'Toggle a preview of the current memory injection.',
+        callback: (args) => {
+            display_injection_preview();
+            return "";
+        },
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'qm-toggle-remember',
+        aliases: ['qvink-memory-toggle-remember'],
+        callback: (args, index) => {
+            if (index === "") index = null  // if not provided the index is an empty string, but we need it to be null to get the default behavior
+            remember_message_toggle(index);
+            return "";
+        },
+        helpString: 'Toggle whether a memory should be long-term (default is the most recent message).',
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'Index of the message to toggle',
+                isRequired: false,
+                typeList: ARGUMENT_TYPE.NUMBER,
+            }),
+        ],
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'qm-toggle-exclude',
+        aliases: ['qvink-memory-toggle-exclude'],
+        helpString: 'Toggle to force-exclude a memory, regardless of other inclusion criteria (default is the most recent message).',
+        callback: (args, index) => {
+            if (index === "") index = null  // if not provided the index is an empty string, but we need it to be null to get the default behavior
+            forget_message_toggle(index);
+            return "";
+        },
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'Index of the message to toggle',
+                isRequired: false,
+                typeList: ARGUMENT_TYPE.NUMBER,
+            }),
+        ],
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'qm-get',
+        aliases: ['qvink-memory-get'],
+        callback: async (args, value) => {
+            let chat = getContext().chat
+            let separator = args.separator ?? get_settings('summary_injection_separator')
+            let range;
+            if (value === "") {
+                range = {start: chat.length-1, end: chat.length-1}
+            } else {
+                range = stringToRange(value, 0, chat.length - 1);
+                if (!range) {
+                    error(`Invalid range provided: "${value}"`);
+                    return "";
+                }
+            }
+
+            let indexes = []
+            for (let i=range.start; i<=range.end; i++) {
+                indexes.push(i)
+            }
+            return concatenate_summaries(indexes, separator)
+        },
+        helpString: 'Return the memory associated with a given message index or range. If no index given, assumes the most recent message.',
+        namedArgumentList: [
+            SlashCommandNamedArgument.fromProps({
+                name: 'separator',
+                description: 'String to separate memories. Defaults to the current profile\'s separator.',
+                isRequired: false,
+                typeList: [ARGUMENT_TYPE.STRING]
+            }),
+        ],
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'Index of the message or range of messages',
+                isRequired: false,
+                typeList: [ARGUMENT_TYPE.NUMBER, ARGUMENT_TYPE.RANGE]
+            }),
+        ],
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'qm-set',
+        aliases: ['qvink-memory-set'],
+        callback: async (args, value) => {
+            let chat = getContext().chat
+            let values = value.split(' ');
+            let index = chat.length - 1;
+            let text = "";
+            if (value !== "") {
+                index = Number(values[0]);
+                text = values[1] ?? "";
+            }
+            if (isNaN(index)) {
+                error(`Invalid index: "${values[0]}"`);
+                return "";
+            }
+            debug(`Setting memory for message ${index} to "${text}"`)
+            set_data(chat[index], "memory", text);
+            refresh_memory();
+            return "";
+        },
+        helpString: 'Set the memory for a given message index. If no text provided, deletes the memory.',
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'Index of the message',
+                isRequired: true,
+                typeList: ARGUMENT_TYPE.NUMBER,
+            }),
+            SlashCommandArgument.fromProps({
+                description: 'Text to set the memory to. If not provided, deletes the memory.',
+                isRequired: false,
+                typeList: ARGUMENT_TYPE.STRING,
+            }),
+        ],
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'qm-summarize',
+        aliases: ['qvink-memory-summarize'],
         callback: async (args, index) => {
             if (index === "") index = null  // if not provided the index is an empty string, but we need it to be null to get the default behavior
             await summarize_messages(index);  // summarize the message
             refresh_memory();
+            return "";
         },
-        helpString: 'Summarize the given message index (defaults to most recent applicable message)',
+        helpString: 'Summarize the given message index (defaults to most recent applicable message).',
         unnamedArgumentList: [
             SlashCommandArgument.fromProps({
                 description: 'Index of the message to summarize',
@@ -3582,29 +4404,35 @@ function initialize_slash_commands() {
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'stop_summarization',
+        name: 'qm-summarize-chat',
+        aliases: ['qvink-memory-summarize-chat'],
+        helpString: 'Summarize the chat using the auto-summarization criteria, even if auto-summarization is off.',
+        callback: async (args, limit) => {
+            let indexes = collect_messages_to_auto_summarize();
+            await summarize_messages(indexes);
+            return ""
+        },
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'qm-stop-summarization',
+        aliases: ['qvink-memory-stop-summarization'],
         callback: (args) => {
-            stop_summarization()
+            stop_summarization();
+            return "";
         },
         helpString: 'Abort any summarization taking place.',
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'get_memory',
-        callback: async (args, index) => {
-            let chat = getContext().chat
-            if (index === "") index = chat.length - 1
-            return get_memory(chat[index])
+        name: 'qm-max-summary-tokens',
+        aliases: ['qvink-memory-max-summary-tokens'],
+        callback: async (args) => {
+            return String(await get_summary_preset_max_tokens());
         },
-        helpString: 'Return the memory associated with a given message index. If no index given, assumes the most recent message.',
-        unnamedArgumentList: [
-            SlashCommandArgument.fromProps({
-                description: 'Index of the message',
-                isRequired: false,
-                typeList: ARGUMENT_TYPE.NUMBER,
-            }),
-        ],
+        helpString: 'Return the max tokens allowed for summarization given the current completion preset.'
     }));
+
 }
 
 function add_menu_button(text, fa_icon, callback, hover=null) {
@@ -3624,7 +4452,7 @@ function add_menu_button(text, fa_icon, callback, hover=null) {
     $button.click(() => callback());
 }
 function initialize_menu_buttons() {
-    add_menu_button("Toggle Memory", "fa-solid fa-brain", toggle_chat_enabled, "Toggle memory for the current chat.")
+    add_menu_button(t`Toggle Memory`, "fa-solid fa-brain", toggle_chat_enabled, t`Toggle memory for the current chat.`)
 }
 
 
@@ -3650,7 +4478,7 @@ function initialize_popout() {
     $popout.attr('id', 'qmExtensionPopout').removeClass('zoomed_avatar').addClass('draggable').empty();
 
     // create the control bar with the close button
-    const controlBarHtml = `<div class="panelControlBar flex-container">
+    const controlBarHtml = `<div class="panelControlBar flex-container" id="qmExtensionPopoutheader">
     <div class="fa-solid fa-grip drag-grabber hoverglow"></div>
     <div class="fa-solid fa-circle-xmark hoverglow dragClose"></div>
     </div>`;
@@ -3676,6 +4504,8 @@ function initialize_popout() {
 function open_popout() {
     debug("Showing popout")
     $('body').append($popout);  // add the popout to the body
+    loadMovingUIState()
+    dragElement($popout)
 
     // setup listener for close button to remove the popout
     $popout.find('.dragClose').off('click').on('click', function () {
@@ -3705,6 +4535,7 @@ function toggle_popout() {
 
 // Entry point
 let memoryEditInterface;
+let summaryPromptEditInterface
 jQuery(async function () {
     log(`Loading extension...`)
 
@@ -3718,7 +4549,9 @@ jQuery(async function () {
     // Load settings
     initialize_settings();
 
+    // initialize interfaces
     memoryEditInterface = new MemoryEditInterface()
+    summaryPromptEditInterface = new SummaryPromptEditInterface()
 
     // load settings html
     await load_settings_html();
@@ -3730,6 +4563,7 @@ jQuery(async function () {
     initialize_group_member_buttons();
     initialize_slash_commands();
     initialize_menu_buttons();
+    add_i18n()
 
     // ST event listeners
     let ctx = getContext();
@@ -3737,7 +4571,7 @@ jQuery(async function () {
     let event_types = ctx.event_types;
     eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, (id) => on_chat_event('char_message', id));
     eventSource.on(event_types.USER_MESSAGE_RENDERED, (id) => on_chat_event('user_message', id));
-    eventSource.on(event_types.GENERATE_BEFORE_COMBINE_PROMPTS, (id, stuff) => on_chat_event('before_message', id));
+    eventSource.on(event_types.GENERATION_STARTED, (id, stuff, dry) => {if (dry) return; on_chat_event('before_message')})
     eventSource.on(event_types.MESSAGE_DELETED, (id) => on_chat_event('message_deleted', id));
     eventSource.on(event_types.MESSAGE_EDITED, (id) => on_chat_event('message_edited', id));
     eventSource.on(event_types.MESSAGE_SWIPED, (id) => on_chat_event('message_swiped', id));
@@ -3745,6 +4579,7 @@ jQuery(async function () {
     eventSource.on(event_types.MORE_MESSAGES_LOADED, refresh_memory)
     eventSource.on('groupSelected', set_character_enabled_button_states)
     eventSource.on(event_types.GROUP_UPDATED, set_character_enabled_button_states)
+    eventSource.on(event_types.SETTINGS_UPDATED, refresh_settings)  // refresh extension settings when ST settings change
 
     // Global Macros
     MacrosParser.registerMacro(short_memory_macro, () => get_short_memory());

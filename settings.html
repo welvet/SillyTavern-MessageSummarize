@@ -3,8 +3,8 @@
 
         <div class="inline-drawer-toggle inline-drawer-header">
             <div class="flex-container alignitemscenter margin0">
-                <b>Qvink Memory</b>
-                <i id="qvink_popout_button" class="fa-solid fa-window-restore menu_button margin0"></i>
+                <b id="qvink_title" title="aka: Message Summarize">Qvink Memory</b>
+                <i id="qvink_popout_button" title="Move config to floating popout" class="fa-solid fa-window-restore menu_button margin0"></i>
             </div>
             <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
         </div>
@@ -41,7 +41,7 @@
                     <button id="delete_profile"     class="menu_button fa-solid fa-trash-can interactable"  title="Delete current profile" tabindex="0"></button>
                 </div>
                 <div class="flex-container justifyspacebetween alignitemscenter">
-                    <button id="character_profile" class="menu_button interactable" title="Auto-load profile for current character" tabindex="0"><i class="fa-solid fa-unlock" style="margin-right: 1em"></i>Character</button>
+                    <button id="character_profile" class="menu_button interactable" title="Auto-load profile for current character or group" tabindex="0"><i class="fa-solid fa-unlock" style="margin-right: 1em"></i>Character</button>
                     <button id="chat_profile"      class="menu_button interactable" title="Auto-load profile for current chat"      tabindex="0"><i class="fa-solid fa-unlock" style="margin-right: 1em"></i>Chat</button>
                     <label class="checkbox_label" title="Show a notification upon switching profiles">
                         <input id="notify_on_profile_switch" type="checkbox" />
@@ -55,7 +55,6 @@
                 <h4 class="textAlignCenter">Summarization <i class="fa-solid fa-info-circle" title="Customize the prompt used to summarize a given message"></i></h4>
                 <div class="flex-container justifyspacebetween alignitemscenter">
                     <button id="edit_summary_prompt" class="menu_button flex1" title="Edit the summary prompt" >Edit</button>
-                    <button id="preview_summary_prompt" class="menu_button fa-solid fa-eye" title="Preview the filled-in summary prompt, using the last message as an example." ></button>
                     <button id="stop_summarization" class="menu_button fa-solid fa-stop" title="Stop all summarization immediately."></button>
                 </div>
 
@@ -71,90 +70,23 @@
                         <td><select id="completion_preset" class="text_pole"></select></td>
                     </tr>
 
-                    <tr title="Start the summarization with this prefilled text.">
-                        <td><span>Summary Prefill</span></td>
-                        <td><input id="prefill" class="text_pole" type="text" placeholder="Start reply with..."></td>
-                    </tr>
-
                 </table>
 
-                <label title="Include the prefill in displayed memories and injections (no effect with reasoning models)" class="checkbox_label">
-                    <input id="show_prefill" type="checkbox" />
-                    <span>Include Prefill In Memories</span>
-                </label>
-
                 <hr>
 
-                <label class="checkbox_label" title="New messages will be automatically summarized if they will be included in short-term memory.">
-                    <input id="auto_summarize" type="checkbox" />
-                    <span>Auto Summarize</span>
-                </label>
-
-                <label class="checkbox_label" title="Auto-summarization will be triggered before a new message is sent instead of after.">
-                    <input id="auto_summarize_on_send" type="checkbox" />
-                    <span>Auto Summarize Before Generation</span>
-                </label>
-
-                <label title="Show the progress bar when auto-summarizing more than 1 message." class="checkbox_label">
-                    <input id="auto_summarize_progress" type="checkbox" />
-                    <span>Auto Summarize Progress Bar</span>
-                </label>
-
-                <label class="checkbox_label" title="Number of messages to wait before auto-summarizing a message (0 = summarize up to the most recent message, 1 = wait one message, etc.)">
-                    <input id="summarization_delay" class="text_pole widthUnset inline_setting" type="number" min="0" max="999" />
-                    <span>Auto Summarize Message Lag</span>
-                </label>
-
-                <label class="checkbox_label" title="Wait until this many messages before auto-summarizing them all in sequence (1 = summarize every message immediately, 2 = summarize when you have two ready, etc). Still summarizes one at a time. ">
-                    <input id="auto_summarize_batch_size" class="text_pole widthUnset inline_setting" type="number" min="1" max="999" />
-                    <span>Auto Summarize Batch Size</span>
-                </label>
-
-                <label class="checkbox_label" title="The maximum amount of lookback when checking for messages to summarize (-1 to disable). For example, 10 means that when auto-summarizing, the 10 most recent valid summarization targets will be checked, and those without summaries will be summarized.">
-                    <input id="auto_summarize_message_limit" class="text_pole widthUnset inline_setting" type="number" min="-1" max="999" />
-                    <span>Auto Summarize Message Limit</span>
-                </label>
-
-                <hr>
-
-                <div class="flex-container justifyspacebetween">
-                    <label title="Whether to use messages and/or summaries as context for summarization. You must use {{history}} in the summary prompt. Summaries will follow configured inclusion criteria." class="checkbox_label">
-                        <span>Message History </span>
-                        <select id="include_message_history_mode" class="text_pole flex2">
-                            <option value="none">None</option>
-                            <option value="messages_only">Messages</option>
-                            <option value="summaries_only">Summaries</option>
-                            <option value="messages_and_summaries">Both</option>
-                        </select>
-                    </label>
-                    <button id="preview_message_history" class="menu_button fa-solid fa-eye interactable" title="Preview what the message history will look like"></button>
-                </div>
-
-                <label title="How many previous messages to include in the summarization prompt as context.">
-                    <input id="include_message_history" class="text_pole widthUnset" type="number" min="1" max="99" />
-                    <span>Number of Previous Messages</span>
-                </label>
-
-                <label title="When including previous messages, also include user messages." class="checkbox_label">
-                    <input id="include_user_messages_in_history" type="checkbox" />
-                    <span>Include Previous User Messages</span>
-                </label>
-
-                <hr>
-
-                <label class="checkbox_label" title="Time in seconds to wait between summarizations. May be needed if you are using a external API with a rate limit.">
-                    <input id="summarization_time_delay" class="text_pole widthUnset inline_setting" type="number" min="0" max="999" />
-                    <span>Summarization Time Delay</span>
-                </label>
-
-                <label title="Editing a message will automatically trigger a re-summarization if it has already been summarized." class="checkbox_label">
+                <label title="Editing a message will trigger a re-summarization if it has already been summarized." class="checkbox_label">
                     <input id="auto_summarize_on_edit" type="checkbox" />
                     <span>Re-summarize on Edit</span>
                 </label>
 
-                <label title="Swiping a message will automatically trigger a re-summarization if it has already been summarized." class="checkbox_label">
+                <label title="Swiping a message will trigger a re-summarization if it has already been summarized." class="checkbox_label">
                     <input id="auto_summarize_on_swipe" type="checkbox" />
                     <span>Re-summarize on Swipe</span>
+                </label>
+
+                <label title="Continuing a message will trigger a re-summarization if it has already been summarized." class="checkbox_label">
+                    <input id="auto_summarize_on_continue" type="checkbox" />
+                    <span>Re-summarize on Continue</span>
                 </label>
 
                 <label title="Block chat input while summarizing." class="checkbox_label">
@@ -162,15 +94,48 @@
                     <span>Block Chat</span>
                 </label>
 
+                <div class="flex-container justifyspacebetween alignitemscenter">
+                    <label class="checkbox_label" title="Time in seconds to wait before summarizing. May be needed if you are using a external API with a rate limit.">
+                        <input id="summarization_time_delay" class="text_pole widthUnset inline_setting" type="number" min="0" max="999" />
+                        <span>Time Delay</span>
+                    </label>
+                    <label class="checkbox_label" title="When auto-summarizing, don't delay the first summary right after a character message.">
+                        <input id="summarization_time_delay_skip_first" type="checkbox"/>
+                        <span>Skip First</span>
+                    </label>
+                </div>
 
-                <label title="The message to summarize will be inside the system instruct template itself. In unchecked (default), the message will instead be added separately after the prompt. Some models benefit from this, but it is not recommended." class="checkbox_label">
-                    <input id="nest_messages_in_prompt" type="checkbox" />
-                    <span>Nest Message in Summary Prompt</span>
+                <hr>
+                <h4 class="textAlignCenter">Auto-Summarization <i class="fa-solid fa-info-circle" title="Automatically perform summarizations when messages are sent. A message will only be auto-summarized if that summary would be included in short-term memory."></i></h4>
+
+                <label class="checkbox_label" title="Enable / Disable.">
+                    <input id="auto_summarize" type="checkbox" />
+                    <span>Auto Summarize</span>
                 </label>
 
-                <label title="WARNING: doesn't work great. Attempts to preserve context-shifting by including all the content that is sent in regular prompts (world info, description, personas, example messages, message history, etc). If your regular prompts are static, this can allow Context Shifting to work between summarizations, but it decreases the accuracy of summarization due to all the extra stuff in the prompt. It also can't be previewed as this injection is handled by ST, not the extension." class="checkbox_label">
-                    <input id="include_world_info" type="checkbox" />
-                    <span>Include All Context Content</span>
+                <label class="checkbox_label" title="Auto-summarization will be triggered before a new message is sent instead of after.">
+                    <input id="auto_summarize_on_send" type="checkbox" />
+                    <span>Before Generation</span>
+                </label>
+
+                <label title="Show the progress bar when auto-summarizing more than 1 message." class="checkbox_label">
+                    <input id="auto_summarize_progress" type="checkbox" />
+                    <span>Progress Bar</span>
+                </label>
+
+                <label class="checkbox_label" title="Number of messages to wait before auto-summarizing a message (0 = summarize up to the most recent message, 1 = wait one message, etc.)">
+                    <input id="summarization_delay" class="text_pole widthUnset inline_setting" type="number" min="0" max="999" />
+                    <span>Message Lag</span>
+                </label>
+
+                <label class="checkbox_label" title="Wait until this many messages before auto-summarizing them all in sequence (1 = summarize every message immediately, 2 = summarize when you have two ready, etc). Still summarizes one at a time. ">
+                    <input id="auto_summarize_batch_size" class="text_pole widthUnset inline_setting" type="number" min="1" max="999" />
+                    <span>Batch Size</span>
+                </label>
+
+                <label class="checkbox_label" title="The maximum amount of lookback when checking for messages to summarize (-1 to disable). For example, 10 means that when auto-summarizing, the 10 most recent valid summarization targets will be checked, and those without summaries will be summarized.">
+                    <input id="auto_summarize_message_limit" class="text_pole widthUnset inline_setting" type="number" min="-1" max="999" />
+                    <span>Message Limit</span>
                 </label>
 
 
@@ -179,7 +144,7 @@
                 <h4 class="textAlignCenter">General Injection Settings <i class="fa-solid fa-info-circle" title="Determines how summaries are injected into context, applying to both short and long term memory."></i></h4>
                 <label title="Separator between summaries when injected into context." class="checkbox_label">
                     <input id="summary_injection_separator" class="text_pole" type="text" placeholder="" style="width: 5em">
-                    <span>Summary Injection Separator</span>
+                    <span>Summary Separator</span>
                 </label>
                 <label title="The number of messages to wait before summaries start to be injected." class="checkbox_label">
                     <input id="summary_injection_threshold" class="text_pole widthUnset" type="number" min="0" max="999" />
@@ -192,6 +157,10 @@
                 <label title="This will keep the most recent user message in context even if it's past the exclusion threshold" class="checkbox_label">
                     <input id="keep_last_user_message" type="checkbox">
                     <span>Preserve Last User Message</span>
+                </label>
+                <label title="In Static Memory Mode, long-term memories are always injected separately from short-term memories, regardless of chronological order. This is in contrast to the default behavior where summaries are kept in short-term memory until the context fills up, then dynamically moved to long-term memory if marked as such." class="checkbox_label">
+                    <input id="separate_long_term" type="checkbox">
+                    <span>Static Memory Mode</span>
                 </label>
 
 
@@ -347,7 +316,7 @@
                     <span>Enable Memory in New Chats</span>
                 </label>
 
-                <label title="Uses a global on/off state shared between all chats with this enabled. When unchecked, turning the extension on/off only applies to active chat." class="checkbox_label">
+                <label title="Uses a global on/off state for the extension shared between all chats with this enabled. If you enable this option, toggling memory on/off will also toggle memory in other chats that also have this option enabled. When disabled, toggling memory on/off only applies to the active chat." class="checkbox_label">
                     <input id="use_global_toggle_state" type="checkbox" />
                     <span>Use Global Toggle State</span>
                 </label>

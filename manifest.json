@@ -1,12 +1,15 @@
 {
     "display_name": "qvink_memory",
-    "loading_order": 100,
+    "loading_order": 1,
     "requires": [],
     "optional": [],
     "js": "index.js",
     "css": "style.css",
     "author": "qvink",
-    "version": "0.9.5",
+    "version": "1.1.0",
     "homePage": "https://github.com/qvink/qvink_memory.git",
-    "generate_interceptor": "memory_intercept_messages"
+    "generate_interceptor": "memory_intercept_messages",
+    "i18n": {
+        "zh-tw": "locales/zh-tw.json"
+    }
 }
