@@ -311,6 +311,12 @@ function assign_and_prune(target, source) {
         else target[key] = source[key];
     }
 }
+function assign_defaults(target, source) {
+    // Modifies target in-place, assigning values only when they don't exist in the target.
+    for (let key of Object.keys(source)) {
+        if (!(key in target)) target[key] = source[key];
+    }
+}
 function check_objects_different(obj_1, obj_2) {
     // check whether two objects are different by checking each key, recursively
     // if both are objects, recurse on each element of obj_1
@@ -2445,17 +2451,17 @@ class SummaryPromptEditInterface {
     static fa_disabled = "fa-xmark"
 
     default_macro_settings = {
-        "name": "new_macro",
-        "enabled": true,
-        "type": "preset",
-        "start": 1, "end": 1,
-        "bot_messages": true,
-        "bot_summaries": true,
-        "user_messages": true,
-        "user_summaries": true,
-        "instruct_template": true,
-        "command": "",
-        "regex_scripts": [],
+        name: "new_macro",
+        enabled: true,
+        type: "preset",
+        start: 1, end: 1,
+        bot_messages: true,
+        bot_summaries: true,
+        user_messages: true,
+        user_summaries: true,
+        instruct_template: true,
+        command: "",
+        regex_scripts: [],
     }
 
     // If you define the popup in the constructor so you don't have to recreate it every time, then clicking the "ok" button has like a .5-second lag before closing the popup.
@@ -2840,7 +2846,8 @@ class SummaryPromptEditInterface {
         if (!macro.default) return
         let default_macro = default_summary_macros[name]
         if (!default_macro) error(`Attempted to restore default summary macro, but no default was found: "${name}"`)
-        assign_and_prune(macro, default_macro)
+        assign_and_prune(macro, default_macro)  // set macro to the specific default in-place
+        assign_defaults(macro, this.default_macro_settings)   // set global defaults if they don't exist
         this.update_macros(macro)
     }
 
