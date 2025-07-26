@@ -1,12 +1,12 @@
 # Changelog
 
 #### v1.1.0
-**ST Version Requirement**: You must be on ST staging as it relies on this PR https://github.com/SillyTavern/SillyTavern/pull/4264#issue-3226223356
+**ST Version Requirement**: You must be on ST v1.13.2
 - **New Feature**: You can now specify the role of the summary prompt
 - **New Feature**: When using chat completion, the prompt preview will show in chat message format
-- **Fix**: Prefill now works with chat completion (and moved to the prompt editing interface)
+- **New Feature**: Prefill now works with chat completion (and moved to the prompt editing interface)
 
-#### v1.0.5
+#### v1.0.8
 **IMPORTANT 1**: All slash commands, CSS variables, and macros have been renamed for consistency. You will need to update any QRs, custom CSS, or prompts that use these.
 
 **IMPORTANT 2**: Your current `{{history}}` macro may no longer work as it did before. You will need to reconfigure it in the new interface by clicking "Edit" under "Summarization"

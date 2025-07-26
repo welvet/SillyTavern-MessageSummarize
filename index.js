@@ -656,7 +656,7 @@ async function load_settings_html() {
     let path = `${module_dir}/settings.html`
     let found = await $.get(path).then(async response => {
         log(`Loaded settings.html at "${path}"`)
-        $("#extensions_settings2").append(response);  // load html into the settings div\
+        $("#extensions_settings2").append(response);  // load html into the settings div
         return true
     }).catch((response) => {
         error(`Error getting settings.json from "${path}": status: ${response.status}`);
@@ -4563,8 +4563,6 @@ jQuery(async function () {
     initialize_group_member_buttons();
     initialize_slash_commands();
     initialize_menu_buttons();
-
-    // Add i18n
     add_i18n()
 
     // ST event listeners
