@@ -3659,7 +3659,12 @@ async function summarize_message(index) {
         if (e === "Clicked stop button") {  // summarization was aborted
             err = "Summarization aborted"
         } else {
-            error(`Unrecognized error when summarizing message ${index}: ${e}`)
+            err = e.message
+            if (e.message === "No message generated") {
+                err = "Empty Response"
+            } else {
+                error(`Unrecognized error when summarizing message ${index}: ${e}`)
+            }
         }
         summary = null
     }
@@ -3693,7 +3698,7 @@ async function summarize_message(index) {
         set_data(message, 'prefill', reasoning ? "" : get_settings('prefill'))  // store prefill if there was no reasoning.
         set_data(message, 'reasoning', reasoning)
     } else {  // generation failed
-        error(`Failed to summarize message ${index} - generation failed.`);
+        error(`Failed to summarize message ${index}: ${err}`);
         set_data(message, 'error', err || "Summarization failed");  // store the error message
         set_data(message, 'memory', null);  // clear the memory if generation failed
         set_data(message, 'edited', false);  // clear the error message
