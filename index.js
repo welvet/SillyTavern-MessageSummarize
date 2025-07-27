@@ -2933,7 +2933,7 @@ class SummaryPromptEditInterface {
         if (!macro) return  // macro doesn't exist
         if (!macro.enabled && !ignore_enabled) return
 
-        console.log("COMPUTING: ", name)
+        debug("Computing Macro: ", name)
 
         // special macro?
         if (name === "message") {
@@ -3122,7 +3122,8 @@ class SummaryPromptEditInterface {
             if (part.startsWith('{{') && part.endsWith('}}')) {  // this is a macro
                 let macro_name = part.slice(2, -2)  // get the macro name
                 let value = macros[macro_name]
-                add(value)  // don't merge
+                if (value === undefined) log(`Undefined macro in summary prompt: "${macro_name}"`)
+                add(value ?? '')  // don't merge
             } else {  // not a macro - merge according to the previous item
                 add([{content: parts[i]}])
             }
