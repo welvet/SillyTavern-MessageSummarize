@@ -12,7 +12,6 @@ import {
     scrollChatToBottom,
     extension_prompt_roles,
     extension_prompt_types,
-    is_send_press,
     saveSettingsDebounced,
     generateRaw,
     createRawPrompt,
@@ -25,11 +24,11 @@ import {
     chat_metadata,
     messageFormatting
 } from '../../../../script.js';
-import { getContext, getApiUrl, extension_settings } from '../../../extensions.js';
+import { getContext, extension_settings } from '../../../extensions.js';
 import { getPresetManager } from '../../../preset-manager.js'
 import { formatInstructModeChat, formatInstructModePrompt } from '../../../instruct-mode.js';
-import { is_group_generating, selected_group, openGroupId } from '../../../group-chats.js';
-import { loadMovingUIState, renderStoryString, power_user } from '../../../power-user.js';
+import { selected_group, openGroupId } from '../../../group-chats.js';
+import { loadMovingUIState, power_user } from '../../../power-user.js';
 import { dragElement } from '../../../RossAscends-mods.js';
 import { debounce_timeout } from '../../../constants.js';
 import { MacrosParser } from '../../../macros.js';
@@ -2724,7 +2723,7 @@ class SummaryPromptEditInterface {
         for (let i in regex_scripts) {
             let name = regex_scripts[i].scriptName
             options.push({id: i, name: name})
-            if (macro.regex_scripts.includes(name)) selected.push(i)
+            if (macro.regex_scripts?.includes(name)) selected.push(i)
         }
         refresh_select2_element($regex_select, selected, options, t`Select regex scripts`, (values) => {
             macro.regex_scripts = values
