@@ -2859,6 +2859,10 @@ class SummaryPromptEditInterface {
         if (typeof prompt === 'string') {
             prompt = clean_string_for_html(prompt)
         } else {  // array
+            prompt = prompt.map(m => {  // need to clean text *before* we stringify because of the &emsp;
+                m.content = clean_string_for_html(m.content)
+                return m
+            })
             prompt = JSON.stringify(prompt, null, "&emsp;")
         }
         await display_text_modal(t`Summary Prompt Preview (Last Message)`, prompt);
@@ -2878,7 +2882,7 @@ class SummaryPromptEditInterface {
 
                 result = clean_string_for_html(result)  // if string, clean it
             } else {  // list of message objects
-                result = result.map(m => {  // need to clean text before we stringify because of the &emsp;
+                result = result.map(m => {  // need to clean text *before* we stringify because of the &emsp;
                     m.content = clean_string_for_html(m.content)
                     return m
                 })
