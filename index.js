@@ -12,7 +12,6 @@ import {
     scrollChatToBottom,
     extension_prompt_roles,
     extension_prompt_types,
-    is_send_press,
     saveSettingsDebounced,
     generateRaw,
     createRawPrompt,
@@ -25,11 +24,11 @@ import {
     chat_metadata,
     messageFormatting
 } from '../../../../script.js';
-import { getContext, getApiUrl, extension_settings } from '../../../extensions.js';
+import { getContext, extension_settings } from '../../../extensions.js';
 import { getPresetManager } from '../../../preset-manager.js'
 import { formatInstructModeChat, formatInstructModePrompt } from '../../../instruct-mode.js';
-import { is_group_generating, selected_group, openGroupId } from '../../../group-chats.js';
-import { loadMovingUIState, renderStoryString, power_user } from '../../../power-user.js';
+import { selected_group, openGroupId } from '../../../group-chats.js';
+import { loadMovingUIState, power_user } from '../../../power-user.js';
 import { dragElement } from '../../../RossAscends-mods.js';
 import { debounce_timeout } from '../../../constants.js';
 import { MacrosParser } from '../../../macros.js';
@@ -309,6 +308,12 @@ function assign_and_prune(target, source) {
     for (let key of keys) {
         if (!(key in source)) delete target[key];
         else target[key] = source[key];
+    }
+}
+function assign_defaults(target, source) {
+    // Modifies target in-place, assigning values only when they don't exist in the target.
+    for (let key of Object.keys(source)) {
+        if (!(key in target)) target[key] = source[key];
     }
 }
 function check_objects_different(obj_1, obj_2) {
@@ -2445,17 +2450,17 @@ class SummaryPromptEditInterface {
     static fa_disabled = "fa-xmark"
 
     default_macro_settings = {
-        "name": "new_macro",
-        "enabled": true,
-        "type": "preset",
-        "start": 1, "end": 1,
-        "bot_messages": true,
-        "bot_summaries": true,
-        "user_messages": true,
-        "user_summaries": true,
-        "instruct_template": true,
-        "command": "",
-        "regex_scripts": [],
+        name: "new_macro",
+        enabled: true,
+        type: "preset",
+        start: 1, end: 1,
+        bot_messages: true,
+        bot_summaries: true,
+        user_messages: true,
+        user_summaries: true,
+        instruct_template: true,
+        command: "",
+        regex_scripts: [],
     }
 
     // If you define the popup in the constructor so you don't have to recreate it every time, then clicking the "ok" button has like a .5-second lag before closing the popup.
@@ -2718,7 +2723,7 @@ class SummaryPromptEditInterface {
         for (let i in regex_scripts) {
             let name = regex_scripts[i].scriptName
             options.push({id: i, name: name})
-            if (macro.regex_scripts.includes(name)) selected.push(i)
+            if (macro.regex_scripts?.includes(name)) selected.push(i)
         }
         refresh_select2_element($regex_select, selected, options, t`Select regex scripts`, (values) => {
             macro.regex_scripts = values
@@ -2840,7 +2845,8 @@ class SummaryPromptEditInterface {
         if (!macro.default) return
         let default_macro = default_summary_macros[name]
         if (!default_macro) error(`Attempted to restore default summary macro, but no default was found: "${name}"`)
-        assign_and_prune(macro, default_macro)
+        assign_and_prune(macro, default_macro)  // set macro to the specific default in-place
+        assign_defaults(macro, this.default_macro_settings)   // set global defaults if they don't exist
         this.update_macros(macro)
     }
 
