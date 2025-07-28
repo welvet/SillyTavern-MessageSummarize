@@ -269,3 +269,4 @@ There you will find [forum thread](https://discord.com/channels/1100685673633153
 - ~~fix prefill compatability with chat completion (generate_raw doesn't allow adding separate messages in chat completion)~~
 - ~~Re-summarize on continue~~
 - ~~Render markdown in summaries~~
+- ST PR to provide custom start/end strings to parseReasoningFromString(), and allow memories to be parsed any time. Should the reasoning format just be separate from the advanced formatting template?

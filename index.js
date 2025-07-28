@@ -185,7 +185,9 @@ function error(message) {
     console.error(`[${MODULE_NAME_FANCY}]`, message);
     toastr.error(message, MODULE_NAME_FANCY);
 }
-
+function delay(ms) {
+    return new Promise(res => setTimeout(res, ms));
+}
 function toast(message, type="info") {
     // debounce the toast messages
     toastr[type](message, MODULE_NAME_FANCY);
@@ -537,6 +539,7 @@ async function set_connection_profile(name) {
     }
     let ctx = getContext();
     await ctx.executeSlashCommandsWithOptions(`/profile ${name}`)
+    //await delay(2000)
 }
 async function get_connection_profiles() {
     // Get a list of available connection profiles
@@ -2783,6 +2786,7 @@ class SummaryPromptEditInterface {
         set_settings('prefill', this.$prefill.val())
         set_settings('show_prefill', this.$show_prefill.is(':checked'))
         set_settings('summary_prompt_macros', this.macros, true)
+        update_all_message_visuals()
     }
     get_prompt_role(name=false) {
         let role = this.is_open() ? Number(this.$prompt_role.val()) : get_settings('prompt_role')
@@ -3985,9 +3989,6 @@ function initialize_settings_listeners() {
 
     bind_function('#export_profile', () => export_profile(), false)
     bind_function('#import_profile', (e) => {
-
-        log($(e.target))
-        log($(e.target).parent().find("#import_file"))
         $(e.target).parent().find("#import_file").click()
     }, false)
     bind_function('#import_file', async (e) => await import_profile(e), false)
