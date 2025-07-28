@@ -193,7 +193,7 @@ dialog:has(#qvink_summary_prompt_interface) {
     padding-right: 0;  /* account for the padding of the card to keep the icon visually centered */
 }
 
-/* remove the background and styling form the dropdown drawers inside the summry prompt interface */
+/* remove the background and styling form the dropdown drawers inside the summary prompt interface */
 #qvink_summary_prompt_interface .inline-drawer-header {
     background: unset;
     border: unset;
@@ -202,6 +202,20 @@ dialog:has(#qvink_summary_prompt_interface) {
 }
 #qvink_summary_prompt_interface .select2-container {
     flex: 1;  /* ensures the select2 respects the surrounding flex container */
+}
+
+@media screen and (max-width: 1100px) {
+    .qm-large {
+        display: none;
+    }
+    .qm-small {
+        display: block;
+    }
+}
+@media screen and (min-width: 1100px) {
+    .qm-small {
+        display: none;
+    }
 }
 
 

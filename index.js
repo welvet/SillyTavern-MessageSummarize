@@ -2309,7 +2309,7 @@ class SummaryPromptEditInterface {
     html_template = `
 <div id="qvink_summary_prompt_interface" style="height: 100%">
 <div class="flex-container justifyspacebetween">
-    <div class="flex2">
+    <div class="flex2 toggle-macro">
         <div class="flex-container justifyspacebetween alignitemscenter">
             <h3>Summary Prompt</h3>
             <i class="fa-solid fa-info-circle" style="margin-right: 1em" title="Customize the prompt used for summarizing messages."></i>
@@ -2324,21 +2324,24 @@ class SummaryPromptEditInterface {
                     <option value="2">Assistant</option>
                 </select>
             </label>
+            <button class="menu_button fa-solid fa-list-check margin0 qm-small open_macros" title="Show/hide macro editor"></button>
+
         </div>
     </div>
-    <div class="flex1" style="height: 100%">
+    <div class="flex1 qm-large toggle-macro" style="height: 100%">
         <div class="flex-container justifyspacebetween alignitemscenter">
             <h3 class="flex2">Macros <i class="fa-solid fa-info-circle" title="Dynamic macros only available for the summary prompt."></i></h3>
             <button id="add_macro" class="flex1 menu_button" title="Add a new macro">New</button>
+            <button class="menu_button fa-solid fa-list-check margin0 qm-small open_macros" title="Show/hide macro editor"></button>
         </div>
     </div>
 </div>
 
 <div class="flex-container justifyspacebetween" style="height: calc(100% - 120px);">
-    <div class="flex2">
+    <div class="flex2 toggle-macro">
         <textarea id="prompt" class="" style="height: 100%; overflow-y: auto"></textarea>
     </div>
-    <div class="flex1" style="height: 100%">
+    <div class="flex1 qm-large toggle-macro" style="height: 100%">
         <div id="macro_definitions" style="height: 100%; overflow-y: auto"></div>
     </div>
 </div>
@@ -2479,6 +2482,7 @@ class SummaryPromptEditInterface {
         this.$restore = this.$content.find('#restore_default_prompt')
         this.$definitions = this.$content.find('#macro_definitions')
         this.$add_macro = this.$content.find('#add_macro')
+        this.$open_macros = this.$content.find('.open_macros')
 
         // settings
         this.$prompt = this.$content.find('#prompt')
@@ -2494,6 +2498,9 @@ class SummaryPromptEditInterface {
         this.$preview.on('click', () => this.preview_prompt())
         this.$add_macro.on('click', () => this.new_macro())
         this.$restore.on('click', () => this.$prompt.val(default_settings["prompt"]))
+        this.$open_macros.on('click', () => {
+            this.$content.find('.toggle-macro').toggle()
+        })
 
         // manually add tooltips to the popout buttons because you can't do that when defining them
         this.$buttons.find('.popup-button-ok').attr('title', 'Save changes to the prompt and macros')

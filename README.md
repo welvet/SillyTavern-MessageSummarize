@@ -168,6 +168,7 @@ For example, to color short-term memories yellow and long-term memories black, y
 
 - **"min new tokens must be in (0, max_new_tokens(X)], got Y":** your model has a minimum token amount, which is conflicting with the max tokens you are using for summarization. Either reduce the minimum token amount for your model (usually in the completion settings), or increase the maximum token length for summarizations.
 
+- **API Returning error about the roles:** If you are using chat completion with a cloud API, it might complain about the specific roles of the last message sent. Try this: Go to the `Summarization` section of the config, click `Edit`, then open the `message` macro dropdown and uncheck the `Separate Block` checkbox. This makes it so that the message to summarize is not sent separately, but rather as part of the system message itself.
 
 - **Summaries seem to be continuing the conversation rather than summarizing:** probably an issue with your instruct template.
 Make sure you are using the correct template for your model, and make sure that system messages are properly distinct from user messages.
