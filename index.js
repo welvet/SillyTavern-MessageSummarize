@@ -2882,7 +2882,10 @@ class SummaryPromptEditInterface {
         // show the result of the given macro
         let messages = await this.compute_macro(this.ctx.chat.length-1, macro.name, true)
         let result;
-        if (macro.instruct_template) {
+
+        if (!messages) {  // no messages, empty macro
+            result = ''
+        } else if (macro.instruct_template) {
             result = createRawPrompt(messages, this.api, false, false, '', '')  // build prompt with instruct template
             if (typeof result === 'string') {
                 // remove the end line (which for TC include the assistant start sequence)
@@ -2944,6 +2947,8 @@ class SummaryPromptEditInterface {
     async compute_macro(index, name, ignore_enabled=false) {
         // get the result from the given custom macro for the given message index
         // Returns a list of message objects, i.e.: [{role: '', content: ''}, ...]
+        // If macro evaluated empty, returns null
+
         let macro = this.get_macro(name)
         if (!macro) return  // macro doesn't exist
         if (!macro.enabled && !ignore_enabled) return
@@ -2961,13 +2966,13 @@ class SummaryPromptEditInterface {
             let text = await this.evaluate_script(macro, index, "")
             if (text && macro.instruct_template) {
                 return [{role: this.get_prompt_role(true), content: text}]
-            } else {
+            } else if (text) {
                 return [{content: text}]
             }
-
         } else {
             error(`Unknown summary prompt macro type: "${macro.type}"`)
         }
+        return null
     }
     async compute_range_macro(index, macro) {
         // Get a history of messages from index-end to index-start
@@ -3085,7 +3090,7 @@ class SummaryPromptEditInterface {
         return values
     }
     substitute_conditionals(text, macros) {
-        // substitute any {{#if macro}} ... {{/if}} blocks in the text with the corresponding content if the macro is in the passed map
+        // substitute any {{#if macro}} ... {{/if}} blocks in the text with its content if the macro is in the passed map
         // Does NOT replace the actual macros, that is done in substitute_macros()
         // We use Handlebars.js to parse out the {{#if}} ... {{/if}} blocks
         // ignoreStandalone=true: blocks and partials that are on their own line will not remove the whitespace on that line.

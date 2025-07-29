@@ -1,10 +1,11 @@
 # Changelog
 
-#### v1.1.2
+#### v1.1.5
 **ST Version Requirement**: You must be on ST v1.13.2
 - **New Feature**: You can now specify the role of the summary prompt
 - **New Feature**: When using chat completion, the prompt preview will show in chat message format
 - **New Feature**: Prefill now works with chat completion (and moved to the prompt editing interface)
+- **Fixed**: Made the summary edit popup less cramped on mobile. There is now a button that swaps between viewing the prompt and viewing the macros.
 
 #### v1.0.8
 **IMPORTANT 1**: All slash commands, CSS variables, and macros have been renamed for consistency. You will need to update any QRs, custom CSS, or prompts that use these.
