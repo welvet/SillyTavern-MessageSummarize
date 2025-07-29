@@ -22,7 +22,8 @@ import {
     CONNECT_API_MAP,
     main_api,
     chat_metadata,
-    messageFormatting
+    messageFormatting,
+    CLIENT_VERSION
 } from '../../../../script.js';
 import { getContext, extension_settings } from '../../../extensions.js';
 import { getPresetManager } from '../../../preset-manager.js'
@@ -43,6 +44,7 @@ export { MODULE_NAME };
 const MODULE_NAME = 'qvink_memory';
 const MODULE_NAME_FANCY = 'Qvink Memory';
 const PROGRESS_BAR_ID = `${MODULE_NAME}_progress_bar`;
+const REQUIRE_ST_VERSION = "1.13.2"
 
 // CSS classes (must match the CSS file because I'm too stupid to figure out how to do this properly)
 const css_message_div = `qvink_memory_display`
@@ -348,17 +350,44 @@ function get_regex_script(name) {
     }
     error(`No regex script found: "${name}"`)
 }
-function check_st_version() {
+function compare_semver(v1, v2){
+    var v1p = v1.split('.');
+    var v2p = v2.split('.');
+
+    for (var i = 0; i < v1p.length; ++i) {
+        if (v2p.length === i) {
+            return 1;
+        }
+        if (v1p[i] === v2p[i]) {
+            continue;
+        }
+        if (v1p[i] > v2p[i]) {
+            return 1;
+        }
+        return -1;
+    }
+    if (v1.length !== v2.length) {
+        return -1;
+    }
+    return 0;
+}
+async function check_st_version() {
     // Check to see if the current version of ST is acceptable.
     // Currently checks for the "symbols" property of the global context,
     //   which was added in https://github.com/SillyTavern/SillyTavern/pull/3763#issue-2948421833
-    log("Checking ST version...")
-    if (getContext().symbols !== undefined) {
-        return true
-    } else {
-        log(`Symbols not found in context: [${getContext().symbols}]`)
-        toast("Incompatible ST version - please update.", "error")
+    log("Checking ST version: " + CLIENT_VERSION)
+    try {
+        let parts = CLIENT_VERSION.split(':')
+        let version = parts[1]
+        log("ST Version: "+version)
+        log("Required Version: "+REQUIRE_ST_VERSION)
+        if (compare_semver(version, REQUIRE_ST_VERSION) < 0) {
+            error(`Incompatible ST Version [${version}], requires [${REQUIRE_ST_VERSION}]`)
+        }
+    } catch (e) {
+        error("Unable to determine ST version.")
     }
+
 }
 function add_i18n($element=null) {
     // dynamically translate config settings
@@ -4572,7 +4601,6 @@ jQuery(async function () {
     const manifest = await get_manifest();
     const VERSION = manifest.version;
     log(`Version: ${VERSION}`)
-
     check_st_version()
 
     // Load settings
