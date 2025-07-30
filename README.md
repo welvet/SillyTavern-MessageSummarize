@@ -4,9 +4,9 @@
 - [Notable Features](#notable-features)
 - [Installation and Basic Usage](#installation-and-basic-usage)
 - [Advanced Usage](#advanced-usage)
-- [Tips](#tips)
 - [Slash Commands](#slash-commands)
 - [Custom CSS](#custom-css)
+- [Tips & Tricks](#tips--tricks)
 - [Troubleshooting](#troubleshooting)
 - [Contact](#contact)
 - [Known Issues](#known-issues)
@@ -105,22 +105,6 @@ How this extension addresses these issues:
 - `Use Global Toggle State` will make all configuration profiles that have this option enabled share an on/off state. If this is enabled, toggling the extension on/off will do the same for any configuration profile that also has this option enabled. If this is disabled, then toggling the extension will only apply for the currently selected profile.
 
 
-### Tips & Tricks
-Each model is different of course, but here are just some general things that I have found help getting clean summarizations.
-Try them out if you want.
-
-- **Keep it simple**: Longer summary prompts tend to muddy the waters and get less accurate results. Just in general LLMs have trouble with information overload (hence the reason for this extension in the first place).
-- **Low temperature**: I like to use a temp of 0 to reduce creativity and just get down to the facts. No need for flowery language.
-- **No repetition penalty**: Again, no need for creativity, in fact I want it to repeat what happened.
-- **The `{{words}}` macro doesn't always help**: While some models may reign themselves in if you tell them to keep it under X words, LLMs don't have a soul and therefore can't count, so don't bet on it.
-- **You can use global macros**: If your summaries aren't using names properly, keep in mind that you can use the `{{char}}` or `{{user}}` macro in the prompt.
-- **No need to pause roleplay**: You don't have to include anything like "ignore previous instructions" or "pause your roleplay". The summary prompt is completely independent and will only send what you see in the edit window.
-- **I don't recommend reasoning**: Reasoning models can summarize fine, but they do tend to blab for ages which makes summarizing slow, so I wouldn't recommend them for that reason. If you do use one, make sure to use the appropriate prefill in your summarization prompt, and set the thinking formatting in your `Advanced Formatting` tab.
-- **Custom Macros**: In the `Edit` window for your summary prompt, you can create custom macros to use in your prompt with STScript. In your command, you can reference the ID of the message being summarized with `{{id}}` and the content of the message with `{{message}}`.
-- **Save your presets**: If you are using a different completion preset or connection profile for summaries, make sure to save any changes to your regular completion preset or instruct template. When summarizing, the extension has to temporarily switch presets or connection profiles, which will discard any unsaved changes to the one you are currently using.
-
-
-
 ### Slash Commands
 Note: all commands have `/qvink-memory-` as an alias.
 - `/qm-enabled`: Returns whether the extension is enabled in the current chat.
@@ -158,7 +142,81 @@ For example, to color short-term memories yellow and long-term memories black, y
 }
 ```
 
+### Tips & Tricks
+Each model is different of course, but here are just some general things that I have found help getting clean summarizations.
+Try them out if you want.
+
+- **Keep it simple**: Longer summary prompts tend to muddy the waters and get less accurate results. Just in general LLMs have trouble with information overload (hence the reason for this extension in the first place).
+
+
+- **Low temperature**: I like to use a temp of 0 to reduce creativity and just get down to the facts. No need for flowery language.
+
+
+- **No repetition penalty**: Again, no need for creativity, in fact I want it to repeat what happened.
+
+
+- **The `{{words}}` macro doesn't always help**: While some models may reign themselves in if you tell them to keep it under X words, LLMs don't have a soul and therefore can't count, so don't bet on it.
+
+
+- **You can use global macros**: If your summaries aren't using names properly, keep in mind that you can use the `{{char}}` or `{{user}}` macro in the prompt.
+
+
+- **No need to pause roleplay**: You don't have to include anything like "ignore previous instructions" or "pause your roleplay". The summary prompt is completely independent and will only send what you see in the edit window.
+
+
+- **I don't recommend reasoning**: Reasoning models can summarize fine, but they do tend to blab for ages which makes summarizing slow, so I wouldn't recommend them for that reason. If you do use one, make sure to use the appropriate prefill in your summarization prompt, and set the thinking formatting in your `Advanced Formatting` tab.
+
+
+- **Custom Macros**: In the `Edit` window for your summary prompt, you can create custom macros to use in your prompt with STScript. In your command, you can reference the ID of the message being summarized with `{{id}}` and the content of the message with `{{message}}`.
+
+
+- **Save your presets**: If you are using a different completion preset or connection profile for summaries, make sure to save any changes to your regular completion preset or instruct template. When summarizing, the extension has to temporarily switch presets or connection profiles, which will discard any unsaved changes to the one you are currently using.
+
+
+- **Cloud Models are Picky**: Cloud APIs tend to have strict rules about how their prompts are constructed, so you may need to adjust things when creating your prompt. For example, some models have heavy filters enabled for `User` roles messages, and may work better with `System` messages. Some cloud models don't support `System` messages at all, so you would need to use `User`. You will need to experiment, or read up on what your particular cloud model expects.
+
+
 ### Troubleshooting:
+
+- **Summaries seem to be continuing the conversation rather than summarizing:** probably an issue with your instruct template (text completion).
+Make sure you are using the correct template for your model, and make sure that system messages are properly distinct from user messages.
+This can be caused by the "System same as user" checkbox in your instruct template settings, which will cause all system messages to be treated like a user - uncheck that if your model can handle it. 
+Some default instruct templates also may not have anything defined for the "System message sequences" field - that should be filled out. If all else fails, you can also change the role of the summarization prompt in the prompt `Edit` interface (some cloud models don't have system messages).
+
+
+- **The summaries refer to "a person" or "someone" rather than the character by name:** Try using the `{{user}}` or `{{char}}` macros in the summary prompt. There is also a `{{history}}` macro to use that can add a few previous messages in the summarization prompt to give the model a little more context. 
+
+
+- **The summaries are too long:** You can select a custom completion preset in the settings to use for summarizations, and that can be used to set a maximum token length after which generation will be cut off. You can also use the `{{words}}` macro in the summarization prompt to try and guide the LLM according to that token length, though LLMs cannot actually count words so it's really just a suggestion.
+
+
+- **Reasoning model won't do any reasoning**: Some reasoning models need to be prefilled, so make sure to add that in the `Prefill` field of the summary prompt `Edit` interface (**NOT** the normal "start reply with" field in the Advanced Formatting tab).
+
+
+- **Reasoning model thinking is included in summary**: In the `Advanced Formatting` tab, make sure to fill in the thinking tags (e.g. `<think>` and `</think>` for DeepSeek R1). This will let the extension identify the thinking section in memories and parse them separately.
+
+
+- **Chat Completion API behaving strangely (errors, hallucinating, etc):** If you are using a cloud API, it might have specific requirements about how it expects prompts to be sent.
+  - Some cloud models don't support a `System` role for prompts, so you would need to use the `User` role in the summary prompt `Edit` interface.
+  - Some cloud models don't accept prompts that end in an assistant message, so if the prompt ends with the `{{message}}` macro, you would need to disable the `Separate Block` checkbox in the `{{message}}` macro. This makes it so that the message to summarize is not sent separately, but rather as part of the prompt message itself.
+  - Some cloud models need more than one message to be sent. To accomplish this, you could make a custom STScript macro, put it at the top of your prompt, and check the `Separate Block` checkbox to make it a separate message.
+
+
+
+- **Incomplete sentences aren't getting trimmed even though the option is checked in the advanced formatting settings:** If you are using a different connection profile for summaries, note that instruction templates are part of that so the option needs to be checked in the templated used for that connection profile.
+
+
+- **My jailbreak isn't working:** You'll need to put a jailbreak in the summarization prompt if you want it to be included.
+
+
+- **Just updated and things are broken:** try reloading the page first, and make sure you are on the most recent version of ST. If you are on the dev branch of this extension, you must also be on the staging branch of ST.
+
+
+- **When I use a different completion preset for summaries, my regular completion preset get changed after summarizing:** When a summary is generated, we actually have to switch completion presets temporarily which discards any unsaved changes you might have made to your current completion preset. This is just how ST does things. The same applies to connection profiles (which in turn affects instruction templates.)
+
+
+- **An unknown error occurred while counting tokens**: This might indicate an issue with your custom chat completion preset. ST expects there to be a prompt section called "main", which is where extension injections go by default. If your preset doesn't have a section called "main", this will fail and cause the above error. To fix this, you can (1) add a section called "main" to your preset or (2) go to this extension's config menu and click "Do not inject" in both the short-term and long-term injection sections. This will prevent the extension from attempting to insert context, and you can instead use the `{{short_term_memory}}` and `{{long_term_memory}}` macros to place them anywhere you want.
+
 
 - **"ForbiddenError: invalid csrf token":** You opened ST in multiple tabs.
 
@@ -167,40 +225,6 @@ For example, to color short-term memories yellow and long-term memories black, y
 
 
 - **"min new tokens must be in (0, max_new_tokens(X)], got Y":** your model has a minimum token amount, which is conflicting with the max tokens you are using for summarization. Either reduce the minimum token amount for your model (usually in the completion settings), or increase the maximum token length for summarizations.
-
-- **API Returning error about the roles:** If you are using chat completion with a cloud API, it might complain about the specific roles of the last message sent. Try this: Go to the `Summarization` section of the config, click `Edit`, then open the `message` macro dropdown and uncheck the `Separate Block` checkbox. This makes it so that the message to summarize is not sent separately, but rather as part of the system message itself.
-
-- **Summaries seem to be continuing the conversation rather than summarizing:** probably an issue with your instruct template.
-Make sure you are using the correct template for your model, and make sure that system messages are properly distinct from user messages.
-This can be caused by the "System same as user" checkbox in your instruct template settings, which will cause all system messages to be treated like a user - uncheck that if your model can handle it. 
-Some default instruct templates also may not have anything defined for the "System message sequences" field - that should be filled out. If all else fails, you can also change the role of the summarization prompt in the prompt `Edit` interface (some cloud models don't have system messages).
-
-
-- **My jailbreak isn't working:** You'll need to put a jailbreak in the summarization prompt if you want it to be included.
-
-
-- **The summaries refer to "a person" or "someone" rather than the character by name:** Try using the `{{user}}` or `{{char}}` macros in the summary prompt. There is also a "Message History" setting to include a few previous messages in the summarization prompt to give the model a little more context. 
-
-
-- **The summaries are too long:** You can select a custom completion preset in the settings to use for summarizations, and that can be used to set a maximum token length after which generation will be cut off. You can also use the `{{words}}` macro in the summarization prompt to try and guide the LLM according to that token length, though LLMs cannot actually count words so it's really just a suggestion.
-
-
-- **Incomplete sentences aren't getting trimmed even though the option is checked in the advanced formatting settings:** If you are using a different connection profile for summaries, note that instruction templates are part of that so the option needs to be checked in the templated used for that connection profile.
-
-
-- **When I use a different completion preset for summaries, my regular completion preset get changed after summarizing:** When a summary is generated, we actually have to switch completion presets temporarily which discards any unsaved changes you might have made to your current completion preset. This is just how ST does things. The same applies to connection profiles (which in turn affects instruction templates.)
-
-
-- **Reasoning model won't do any reasoning**: Some reasoning models need to be prefilled, so make sure to add that in the `Prefill` field of the summary prompt `Edit` interface (**not** the normal "start reply with" field in the `Advanced Formatting` tab).
-
-
-- **Reasoning model thinking is included in summary**: In the `Advanced Formatting` tab, make sure to fill in the thinking tags (e.g. `<think>` and `</think>`). This will let the extension identify the thinking section in memories and parse them separately.
-
-
-- **An unknown error occurred while counting tokens**: This might indicate an issue with your custom chat-completion preset. ST expects there to be a prompt section called "main", which is where extension injections go by default. To fix this, you can go to this extension's config menu and click "Do not inject" in both the short-term and long-term injection sections. This will prevent the extension from attempting to insert context, and you can instead use the `{{short_term_memory}}` and `{{long_term_memory}}` macros to place them anywhere you want.
-
-
-- **Just updated and things are broken:** try reloading the page first, and make sure you are on the most recent version of ST. If you are on the dev branch of this extension, you must also be on the staging branch of ST.
 
 
 If it's something else, please turn on `Debug Mode` in the settings and send me the output logs from your browser console and raise an issue or message on discord.

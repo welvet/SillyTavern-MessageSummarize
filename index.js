@@ -112,7 +112,7 @@ const default_settings = {
     // summarization settings
     prompt: default_prompt,
     summary_prompt_macros: default_summary_macros,  // macros for the summary prompt interface
-    prompt_role: extension_prompt_roles.SYSTEM,
+    prompt_role: extension_prompt_roles.USER,
     prefill: "",   // summary prompt prefill
     show_prefill: false, // whether to show the prefill when memories are displayed
     completion_preset: "",  // completion preset to use for summarization. Empty ("") indicates the same as currently selected.
@@ -348,7 +348,7 @@ function get_regex_script(name) {
             return script
         }
     }
-    error(`No regex script found: "${name}"`)
+    debug(`No regex script found: "${name}"`)
 }
 function compare_semver(v1, v2){
     var v1p = v1.split('.');
@@ -2813,6 +2813,13 @@ class SummaryPromptEditInterface {
         // for each macro, ensure default settings if not specified
         for (let name of Object.keys(this.macros)) {
             this.macros[name] = Object.assign({}, this.default_macro_settings, this.macros[name])
+
+            // check each regex macro. Only keep valid macros.
+            let valid_macros = []
+            for (let regex of this.macros[name].regex_scripts) {
+                if (get_regex_script(name)) valid_macros.push(regex)
+            }
+            this.macros[name].regex_scripts = valid_macros
         }
     }
     save_settings() {

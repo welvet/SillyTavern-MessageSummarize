@@ -1,6 +1,6 @@
 # Changelog
 
-#### v1.1.5
+#### v1.1.7
 **ST Version Requirement**: You must be on ST v1.13.2
 - **New Feature**: You can now specify the role of the summary prompt
 - **New Feature**: When using chat completion, the prompt preview will show in chat message format
