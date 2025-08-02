@@ -8,7 +8,7 @@
 - [Custom CSS](#custom-css)
 - [Tips & Tricks](#tips--tricks)
 - [Troubleshooting](#troubleshooting)
-- [Contact](#contact)
+- [Reporting an Issue](#reporting-an-issue)
 - [Known Issues](#known-issues)
 
 
@@ -227,12 +227,17 @@ Some default instruct templates also may not have anything defined for the "Syst
 - **"min new tokens must be in (0, max_new_tokens(X)], got Y":** your model has a minimum token amount, which is conflicting with the max tokens you are using for summarization. Either reduce the minimum token amount for your model (usually in the completion settings), or increase the maximum token length for summarizations.
 
 
-If it's something else, please turn on `Debug Mode` in the settings and send me the output logs from your browser console and raise an issue or message on discord.
+### Reporting an Issue
+You can raise an issue here, but I am more responsive on the SillyTavern [Discord server](https://discord.gg/sillytavern) as Qvink (#qvink1). There you will find [forum thread](https://discord.com/channels/1100685673633153084/1318109682329587722) dedicated to this extension (and others).
 
-### Contact
-You can raise an issue here, but I am more responsive on the SillyTavern [Discord server](https://discord.gg/sillytavern) as Qvink (#qvink1). 
+When you report an issue, please include the following information:
+1. Your SillyTavern version + branch
+2. Your extension version + branch
+3. Description of the bug
+4. Detailed steps to reproduce the bug in a **minimal environment** (new chat, default config, no other extensions)
+5. Any errors in the browser console or ST terminal (you can access your browser console with F12)
 
-There you will find [forum thread](https://discord.com/channels/1100685673633153084/1318109682329587722) dedicated to this extension (and others).
+The best way to help identify a bug is to help me reproduce it. Simply saying "X doesn't work" is unhelpful. Ideally, the steps you provide in #4 above should start with creating a new, blank chat and using default settings for the extension. You can revert settings to default by scrolling to the bottom of the config and clicking `Revert Settings`.
 
 ### Known Issues
 - When editing a message that already has a memory, the memory displayed below the message does not have the right color. This is just a visual bug, and it will correct itself after the next summarization.
