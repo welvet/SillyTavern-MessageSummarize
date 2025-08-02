@@ -3915,6 +3915,7 @@ async function on_chat_event(event=null, data=null) {
     switch (event) {
         case 'chat_changed':  // chat was changed
             last_message_swiped = null;
+            last_message = null;
             auto_load_profile();  // load the profile for the current chat or character
             refresh_memory();  // refresh the memory state
             if (context?.chat?.length) {
@@ -3924,6 +3925,7 @@ async function on_chat_event(event=null, data=null) {
 
         case 'message_deleted':   // message was deleted
             last_message_swiped = null;
+            if (index === last_message) last_message -= 1;  // If the last message was deleted
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
             debug("Message deleted, refreshing memory")
             refresh_memory();
@@ -3941,6 +3943,7 @@ async function on_chat_event(event=null, data=null) {
 
         case 'user_message':
             last_message_swiped = null;
+            last_message = null;
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
             if (!get_settings('auto_summarize')) break;  // if auto-summarize is disabled, do nothing
 
