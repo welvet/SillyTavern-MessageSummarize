@@ -924,7 +924,8 @@ function update_profile_section() {
     let $chat_icon = $chat.find('i')
 
 
-    // Set the profile dropdowns to reflect the available profiles and the currently chosen one
+    // Set the profile dropdowns to reflect the available profiles and the currently chosen one.
+    // The value is set later when all config settings are updated
     for (let profile of profile_options) {
         // if the current character/chat has a default profile, indicate as such
         let text = profile
@@ -936,18 +937,7 @@ function update_profile_section() {
         $choose_profile_dropdown.append(`<option value="${profile}">${text}</option>`);
     }
 
-    // if (current_character_profile) {  // set the current chosen profile in the dropdown
-    //     choose_profile_dropdown.val(current_character_profile);
-    // }
-
-
-    // When in a group chat, the character profile lock is disabled
-    if (context.groupId) {
-        $character.prop('disabled', true)
-    }
-
     // button highlights and icons
-
     let lock_class = 'fa-lock'
     let unlock_class = 'fa-unlock'
     let highlight_class = 'button_highlight'
@@ -1370,7 +1360,7 @@ async function delete_profile() {
 function toggle_character_profile() {
     // Toggle whether the current profile is set to the default for the current character
     let key = get_current_character_identifier();  // uniquely identify the current character or group chat
-    log("Character Key: "+key)
+    debug("Character Key: "+key)
     if (!key) {  // no character selected
         return;
     }
@@ -1506,10 +1496,11 @@ function update_message_visuals(i, style=true, text=null) {
 
     let chat = getContext().chat;
     let message = chat[i];
-    let error_message = translate(get_data(message, 'error'));
     let reasoning = get_data(message, 'reasoning')
     let memory = get_memory(message)
     let lagging = get_data(message, 'lagging')  // lagging behind injection threshold
+    let error_message = get_data(message, 'error');
+    if (error_message) error_message = translate(error_message)
     let exclude_messages = get_settings('exclude_messages_after_threshold')  // are we excluding messages after the threshold?
 
     // get the div holding the main message text
@@ -3093,15 +3084,10 @@ class SummaryPromptEditInterface {
         // Substitute any {{#if macro}} ... {{/if}} blocks.
         // These conditional substitutions have to be done before splitting and making each section a system prompt,
         //   because the conditional content may contain regular text that should be included in the system prompt.
-        prompt = this.substitute_conditionals(prompt, macros)
+        prompt = this.compile_handlebars(prompt, macros, index)
 
-        // now split the prompt into messages and substitute macros
+        // now split the prompt into messages and substitute custom macros
         let messages = this.evaluate_prompt(prompt, macros)
-
-        // substitute any global macros like {{persona}}, {{char}}, etc...
-        for (let message of messages) {
-            message.content = this.ctx.substituteParamsExtended(message.content)
-        }
         return messages
     }
     async compute_used_macros(index, text) {
@@ -3125,16 +3111,29 @@ class SummaryPromptEditInterface {
         }
         return values
     }
-    substitute_conditionals(text, macros) {
+    compile_handlebars(text, macros, index) {
         // substitute any {{#if macro}} ... {{/if}} blocks in the text with its content if the macro is in the passed map
-        // Does NOT replace the actual macros, that is done in substitute_macros()
+        // Does NOT replace the actual macros, that is done later
+        // DOES replace ST built-in macros like {{char}} and {{user}} (I don't know why)
         // We use Handlebars.js to parse out the {{#if}} ... {{/if}} blocks
         // ignoreStandalone=true: blocks and partials that are on their own line will not remove the whitespace on that line.
 
+        // TODO: for some reason this.ctx.groupId is null when in a group so we have to get the context again??? Even though other fields properly update?
+        let group_id = getContext().groupId
+        let name = this.ctx.chat[index].name
+
         let template_data = {};
+
+        // I don't know why, but Handlebars.compile does replace ST built-in macros like {{user}} and {{char}} even if not specified in the template.
+        //   Because of this, any modifications to these have to be done here.
+        if (group_id) {  // if in group chat, define {{char}} (it's normally empty in group chats)
+            template_data['char'] = name
+        }
+
         for (let name of Object.keys(macros)) {
             template_data[name] = `{{${name}}}`  // replace any instance of the macro with itself
         }
+
         try {
             return Handlebars.compile(text, {ignoreStandalone: true})(template_data)
         } catch (e) {
