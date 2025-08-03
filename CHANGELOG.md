@@ -2,6 +2,7 @@
 
 #### v1.2.0
 **ST Version Requirement**: You must be on ST v1.13.2
+**IMPORTANT**: Any profiles locked to specific chats (not characters) will need to be re-locked.
 **Fixed** Locking profiles to a chat now persist after branching.
 
 #### v1.1.9
