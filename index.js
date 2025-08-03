@@ -13,6 +13,7 @@ import {
     extension_prompt_roles,
     extension_prompt_types,
     saveSettingsDebounced,
+    chat_metadata,
     generateRaw,
     createRawPrompt,
     getMaxContextSize,
@@ -21,11 +22,10 @@ import {
     system_message_types,
     CONNECT_API_MAP,
     main_api,
-    chat_metadata,
     messageFormatting,
     CLIENT_VERSION
 } from '../../../../script.js';
-import { getContext, extension_settings } from '../../../extensions.js';
+import { getContext, extension_settings, saveMetadataDebounced} from '../../../extensions.js';
 import { getPresetManager } from '../../../preset-manager.js'
 import { formatInstructModeChat, formatInstructModePrompt } from '../../../instruct-mode.js';
 import { selected_group, openGroupId } from '../../../group-chats.js';
@@ -163,10 +163,8 @@ const default_settings = {
 const global_settings = {
     profiles: {},  // dict of profiles by name
     character_profiles: {},  // dict of character identifiers to profile names
-    chat_profiles: {},  // dict of chat identifiers to profile names
     profile: 'Default', // Current profile
     notify_on_profile_switch: false,
-    chats_enabled: {},  // dict of chat IDs to whether memory is enabled
     global_toggle_state: true,  // global state of memory (used when a profile uses the global state)
     disabled_group_characters: {},  // group chat IDs mapped to a list of disabled character keys
     memory_edit_interface_settings: {},  // settings last used in the memory edit interface
@@ -245,12 +243,6 @@ function get_current_character_identifier() {
     }
 
     return context.characters[index].avatar;
-}
-function get_current_chat_identifier() {
-    // uniquely identify the current chat
-    let context = getContext();
-    return context.chatId
-
 }
 function get_extension_directory() {
     // get the directory of the extension
@@ -672,6 +664,25 @@ function get_settings(key, copy=false) {
     }
 
 }
+function set_chat_metadata(key, value, copy=false) {
+    // Set a key and value in chat metadata (persists with branches)
+    if (copy) {
+        value = structuredClone(value);
+    }
+    if (!chat_metadata[MODULE_NAME]) chat_metadata[MODULE_NAME] = {};
+    chat_metadata[MODULE_NAME][key] = value;
+    saveMetadataDebounced();
+}
+function get_chat_metadata(key, copy=false) {
+    // Get a key from chat metadata
+    let value = chat_metadata[MODULE_NAME]?.[key]
+    if (copy) {  // needed when retrieving objects
+        return structuredClone(value)
+    } else {
+        return value
+    }
+}
+
 function get_settings_element(key) {
     return settings_ui_map[key]?.[0]
 }
@@ -704,7 +715,6 @@ async function load_settings_html() {
 }
 function chat_enabled() {
     // check if the extension is enabled in the current chat
-    let context = getContext();
 
     // global state
     if (get_settings('use_global_toggle_state')) {
@@ -712,7 +722,7 @@ function chat_enabled() {
     }
 
     // per-chat state
-    return get_settings('chats_enabled')?.[context.chatId] ?? get_settings('default_chat_enabled')
+    return get_chat_metadata('enabled') ?? get_settings('default_chat_enabled')
 }
 function toggle_chat_enabled(value=null) {
     // Change the state of the extension. If value is null, toggle. Otherwise, set to the given value
@@ -728,10 +738,7 @@ function toggle_chat_enabled(value=null) {
     if (get_settings('use_global_toggle_state')) {   // using the global state - update the global state
         set_settings('global_toggle_state', value);
     } else {  // using per-chat state - update the chat state
-        let enabled = get_settings('chats_enabled');
-        let context = getContext();
-        enabled[context.chatId] = value;
-        set_settings('chats_enabled', enabled);
+        set_chat_metadata('enabled', value);
     }
 
 
@@ -828,6 +835,7 @@ function bind_setting(selector, key, type=null, callback=null, disable=true) {
         }
 
         // update the setting
+        debug(`Setting Triggered: [${key}] [${value}]`)
         set_settings(key, value)
 
         // trigger callback if provided, passing the new value
@@ -910,8 +918,6 @@ function update_save_icon_highlight() {
     }
 }
 function update_profile_section() {
-    let context = getContext()
-
     let current_profile = get_settings('profile')
     let current_character_profile = get_character_profile();
     let current_chat_profile = get_chat_profile();
@@ -1063,49 +1069,17 @@ function refresh_settings() {
 
 }
 
-// some unused function for a multiselect
-function refresh_character_select() {
-    // sets the select2 multiselect for choosing a list of characters
-    let context = getContext()
-
-    // get all characters present in the current chat
-    let char_id = context.characterId;
-    let group_id = context.groupId;
-    let character_options = []  // {id, name}
-    if (char_id !== undefined && char_id !== null) {  // we are in an individual chat, add the character
-        let id = context.characters[char_id].avatar
-        character_options.push({id: id, name: context.characters[char_id].name})
-    } else if (group_id) {   // we are in a group - add all members
-        let group = context.groups.find(g => g.id == group_id)  // find the group we are in by ID
-        for (let key of group.members) {
-            let char = context.characters.find(c => c.avatar == key)
-            character_options.push({id: key, name: char.name})  // add all group members to options
-        }
-    }
-
-    // add the user to the list of options
-    character_options.push({id: "user", name: "User (you)"})
-
-    // set the current value (default if empty)
-    let current_selection = get_settings('characters_to_summarize')
-    log(current_selection)
-
-    // register the element as a select2 widget
-    refresh_select2_element('characters_to_summarize', current_selection, character_options,'No characters filtered - all will be summarized.')
-
-}
-
-/*
-Use like this:
-<div class="flex-container justifySpaceBetween alignItemsCenter">
-    <label title="description here">
-        <span>label here</span>
-        <select id="id_here" multiple="multiple"></select>
-    </label>
-</div>
- */
 function refresh_select2_element(element, selected, options, placeholder="", callback) {
     // Refresh a select2 element with the given select element (or ID) and set the options
+    /*
+    Use like this:
+    <div class="flex-container justifySpaceBetween alignItemsCenter">
+        <label title="description here">
+            <span>label here</span>
+            <select id="id_here" multiple="multiple"></select>
+        </label>
+    </div>
+     */
     let $select = element
     let id;
     if (typeof(element) === "string") {
@@ -1162,8 +1136,6 @@ function refresh_select2_element(element, selected, options, placeholder="", cal
     $select.val(selected)
     $select.trigger('change.select2')
 }
-
-
 
 
 // Profile management
@@ -1373,19 +1345,12 @@ function toggle_character_profile() {
     set_character_profile(key, profile === get_character_profile() ? null : profile);
 }
 function toggle_chat_profile() {
-    // Toggle whether the current profile is set to the default for the current character
-    let key = get_current_chat_identifier();  // uniquely identify the current chat
-    log("Chat ID: "+key)
-    if (!key) {  // no chat selected
-        return;
-    }
-
-    // current profile
-    let profile = get_settings('profile');
+    // Toggle whether the current profile is set to the default for the current chat
+    let profile = get_settings('profile');  // current profile
 
     // if the chat profile is already set to the current profile, unset it.
     // otherwise, set it to the current profile.
-    set_chat_profile(key, profile === get_chat_profile() ? null : profile);
+    set_chat_profile(profile === get_chat_profile() ? null : profile);
 }
 function get_character_profile(key) {
     // Get the profile for a given character
@@ -1410,27 +1375,19 @@ function set_character_profile(key, profile=null) {
     set_settings('character_profiles', character_profiles);
     refresh_settings()
 }
-function get_chat_profile(id) {
-    // Get the profile for a given chat
-    if (!id) {  // if none given, assume the current character
-        id = get_current_chat_identifier();
-    }
-    let profiles = get_settings('chat_profiles');
-    return profiles[id]
+function get_chat_profile() {
+    // Get the profile for the current chat
+    return get_chat_metadata('profile');
 }
-function set_chat_profile(id, profile=null) {
+function set_chat_profile(profile=null) {
     // Set the profile for a given chat (or unset it if no profile provided)
-    let chat_profiles = get_settings('chat_profiles');
-
     if (profile) {
-        chat_profiles[id] = profile;
-        log(`Set chat [${id}] to use profile [${profile}]`);
+        set_chat_metadata('profile', profile)
+        log(`Set chat to use profile [${profile}]`);
     } else {
-        delete chat_profiles[id];
-        log(`Unset chat [${id}] default profile`);
+        set_chat_metadata('profile', null)
+        log(`Unset chat default profile`);
     }
-
-    set_settings('chat_profiles', chat_profiles);
     refresh_settings()
 }
 function auto_load_profile() {
@@ -4237,6 +4194,7 @@ function initialize_slash_commands() {
         callback: (args) => {
             log(getContext());
             log(extension_settings[MODULE_NAME]);
+            log(chat_metadata)
             return "";
         },
 

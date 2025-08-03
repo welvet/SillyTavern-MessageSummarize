@@ -1,5 +1,9 @@
 # Changelog
 
+#### v1.2.0
+**ST Version Requirement**: You must be on ST v1.13.2
+**Fixed** Locking profiles to a chat now persist after branching.
+
 #### v1.1.9
 **ST Version Requirement**: You must be on ST v1.13.2
 - **New Feature**: You can now specify the role of the summary prompt
