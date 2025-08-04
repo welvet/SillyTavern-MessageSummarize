@@ -3,10 +3,11 @@
     "loading_order": 1,
     "requires": [],
     "optional": [],
+    "minimum_client_version": "1.13.2",
     "js": "index.js",
     "css": "style.css",
     "author": "qvink",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "homePage": "https://github.com/qvink/qvink_memory.git",
     "generate_interceptor": "memory_intercept_messages",
     "i18n": {
