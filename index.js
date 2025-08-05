@@ -23,6 +23,7 @@ import {
     CONNECT_API_MAP,
     main_api,
     messageFormatting,
+    getCharacterCardFields,
     CLIENT_VERSION
 } from '../../../../script.js';
 import { getContext, extension_settings, saveMetadataDebounced} from '../../../extensions.js';
@@ -3079,9 +3080,10 @@ class SummaryPromptEditInterface {
         let group_id = getContext().groupId
         let name = this.ctx.chat[index].name
 
-        let template_data = {};
+        // include all character card fields as macros
+        let template_data = Object.assign({}, getCharacterCardFields())
 
-        // I don't know why, but Handlebars.compile does replace ST built-in macros like {{user}} and {{char}} even if not specified in the template.
+        // I don't know why, but Handlebars.compile does replace ST built-in macros like {{user}}, {{char}}, and {{persona}} even if not specified in the template.
         //   Because of this, any modifications to these have to be done here.
         if (group_id) {  // if in group chat, define {{char}} (it's normally empty in group chats)
             template_data['char'] = name
