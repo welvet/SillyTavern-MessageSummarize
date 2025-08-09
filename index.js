@@ -172,17 +172,17 @@ const settings_ui_map = {}  // map of settings to UI elements
 
 
 // Utility functions
-function log(message) {
-    console.log(`[${MODULE_NAME_FANCY}]`, message);
+function log() {
+    console.log(`[${MODULE_NAME_FANCY}]`, ...arguments);
 }
-function debug(message) {
+function debug() {
     if (get_settings('debug_mode')) {
-        log("[DEBUG] "+message);
+        log("[DEBUG]", ...arguments);
     }
 }
-function error(message) {
-    console.error(`[${MODULE_NAME_FANCY}]`, message);
-    toastr.error(message, MODULE_NAME_FANCY);
+function error() {
+    console.error(`[${MODULE_NAME_FANCY}]`, ...arguments);
+    toastr.error(Array.from(arguments).join(' '), MODULE_NAME_FANCY);
 }
 function delay(ms) {
     return new Promise(res => setTimeout(res, ms));
@@ -3824,7 +3824,7 @@ var last_message_swiped = null  // if an index, that was the last message swiped
 var last_message = null // if an index, that was the last message sent
 async function on_chat_event(event=null, data=null) {
     // When the chat is updated, check if the summarization should be triggered
-    debug("Chat updated: " + event + " " + data)
+    debug("Chat updated:", event, data)
 
     const context = getContext();
     let index = data
