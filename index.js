@@ -3852,6 +3852,14 @@ async function on_chat_event(event=null, data=null) {
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
             if (!get_settings('auto_summarize')) break;  // if auto-summarize is disabled, do nothing
             if (!get_settings('auto_summarize_on_send')) break;  // if auto-summarize-on-send is disabled, skip
+
+            // If a dry run, skip. If in a group chat and type is undefined, skip (Generate() is run twice in group chats, and the first one has undefined type).
+            // generations in regular chats also have undefined type though, so only skip if undefined in group chats.
+            if (data.dry || (!data.type && context.groupId)) {
+                debug(`Skipping before_message trigger. GroupID: ${context.groupId}, Dry Run: ${data.dry},  Type: ${data.type}`)
+                break;
+            }
+
             index = context.chat.length - 1
             if (last_message_swiped === index) break;  // this is a swipe, skip
             debug("Summarizing chat before message")
@@ -4563,9 +4571,7 @@ jQuery(async function () {
     eventSource.on('groupSelected', set_character_enabled_button_states)
     eventSource.on(event_types.GROUP_UPDATED, set_character_enabled_button_states)
     eventSource.on(event_types.SETTINGS_UPDATED, refresh_settings)  // refresh extension settings when ST settings change
-
-    // triggered twice in group chats. Ignore the first one when type is undefined. Also ignore any dry runs.
-    eventSource.on(event_types.GENERATION_STARTED, (type, stuff, dry) => {if (!type || dry) return; on_chat_event('before_message')})
+    eventSource.on(event_types.GENERATION_STARTED, (type, stuff, dry) => on_chat_event('before_message', {'type': type, 'dry': dry}))
 
     // Global Macros
     MacrosParser.registerMacro(short_memory_macro, () => get_short_memory());
