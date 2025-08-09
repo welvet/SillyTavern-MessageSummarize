@@ -2897,7 +2897,7 @@ class SummaryPromptEditInterface {
         if (!macro) return  // macro doesn't exist
         if (!macro.enabled && !ignore_enabled) return
 
-        debug("Computing Macro: ", name)
+        debug("Computing Macro: "+ name)
 
         // special macro?
         if (name === "message") {
@@ -4555,7 +4555,6 @@ jQuery(async function () {
     let event_types = ctx.event_types;
     eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, (id) => on_chat_event('char_message', id));
     eventSource.on(event_types.USER_MESSAGE_RENDERED, (id) => on_chat_event('user_message', id));
-    eventSource.on(event_types.GENERATION_STARTED, (id, stuff, dry) => {if (dry) return; on_chat_event('before_message')})
     eventSource.on(event_types.MESSAGE_DELETED, (id) => on_chat_event('message_deleted', id));
     eventSource.on(event_types.MESSAGE_EDITED, (id) => on_chat_event('message_edited', id));
     eventSource.on(event_types.MESSAGE_SWIPED, (id) => on_chat_event('message_swiped', id));
@@ -4564,6 +4563,9 @@ jQuery(async function () {
     eventSource.on('groupSelected', set_character_enabled_button_states)
     eventSource.on(event_types.GROUP_UPDATED, set_character_enabled_button_states)
     eventSource.on(event_types.SETTINGS_UPDATED, refresh_settings)  // refresh extension settings when ST settings change
+
+    // triggered twice in group chats. Ignore the first one when type is undefined. Also ignore any dry runs.
+    eventSource.on(event_types.GENERATION_STARTED, (type, stuff, dry) => {if (!type || dry) return; on_chat_event('before_message')})
 
     // Global Macros
     MacrosParser.registerMacro(short_memory_macro, () => get_short_memory());
