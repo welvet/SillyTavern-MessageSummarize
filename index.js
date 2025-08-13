@@ -3884,13 +3884,15 @@ async function on_chat_event(event=null, data=null) {
             if (!chat_enabled()) break;  // if chat is disabled, do nothing
             if (!context.groupId && context.characterId === undefined) break; // no characters or group selected
             if (streamingProcessor && !streamingProcessor.isFinished) break;  // Streaming in-progress
+
+            let skip_first_delay = get_settings('summarization_time_delay_skip_first')
             if (last_message_swiped === index) {  // this is a swipe
                 let message = context.chat[index];
                 if (!get_settings('auto_summarize_on_swipe')) break;  // if auto-summarize on swipe is disabled, do nothing
                 if (!check_message_exclusion(message)) break;  // if the message is excluded, skip
                 if (!get_previous_swipe_memory(message, 'memory')) break;  // if the previous swipe doesn't have a memory, skip
                 debug("re-summarizing on swipe")
-                await summarize_messages(index);  // summarize the swiped message
+                await summarize_messages(index, true, skip_first_delay);  // summarize the swiped message
                 refresh_memory()
             } else if (last_message === index) {  // not a swipe, but the same index as last message - must be a continue
                 last_message_swiped = null
@@ -3898,14 +3900,14 @@ async function on_chat_event(event=null, data=null) {
                 if (!get_settings("auto_summarize_on_continue")) break;  // if auto_summarize_on_continue is disabled, no nothing
                 if (!get_memory(message, 'memory')) break;  // if the message doesn't have a memory, skip.
                 debug("re-summarizing on continue")
-                await summarize_messages(index);  // summarize the swiped message
+                await summarize_messages(index, true, skip_first_delay);  // summarize the swiped message
                 refresh_memory()
             } else { // not a swipe or continue
                 last_message_swiped = null
                 if (!get_settings('auto_summarize')) break;  // if auto-summarize is disabled, do nothing
                 if (get_settings("auto_summarize_on_send")) break;  // if auto_summarize_on_send is enabled, don't auto-summarize on character message
                 debug("New message detected, summarizing")
-                await auto_summarize_chat(get_settings('summarization_time_delay_skip_first'));  // auto-summarize the chat, skipping first delay if needed
+                await auto_summarize_chat(skip_first_delay);  // auto-summarize the chat, skipping first delay if needed
             }
             last_message = index;
             break;
