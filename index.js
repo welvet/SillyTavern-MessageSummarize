@@ -111,7 +111,7 @@ const default_settings = {
     // summarization settings
     prompt: default_prompt,
     summary_prompt_macros: default_summary_macros,  // macros for the summary prompt interface
-    prompt_role: extension_prompt_roles.USER,
+    prompt_role: extension_prompt_roles.SYSTEM,
     prefill: "",   // summary prompt prefill
     show_prefill: false, // whether to show the prefill when memories are displayed
     completion_preset: "",  // completion preset to use for summarization. Empty ("") indicates the same as currently selected.
