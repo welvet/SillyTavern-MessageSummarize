@@ -514,29 +514,6 @@ async function set_connection_profile(name) {
     if (name === await get_current_connection_profile()) return;  // If already using the given profile, return
     if (!await check_connection_profile_valid()) return;  // don't set an invalid profile
 
-    // const waitForProfileLoad = waitForEvent(event_types.CONNECTION_PROFILE_LOADED, 5000);
-    //
-    // try {
-    //     const waitForProfileLoad = waitForEvent(event_types.CONNECTION_PROFILE_LOADED, 5000);
-    //
-    //     console.warn(`${LOG_PREFIX} sending slashcommand callback`);
-    //     await SlashCommandParser.commands['profile'].callback(
-    //         {
-    //             await: 'true',
-    //             _scope: null,
-    //             _abortController: null,
-    //         },
-    //         extension_settings.customReasoning.reasoningProfileName,
-    //     );
-    //     console.warn(`${LOG_PREFIX} sent slashcommand callback`);
-    //
-    //     await waitUntilCondition(() => online_status === 'no_connection', 5000, 100);
-    //     console.warn(`${LOG_PREFIX} Saw online_status change to no_connection; Waiting for profile to load...`);
-    //     await waitForProfileLoad;
-    //     console.warn(`${LOG_PREFIX} Profile loaded; Waiting for status to change to online...`);
-    //     await waitUntilCondition(() => online_status !== 'no_connection', 5000, 100);
-    //     console.warn(`${LOG_PREFIX} Saw online_status change to online`);
-
     // Set the completion preset
     debug(`Setting connection profile to "${name}"`)
     if (get_settings('debug_mode')) {
@@ -2762,8 +2739,6 @@ class SummaryPromptEditInterface {
         set_settings('show_prefill', this.$show_prefill.is(':checked'))
         set_settings('summary_prompt_macros', this.macros, true)
         update_all_message_visuals()
-
-        debug("SAVE MACROS: ", this.macros)
         debug(get_settings('summary_prompt_macros'))
     }
     get_prompt_role(name=false) {
