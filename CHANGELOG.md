@@ -1,12 +1,13 @@
 # Changelog
 
-#### v1.2.6
+#### v1.2.7
 **ST Version Requirement**: You must be on ST v1.13.2
 **IMPORTANT**: Any profiles locked to specific chats (not characters) will need to be re-locked.
 **Fixed** Locking profiles to a chat now persist after branching.
 **Fixed** Fixed double summary in group chats
 **Fixed** Time delay now applies to re-summarizations on swipe and continue if "Skip First" is disabled.
 **Fixed** Fixed regex scripts on macros failing to load properly
+**Fixed** Fixed bulk summarizations not going in the order of message IDs
 
 #### v1.1.9
 **ST Version Requirement**: You must be on ST v1.13.2

@@ -1832,21 +1832,20 @@ class MemoryEditInterface {
 
         // bulk action buttons
         this.$content.find(`#bulk_remember`).on('click', () => {
-            remember_message_toggle(Array.from(this.selected))
+            remember_message_toggle(this.get_sorted_selection())
             this.update_table()
         })
         this.$content.find(`#bulk_exclude`).on('click', () => {
-            forget_message_toggle(Array.from(this.selected))
+            forget_message_toggle(this.get_sorted_selection())
             this.update_table()
         })
         this.$content.find(`#bulk_summarize`).on('click', async () => {
-            let indexes = Array.from(this.selected).sort()  // summarize in ID order
-            await summarize_messages(indexes);
+            await summarize_messages(this.get_sorted_selection());  // summarize in ascending order
             this.update_table()
         })
         this.$content.find(`#bulk_delete`).on('click', () => {
-            this.selected.forEach(id => {
-                debug("DELETING: " + id)
+            this.get_sorted_selection().forEach(id => {
+                debug("Deleting Summary: " , id)
                 clear_memory(this.ctx.chat[id])
             })
             this.update_table()
@@ -1924,6 +1923,10 @@ class MemoryEditInterface {
     }
     global_selection() {
         return this.$global_selection_checkbox.is(':checked');
+    }
+    get_sorted_selection() {
+        // Get the selected IDs, sorted in ascending order
+        return Array.from(this.selected).sort((a, b) => a-b)
     }
 
     clear() {
@@ -2080,7 +2083,7 @@ class MemoryEditInterface {
             let script_name = this.$regex_selector.val()
             let script = scripts[script_name]
             log(`Running regex script \"${script_name}\" on selected memories`)
-            for (let i of this.selected) {
+            for (let i of this.get_sorted_selection()) {
                 let message = this.ctx.chat[i]
                 let memory = get_memory(message)
                 let new_text = runRegexScript(script, memory)
@@ -2228,7 +2231,7 @@ class MemoryEditInterface {
     }
     copy_to_clipboard() {
         // copy the summaries of the given messages to clipboard
-        let text = concatenate_summaries(Array.from(this.selected));
+        let text = concatenate_summaries(this.get_sorted_selection());
         copyText(text)
         toastr.info("All memories copied to clipboard.")
     }
