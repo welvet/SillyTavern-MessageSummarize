@@ -109,6 +109,10 @@ We need the specificity to override some theme styles.
     color: var(--qm-message-removed);
 }
 
+.mes_text.qvink_remember_message {
+    font-weight: bold;
+}
+
 /* Style the message buttons, separating them from the rest */
 .qvink_memory_button_separator {
     margin: 0 1em;

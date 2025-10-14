@@ -193,25 +193,6 @@
                     <span>Message Length Threshold</span>
                 </label>
 
-                <br>
-
-                <div class="flex-container justifyspacebetween">
-                    <label title="The max amount of context that short-term memory can take up (percent or number of tokens).">
-                        <input id="short_term_context_limit" class="text_pole widthUnset inline_setting" type="number" min="0" max="99999" />
-                        <span>Context (<span id="short_term_context_limit_display"></span> tk)</span>
-                    </label>
-                    <div>
-                        <label>
-                            <input type="radio" name="short_term_context_type" value="percent" />
-                            <span>%</span>
-                        </label>
-                        <label>
-                            <input type="radio" name="short_term_context_type" value="tokens" />
-                            <span>tk</span>
-                        </label>
-                    </div>
-                </div>
-
                 <label class="checkbox_label" title="Include short-term memory in the World Info Scan">
                     <input id="short_term_scan" type="checkbox" />
                     <span>Include in World Info Scanning</span>
@@ -250,23 +231,6 @@
                     <!--<button id="preview_long_term_memory" class="menu_button fa-solid fa-eye interactable" title="Preview the long-term memory injection" tabindex="0"></button>-->
                 </div>
 
-                <div class="flex-container justifyspacebetween">
-                    <label title="The max amount of the context that long-term memory can take up (percent or number of tokens).">
-                        <input id="long_term_context_limit" class="text_pole widthUnset inline_setting" type="number" min="0" max="99999" />
-                        <span>Context (<span id="long_term_context_limit_display"></span> tk)</span>
-                    </label>
-                   <div>
-                        <label>
-                            <input type="radio" name="long_term_context_type" value="percent" />
-                            <span>%</span>
-                        </label>
-                        <label>
-                            <input type="radio" name="long_term_context_type" value="tokens" />
-                            <span>tk</span>
-                        </label>
-                    </div>
-
-                </div>
                 <label class="checkbox_label" title="Include long-term memory in the World Info Scan">
                     <input id="long_term_scan" type="checkbox" />
                     <span>Include in World Info Scanning</span>
