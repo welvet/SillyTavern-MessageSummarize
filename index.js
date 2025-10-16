@@ -3452,7 +3452,7 @@ function get_long_memory() {
     if (indexes.length === 0) return ""  // if no memories, return empty
 
     // let text = concatenate_summaries(indexes);
-    let text = concatenate_messages(indexes);
+    let text = concatenate_messages(indexes.reverse());
     let template = get_settings('long_template')    
 
     // replace memories macro
