@@ -96,8 +96,7 @@ Following is the message to summarize:
 const default_long_template = `[Following is a list of events that occurred in the past]:\n{{${generic_memories_macro}}}\n`
 const default_short_template = `[Following is a list of recent events]:\n{{${generic_memories_macro}}}\n`
 const default_summary_macros = {  // default set of macros for the summary prompt.
-    "message": {name: "message", default: true, enabled: true,  type: "special", instruct_template: false, apply_regex: true, description: "The message being summarized"},
-    "words":   {name: "words",   default: true, enabled: true,  type: "custom",  instruct_template: false, apply_regex: false, command: "/qm-max-summary-tokens", description: "Max response tokens defined by the chosen completion preset"},
+    "message": {name: "message", default: true, enabled: true,  type: "special", instruct_template: false, apply_regex: true, description: "The message being summarized"},    
     "history": {name: "history", default: true, enabled: false, type: "preset",  instruct_template: true, apply_regex: true, start: 1, end: 6, bot_messages: true, user_messages: true, bot_summaries: false, user_summaries: false},
 }
 const default_settings = {
@@ -3531,6 +3530,7 @@ async function summarize_messages(indexes=null, show_progress=true, skip_initial
         ctx.deactivateSendButtons();
     }
 
+    const promises = [];
     let n = 0;
     for (let i of indexes) {
         if (show_progress) progress_bar('summarize', n+1, indexes.length, "Summarizing");
@@ -3558,28 +3558,29 @@ async function summarize_messages(indexes=null, show_progress=true, skip_initial
             }
         }
 
-        summarize_message(i);
+        promises.push(summarize_message(i));
         n += 1;
     }
 
+    Promise.all(promises).then(() => {
+        // remove the progress bar
+        if (show_progress) remove_progress_bar('summarize')
 
-    // remove the progress bar
-    if (show_progress) remove_progress_bar('summarize')
+        if (STOP_SUMMARIZATION) {  // check if summarization was stopped
+            STOP_SUMMARIZATION = false  // reset the flag
+        } else {
+            debug(`Messages summarized: ${indexes.length}`)
+        }
 
-    if (STOP_SUMMARIZATION) {  // check if summarization was stopped
-        STOP_SUMMARIZATION = false  // reset the flag
-    } else {
-        debug(`Messages summarized: ${indexes.length}`)
-    }
+        if (get_settings('block_chat')) {
+            ctx.activateSendButtons();
+        }
 
-    if (get_settings('block_chat')) {
-        ctx.activateSendButtons();
-    }
+        refresh_memory()
 
-    refresh_memory()
-
-    // Update the memory state interface if it's open
-    memoryEditInterface.update_table()
+        // Update the memory state interface if it's open
+        memoryEditInterface.update_table()
+    });
 }
 async function summarize_message(index) {
     // Summarize a message given the chat index, replacing any existing memories
@@ -3694,7 +3695,7 @@ async function summarize_text(messages) {
     }
     const profileId = profile.id;
 
-    const maxResponseToken = 1000;
+    const maxResponseToken = 16000;
 
     const response = await ctx.ConnectionManagerRequestService.sendRequest(
         profileId,
@@ -4057,7 +4058,6 @@ function initialize_message_buttons() {
     let html = `
 <div title="${t`Remember`}" class="mes_button ${remember_button_class} fa-solid fa-brain" tabindex="0"></div>
 <div title="${t`Summarize`}" class="mes_button ${summarize_button_class} fa-solid fa-quote-left" tabindex="0"></div>
-<span class="${css_button_separator}"></span>
 `
 
     $("#message_template .mes_buttons .extraMesButtons").prepend(html);
